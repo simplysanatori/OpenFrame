@@ -12,6 +12,11 @@
 # OPENFRAME_BASE=REF changes the upstream reference (default build-734).
 # Prints each finding (never the matched text itself) and exits 1 when there is one.
 #
+# Bundled third-party licence texts are shipped verbatim and carry their authors' e-mail addresses, so
+# files under a licenses/ folder, files named LICENSE* or COPYING*, and THIRD-PARTY-NOTICES.md (inside
+# the tree, a directory scan or a tarball) are exempt from the e-mail check ONLY; every other check
+# (tokens, keys, MACs, IPs, home paths, personal patterns) still applies to them.
+#
 # Built-in checks (generic, safe to keep in the repository): access tokens and
 # API keys, private keys and certificates, e-mail addresses, MAC addresses,
 # IPv4 addresses (LAN ranges included), Steam user ids in paths, home
@@ -146,6 +151,9 @@ if mode == "history":
     print("privacy-check: %d commits, %d added lines" % (n, added))
 else:
     nfiles = 0; skipped = 0
+    def licence_file(rel):
+        parts = rel.split("/"); name = parts[-1]
+        return "licenses" in parts[:-1] or name.startswith(("LICENSE", "COPYING")) or name == "THIRD-PARTY-NOTICES.md"
     for f in files:
         rel = f.decode("utf-8", "replace")
         if rel.startswith("./"): rel = rel[2:]
@@ -159,6 +167,7 @@ else:
             text = data.decode("latin-1"); checks = [c for c in generic if c[0] == "token"]   # binaries: tokens and personal patterns only
         else:
             text = data.decode("utf-8", "replace"); checks = generic
+        if licence_file(rel): checks = [c for c in checks if c[0] != "email"]
         for n, line in enumerate(text.splitlines(), 1):
             report("%s:%d" % (rel, n), scan(clean(rel, line), "", checks))
     print("privacy-check: %d files scanned, %d skipped by path (%s)" % (nfiles, skipped, ", ".join(SKIP_TREES) or "none"))

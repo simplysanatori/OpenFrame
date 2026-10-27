@@ -4,6 +4,13 @@
 # library (through Steam's own client API, so Steam must be running). No sudo.
 #
 #   install.sh [options] [openframe-*-linux-arm64.tar.gz | UNPACKED_RELEASE_DIR]
+#   install.sh --from-build [WORKTREE]
+#                                    install straight from a build tree, without a tarball: stages the same
+#                                    file set release.sh packs (halo and libSDL3.so.0 from
+#                                    WORKTREE/build/linux_arm64, default <repo>/build/linux_arm64; the scripts,
+#                                    docs and licences from this checkout) and installs it the normal way
+#                                    (app/, "OpenFrame"). WORKTREE may be another checkout, e.g. the
+#                                    integration tree built with ofbuild.sh.
 #   install.sh --dev [BUILD_DIR]     install a build tree (default <repo>/build/linux_arm64) as
 #                                    "OpenFrame (dev)" in app-dev; run again after a rebuild
 #
@@ -29,10 +36,11 @@
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 export PYTHONDONTWRITEBYTECODE=1
-DEV=0; NAME=; MAPS_ARG=; SRC=
+DEV=0; FROMBUILD=0; NAME=; MAPS_ARG=; SRC=
 while [ $# -gt 0 ]; do
     case $1 in
         --dev) DEV=1 ;;
+        --from-build) FROMBUILD=1 ;;
         --name) NAME=$2; shift ;;
         --maps) MAPS_ARG=$2; shift ;;
         -h | --help) sed -n '2,/^set -e/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
@@ -58,6 +66,14 @@ if [ "$DEV" = 1 ]; then
 else
     NAME=${NAME:-OpenFrame}
     APP=${OPENFRAME_APP:-$HOME/Games/OpenFrame/app}
+    if [ "$FROMBUILD" = 1 ]; then
+        WT=$(cd "${SRC:-$HERE/..}" 2> /dev/null && pwd) || { echo "no such worktree: ${SRC:-$HERE/..}" >&2; exit 1; }
+        mkdir -p "${TMPDIR:-$HOME/.cache}"
+        SCRATCH=$(mktemp -d "${TMPDIR:-$HOME/.cache}/of-install.XXXXXX")
+        "$HERE/release.sh" --build "$WT/build/linux_arm64" --stage "$SCRATCH/stage" > "$SCRATCH/stage.log" 2>&1 ||
+            { cat "$SCRATCH/stage.log" >&2; echo "staging from $WT/build/linux_arm64 failed" >&2; exit 1; }
+        SRC=$SCRATCH/stage
+    fi
     if [ -f "$SRC" ]; then
         mkdir -p "${TMPDIR:-$HOME/.cache}"
         SCRATCH=$(mktemp -d "${TMPDIR:-$HOME/.cache}/of-install.XXXXXX")
@@ -69,7 +85,7 @@ else
     elif [ -z "$SRC" ] && [ -x "$HERE/halo" ]; then
         ROOT=$HERE      # run from inside an unpacked release
     else
-        echo "usage: $0 [--maps DIR] [--dev [BUILD_DIR]] | openframe-*-linux-arm64.tar.gz | UNPACKED_RELEASE_DIR" >&2; exit 1
+        echo "usage: $0 [--maps DIR] [--dev [BUILD_DIR]] | --from-build [WORKTREE] | openframe-*-linux-arm64.tar.gz | UNPACKED_RELEASE_DIR" >&2; exit 1
     fi
     BIN_DIR=$ROOT
     [ -x "$BIN_DIR/halo" ] && [ -f "$ROOT/openframe.sh" ] || { echo "$ROOT is not an OpenFrame release (halo and openframe.sh expected)" >&2; exit 1; }

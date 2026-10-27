@@ -14,7 +14,7 @@ Everything below is what the scripts do. Nothing here has been run in a headset 
 | File | What |
 |---|---|
 | `build.sh` | the OpenH1 build, serialised: `python3 configure.py --vr --release`, then `ninja linux_arm64` |
-| `install.sh` | installs a release tarball, or `--dev` a build tree |
+| `install.sh` | installs a release tarball or unpacked release; `--dev` a build tree as "OpenFrame (dev)"; `--from-build [WORKTREE]` a build tree as the normal install (it runs `release.sh --stage` into a temp dir) |
 | `uninstall.sh` | removes the shortcut and the program folder; `--purge` also the data |
 | `openframe.sh` | the Steam shortcut's launch wrapper |
 | `steam-cef.py` | adds and edits Steam shortcuts through Steam's local debugging port, or offline in a `shortcuts.vdf` |
@@ -43,6 +43,7 @@ OpenXR headers. The game is C89 (`gnu89`); `AGENTS.md` has the repository's conv
 
 ```
 steam-frame/install.sh --dev --maps /path/to/maps    # "OpenFrame (dev)" in ~/Games/OpenFrame/app-dev
+steam-frame/install.sh --from-build [WORKTREE]       # install a build tree like a release: "OpenFrame" in app/, no tarball
 OPENFRAME_SKIP_STEAM=1 steam-frame/install.sh --dev  # trial mode: no Steam shortcut, Steam need not run
 ```
 
@@ -88,12 +89,13 @@ over `config.toml`.
 ## Release
 
 ```
-steam-frame/release.sh --version 0.1.0     # steam-frame/release/openframe-0.1.0-linux-arm64.tar.gz + SHA256SUMS
+steam-frame/release.sh --version 0.1.0-alpha.1   # steam-frame/release/openframe-0.1.0-alpha.1-linux-arm64.tar.gz + SHA256SUMS (the script's default version)
 ```
 
 Needs a finished build. The tarball has the game, the library, the scripts, `brokers.txt`, `art/` (if it
 has images), the docs and the licence files. It never has the maps, a `config.toml`, a save or a log.
-`privacy-check.sh` runs on the tarball and the tarball is deleted if it finds anything.
+`privacy-check.sh` runs on the tarball and the tarball is deleted if it finds anything. Bundled third-party
+licence texts (`licenses/`, `LICENSE*`, `COPYING*`, `THIRD-PARTY-NOTICES.md`) are shipped verbatim and are exempt from the e-mail check only.
 
 ## Privacy check
 

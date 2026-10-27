@@ -3,9 +3,11 @@
 #
 #   steam-frame/release.sh [--version VER] [--build DIR] [--out DIR]
 #
-#   --version VER the release version, e.g. 0.1.0 (default: the VERSION line below)
+#   --version VER the release version, e.g. 0.1.0-alpha.1 (default: the VERSION line below)
 #   --build DIR   the build folder (default <repo>/build/linux_arm64): halo and libSDL3.so.0
 #   --out DIR     where the tarball and SHA256SUMS go (default <repo>/steam-frame/release)
+#   --stage DIR   only stage the file set into DIR (created if missing) and stop: no tarball, no checks.
+#                 install.sh --from-build uses this to install straight from a build tree.
 #
 # The tarball is openframe-<version>-linux-arm64.tar.gz, with no top level folder: halo,
 # libSDL3.so.0, openframe.sh, install.sh, uninstall.sh, collect-logs.sh, steam-cef.py,
@@ -15,10 +17,10 @@
 # tarball, and SHA256SUMS is written beside it. Any failure deletes the tarball again.
 set -euo pipefail
 
-VERSION=0.1.0
+VERSION=0.1.0-alpha.1
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$here/.." && pwd)
-build=$repo/build/linux_arm64 out=$here/release
+build=$repo/build/linux_arm64 out=$here/release stage_only=
 
 fail() { echo "release.sh: error: $*" >&2; exit 1; }
 while [[ $# -gt 0 ]]; do
@@ -26,6 +28,7 @@ while [[ $# -gt 0 ]]; do
         --version) VERSION=${2:?}; shift ;;
         --build) build=${2:?}; shift ;;
         --out) out=${2:?}; shift ;;
+        --stage) stage_only=${2:?}; shift ;;
         -h | --help) sed -n '2,/^set -e/p' "$0" | sed '$d; s/^# \{0,1\}//'; exit 0 ;;
         *) fail "unknown argument $1" ;;
     esac
@@ -45,13 +48,19 @@ for f in README.md README.upstream.md CREDITS.md LICENSE THIRD-PARTY-NOTICES.md 
     [[ -f $repo/$f ]] || fail "missing $f"
 done
 
-mkdir -p "$out" "$HOME/.cache"
-out=$(cd "$out" && pwd)
-stage=$(mktemp -d "${TMPDIR:-$HOME/.cache}/of-release.XXXXXX")
 tarball=$out/$NAME.tar.gz
-rm -f "$tarball"
-trap 'rm -f "$tarball"; rm -rf "$stage"' ERR
-trap 'rm -rf "$stage"' EXIT
+if [[ -n $stage_only ]]; then
+    mkdir -p "$stage_only"
+    stage=$(cd "$stage_only" && pwd)
+else
+    mkdir -p "$out" "$HOME/.cache"
+    out=$(cd "$out" && pwd)
+    stage=$(mktemp -d "${TMPDIR:-$HOME/.cache}/of-release.XXXXXX")
+    tarball=$out/$NAME.tar.gz
+    rm -f "$tarball"
+    trap 'rm -f "$tarball"; rm -rf "$stage"' ERR
+    trap 'rm -rf "$stage"' EXIT
+fi
 
 echo "release: staging"
 install -m 0755 "$build/halo" "$stage/halo"
@@ -82,6 +91,8 @@ install -m 0644 "$repo/port/assets/icons/lucide/LICENSE" "$stage/licenses/lucide
 if find "$stage" \( -iname '*.map' -o -iname '*.iso' -o -iname '*.xiso' -o -name 'config.toml' -o -name 'debug.txt' -o -name '*.log' \) | grep -q .; then
     fail "the staging folder holds a map, disc image, config or log"
 fi
+
+[[ -n $stage_only ]] && { echo "release: staged in $stage"; exit 0; }
 
 echo "release: packing"
 # Fixed order, owner and times, so the same inputs make the same tarball.

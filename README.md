@@ -64,9 +64,11 @@ Known:
      steam-frame/install.sh --dev --maps /path/to/your/maps
      ```
 
+     `--dev` installs the build as "OpenFrame (dev)" in `app-dev`. To install a build exactly like a release (the normal `app` folder and "OpenFrame" shortcut) without making a tarball, use `steam-frame/install.sh --from-build [WORKTREE] --maps ...`; it stages the same files `release.sh` packs from `WORKTREE/build/linux_arm64` (default: this checkout).
+
    `--maps` takes the folder with your 24 `.map` files, or the folder that contains `maps/`. They are copied, not moved, into `~/.local/share/OpenFrame/maps`.
 
-   The installer copies the program to `~/Games/OpenFrame/app` (`app-dev` with `--dev`), writes `~/.local/share/OpenFrame/config.toml`, and adds **OpenFrame** to your Steam library as a non-Steam shortcut (with its OpenVR, Steam overlay and desktop configuration flags on), or updates the entry if it is there. It talks to Steam through its local debugging port, which SteamOS has on by default. It needs no sudo.
+   The installer copies the program to `~/Games/OpenFrame/app` (`app-dev` with `--dev`; `--from-build` installs into `app`), writes `~/.local/share/OpenFrame/config.toml`, and adds **OpenFrame** to your Steam library as a non-Steam shortcut (with its OpenVR, Steam overlay and desktop configuration flags on), or updates the entry if it is there. It talks to Steam through its local debugging port, which SteamOS has on by default. It needs no sudo.
 
 3. Start SteamVR, put the headset on and launch **OpenFrame** from your Steam library.
 
