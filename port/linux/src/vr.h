@@ -823,7 +823,7 @@ eyes' pass; 0 for the draws after it. Told by the rasterizer for each
 effect's group, and as it ends (rasterizer_xbox_transparent_geometry.c);
 render_sprite.c chooses thick for sprites large enough on the screen. */
 void halo_vr_effect_depth(int mode);
-/* the comfort vignette (vr.comfort_vignette): asked for each frame by
+/* the comfort vignette (vr.vignette, vr.vignette_strength): asked for each frame by
 the game (vr_vehicle.c: how fast the view turns with a vehicle, how hard
 the vehicle speeds up or slows), 0 to 1; and as it is drawn this frame,
 eased (0: none), with the eyes' fields of view (tangents: left, right, up,

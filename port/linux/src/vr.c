@@ -185,6 +185,22 @@ asks for over VIGNETTE_IN_SECONDS as it grows and VIGNETTE_OUT_SECONDS as it
 falls (time constants), to nothing when the game asks for none */
 #define VIGNETTE_IN_SECONDS 0.12f
 #define VIGNETTE_OUT_SECONDS 0.4f
+/* vr.vignette: never, a vehicle's (what vr_vehicle.c and vr_seat.c ask
+for), or also the sticks' own motion on foot (comfort_update) */
+#define VIGNETTE_OFF 0
+#define VIGNETTE_VEHICLE 1
+#define VIGNETTE_ALWAYS 2
+/* ... with vr.vignette = "always" (comfort_update; after
+HaloCE-DecompRemix-VR's comfort vignette by moistman42069, AGPL-3.0-or-later):
+how much of it the left stick asks for on foot pushed all the way; the
+right stick's smooth turn at full speed; a snap turn for a moment (falling to nothing over COMFORT_SNAP_SECONDS); the sticks'
+dead zone, and the push past it to the full ask */
+#define COMFORT_MOVE 0.5f
+#define COMFORT_TURN 0.8f
+#define COMFORT_SNAP 0.6f
+#define COMFORT_SNAP_SECONDS 0.25f
+#define COMFORT_DEADZONE 0.15f
+#define COMFORT_FULL 0.6f
 #define GAMEPAD_RECENTRE_SECONDS 1.0f
 /* both hands on a long gun (vr.two_handed): the left hand takes the
 foregrip when its grip is pressed this near the line ahead of the right hand
@@ -600,6 +616,12 @@ static struct
 	float vignette_asked;
 	unsigned long vignette_asked_at;
 	float vignette;
+	/* comfort_update: the vignette the sticks ask for this frame
+	(vr.vignette = "always"), a snap turn's moment of it, and whether a
+	snap turn was made this frame */
+	float comfort_asked;
+	float comfort_snap;
+	int comfort_snapped;
 	/* debug.vr_test_target: the right controller pointed along this
 	(halo_vr_test_point: game axes from the recentred head), if set */
 	int test_point_valid;
@@ -912,6 +934,10 @@ static struct
 	int handlebars;
 	int wheel;
 	int comfort_vignette;
+	/* vr.vignette (VIGNETTE_OFF, _VEHICLE, _ALWAYS) and vr.vignette_strength
+	(comfort_update) */
+	int vignette_mode;
+	float vignette_strength;
 	/* vr.late_latch */
 	int late_latch;
 	float test_turn;
@@ -1057,6 +1083,12 @@ static void settings_read(void)
 	settings.handlebars = strcmp(config_string("vr.ghost_steering"), "look") != 0;
 	settings.wheel = strcmp(config_string("vr.warthog_steering"), "look") != 0;
 	settings.comfort_vignette = config_boolean("vr.comfort_vignette");
+	settings.vignette_mode = !settings.comfort_vignette || !strcmp(config_string("vr.vignette"), "off") ? VIGNETTE_OFF :
+		!strcmp(config_string("vr.vignette"), "always") ? VIGNETTE_ALWAYS : VIGNETTE_VEHICLE;
+	settings.vignette_strength = (float)config_real("vr.vignette_strength");
+	if (!(settings.vignette_strength >= 0.25f && settings.vignette_strength <= 1.5f))
+		settings.vignette_strength = settings.vignette_strength > 1.5f ? 1.5f :
+			settings.vignette_strength >= 0.0f && settings.vignette_strength < 0.25f ? 0.25f : 1.0f;
 	settings.late_latch = config_boolean("vr.late_latch");
 	settings.test_turn = (float)config_real("debug.vr_test_turn") * (float)M_PI / 180.0f;
 	settings.test_jitter = (float)config_real("debug.vr_test_jitter") * 0.001f;
@@ -3688,11 +3720,58 @@ int halo_vr_seat_enabled(int kind)
 		(kind == HALO_VR_SEAT_BARS ? settings.handlebars : kind == HALO_VR_SEAT_WHEEL ? settings.wheel : 1);
 }
 
-/* the comfort vignette, once a frame (VIGNETTE_* above) */
+/* how far a stick is pushed past COMFORT_DEADZONE, 0 to 1 at COMFORT_FULL:
+ported from HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later) */
+static float comfort_stick(float x, float y)
+{
+	float length = sqrtf(x * x + y * y);
+
+	if (!(length > COMFORT_DEADZONE))
+		return 0.0f;
+	length = (length - COMFORT_DEADZONE) / (COMFORT_FULL - COMFORT_DEADZONE);
+	return length > 1.0f ? 1.0f : length;
+}
+
+/* once a frame, after the turn: what the sticks ask of the comfort
+vignette (vr.vignette = "always", COMFORT_* above) */
+static void comfort_update(float seconds, float turn)
+{
+	float move = comfort_stick(vr.input.left_stick[0], vr.input.left_stick[1]);
+	float asked = 0.0f;
+
+	/* the vignette (vr.vignette = "always"): on foot, the left stick's
+	push; the right stick's smooth turn, or a snap turn's moment, wherever
+	the controllers aim (in a seat too) */
+	if (settings.vignette_mode == VIGNETTE_ALWAYS && vr.aimed && !vr.menus)
+	{
+		if (vr.crouch_able_frame)
+			asked = move * COMFORT_MOVE;
+		asked = fmaxf(asked, turn * COMFORT_TURN);
+		if (vr.comfort_snapped)
+			vr.comfort_snap = COMFORT_SNAP;
+		asked = fmaxf(asked, vr.comfort_snap);
+	}
+	vr.comfort_snapped = 0;
+	if (seconds > 0.0f)
+		vr.comfort_snap = fmaxf(0.0f, vr.comfort_snap - seconds * COMFORT_SNAP / COMFORT_SNAP_SECONDS);
+	vr.comfort_asked = asked;
+}
+
+/* the comfort vignette, once a frame (VIGNETTE_* above): a vehicle's asks
+(vr.vignette = "vehicle", the default), the sticks' too ("always": comfort_
+update), stronger or lighter by vr.vignette_strength */
 static void vignette_update(float seconds)
 {
-	float asked = settings.comfort_vignette && vr.presents - vr.vignette_asked_at <= 1 ? vr.vignette_asked : 0.0f;
-	float constant = asked > vr.vignette ? VIGNETTE_IN_SECONDS : VIGNETTE_OUT_SECONDS;
+	float asked = settings.vignette_mode != VIGNETTE_OFF && vr.presents - vr.vignette_asked_at <= 1 ?
+		vr.vignette_asked : 0.0f;
+	float constant;
+
+	if (settings.vignette_mode == VIGNETTE_ALWAYS && vr.comfort_asked > asked)
+		asked = vr.comfort_asked;
+	asked *= settings.vignette_strength;
+	if (asked > 1.0f)
+		asked = 1.0f;
+	constant = asked > vr.vignette ? VIGNETTE_IN_SECONDS : VIGNETTE_OUT_SECONDS;
 
 	if (seconds > 0.0f)
 		vr.vignette += (asked - vr.vignette) * (1.0f - expf(-seconds / constant));
@@ -3852,6 +3931,8 @@ static void input_update(void)
 	/* (vr.aim = "gamepad": the gamepad's right stick turns, as on the flat
 	screen, and the view after it, halo_vr_aim; the controllers' does not) */
 	float x = settings.gamepad_aim ? 0.0f : vr.input.right_stick[0];
+	/* (how fast the sticks turn the view this frame, 0 to 1: comfort_update) */
+	float turn = 0.0f;
 
 	vr.last_ticks = now;
 	if (seconds > 0.1f)
@@ -3867,7 +3948,6 @@ static void input_update(void)
 	trigger_touch_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 	two_handed_update(seconds);
 	handlebars_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
-	vignette_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 	crouch_update();
 	/* (the poses' times: from one frame's display to the next's) */
 	throw_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
@@ -3896,16 +3976,23 @@ static void input_update(void)
 	/* (driving a vehicle steered toward the aim: the left stick's sideways
 	push turns smoothly too, STICK_DRIVE_FASTEST) */
 	if (seat_drives())
+	{
 		vr.body_yaw -= stick_steer_push(vr.input.left_stick[0]) * STICK_DRIVE_FASTEST * seconds;
+		turn = fabsf(stick_steer_push(vr.input.left_stick[0]));
+	}
 	if (settings.smooth_turn)
 	{
 		if (fabsf(x) > 0.2f)
+		{
 			vr.body_yaw -= (x - (x > 0.0f ? 0.2f : -0.2f)) / 0.8f * settings.smooth_speed * seconds;
+			turn = (fabsf(x) - 0.2f) / 0.8f;
+		}
 	}
 	else if (!vr.snap_latched && fabsf(x) > 0.7f)
 	{
 		vr.body_yaw -= x > 0.0f ? settings.snap_angle : -settings.snap_angle;
 		vr.snap_latched = 1;
+		vr.comfort_snapped = 1;
 	}
 	else if (vr.snap_latched && fabsf(x) < 0.3f)
 	{
@@ -3924,6 +4011,9 @@ static void input_update(void)
 	{
 		vr.recentre_time = 0.0f;
 	}
+	/* the sticks' vignette, then the vignette */
+	comfort_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds, turn);
+	vignette_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 }
 
 /* debug.gpu_stats: each frame's time from one wait's end to the next's (as
