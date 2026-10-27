@@ -42,6 +42,7 @@ inputs no stream feeds only when they change.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 
 /* port/android/guest/runtime/guest_host.h */
 int host_render_stream_open(unsigned int ring);
@@ -259,17 +260,56 @@ static void preparation_commit(void)
 		commit(0);
 }
 
+/* the game's waits for the render thread while a map is prepared (the
+loading's log: render_enumerate.c), as xgpu_backend_preparation_waits
+reads them */
+static struct
+{
+	BOOL counting;
+	double seconds;
+	unsigned long count;
+} preparation_waits;
+
+static double waits_clock(void)
+{
+	struct timespec now;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+		return 0.0;
+	return (double)now.tv_sec + (double)now.tv_nsec * 1e-9;
+}
+
+static void waits_add(double started)
+{
+	double finished = waits_clock();
+
+	if (finished > started)
+		preparation_waits.seconds += finished - started;
+	preparation_waits.count++;
+}
+
+void xgpu_backend_preparation_waits(double *seconds, unsigned long *count)
+{
+	*seconds = preparation_waits.seconds;
+	*count = preparation_waits.count;
+}
+
 /* waits until size bytes from position are free */
 static void room(uint32_t size)
 {
 	struct xgpu_stream_ring *ring = stream.ring;
+	double started = -1.0;
 
 	vertices_keep(size);
 	while (stream.position + size - load_acquire(&ring->released) > stream.size)
 	{
+		if (preparation_waits.counting && started < 0.0)
+			started = waits_clock();
 		commit(0);
 		host_render_stream_wait(stream.position + size - stream.size);
 	}
+	if (started >= 0.0)
+		waits_add(started);
 }
 
 /* a record of type: its fixed part's bytes and its inline data's, made
@@ -453,7 +493,11 @@ static uint32_t carried_one(uint32_t bytes)
 /* a synchronous record's answer: the records so far played and done */
 static void synchronous(void)
 {
+	double started = preparation_waits.counting ? waits_clock() : -1.0;
+
 	commit(XGPU_STREAM_SUBMIT_SYNC);
+	if (started >= 0.0)
+		waits_add(started);
 }
 
 /* what the host had is unknown to it now (or the stream began): sent
@@ -1706,6 +1750,9 @@ void xgpu_backend_prepare(void)
 		return;
 	record(XGPU_STREAM_PREPARE, sizeof(struct xgpu_stream_record));
 	stream.preparing = TRUE;
+	preparation_waits.counting = TRUE;
+	preparation_waits.seconds = 0.0;
+	preparation_waits.count = 0;
 }
 
 void xgpu_backend_loading_art(const unsigned char *rgba)
@@ -1779,6 +1826,7 @@ double xgpu_backend_prepared(void)
 	record_body->reply = STREAM_ADDRESS(&stream.replies->value);
 	stream.replies->value = 0;
 	synchronous();
+	preparation_waits.counting = FALSE;
 	return stream.replies->value / 1000.0;
 }
 
