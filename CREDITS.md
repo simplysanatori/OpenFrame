@@ -29,7 +29,7 @@ The game's code is the Xbox build 2342 (`cachebeta.exe`), decompiled to C by the
 
 ## Halo VR mods
 
-- **[astromaddie/HaloCE-VR](https://github.com/astromaddie/HaloCE-VR)** (astromaddie, Madison): the OpenXR VR foundation for Halo on the Steam Frame, released as CC0: stereo rendering, tracked inputs, hand aiming, arm IK, scopes, vehicles, room-scale and VR menus, and the Frame findings (the Frame's controller profile, Lepton, Mesa's trace markers). It is the base of the fork below and the earliest proof that this works on the Frame.
+- **[astromaddie/HaloCE-VR](https://github.com/astromaddie/HaloCE-VR)** (astromaddie): the OpenXR VR foundation for Halo on the Steam Frame, released as CC0: stereo rendering, tracked inputs, hand aiming, arm IK, scopes, vehicles, room-scale and VR menus, and the Frame findings (the Frame's controller profile, Lepton, Mesa's trace markers). It is the base of the fork below and the earliest proof that this works on the Frame.
 - **[moistman42069/HaloCE-DecompRemix-VR-PC-Android](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android)** (moistman42069), AGPL-3.0-or-later (CC0 before release 1.0.37): a Quest, PICO and Steam Frame fork of OpenCE with VR gameplay features. OpenFrame ports features from it into OpenH1's VR mode, rewritten for OpenH1's code, with attribution in the commits. **Nothing is ported yet.** State, honestly:
 
   | Feature | State |
