@@ -37,6 +37,14 @@ crouched), as bipeds.c makes each tick's speeds: forward and sideways (not
 backing), and the acceleration with them, by vr.sprint_speed at a full
 effort. The view's field is unchanged.
 
+A crouch pauses the sprint, it does not end it: halo_vr_sprint (the
+effort) and vr_sprint_speed_scale go on answering for a toggled sprint
+(stick forward, not backing or sideways) while the player is crouched or
+sliding (vr_parkour.c reads them through it), bipeds.c just does not apply
+the scale to a crouched biped; as the player stands, the speeds scale again
+by themselves, the toggle never having changed. Stopping does not end it
+either; only a flick, the mode, or half a second off foot does.
+
 Ported from HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later):
 its bullet time (vr_bullet_time.c: a local time scale under the game's own
 speed, eased in and out, local games only) and its sprint (vr_frame.c's
