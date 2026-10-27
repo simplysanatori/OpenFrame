@@ -346,6 +346,8 @@ taken since the memory of those past it went back to the system
 (texture_cache_size_for_map) */
 static long texture_cache_map_pages = HALO_PORT_TEXTURE_CACHE_XBOX_MAP_PAGE_COUNT;
 static long texture_cache_backed_pages = HALO_PORT_TEXTURE_CACHE_XBOX_MAP_PAGE_COUNT;
+/* port: the platform layer's (port/linux/src/port_config.c) */
+int config_boolean(char const *name);
 
 /* ---------- public code */
 
@@ -406,13 +408,22 @@ static void texture_cache_discard_past_map_pages(
 set once its tags and its mods' bitmaps are loaded, and whenever the mods'
 bitmaps change (port/linux/game/mods.c), when the cache holds none of the
 textures it would let go of: what is not drawn is not backed, and an Xbox
-map takes no more than the Xbox's on the builds that keep it for those */
+map takes no more than the Xbox's on the builds that keep it for those,
+unless display.large_texture_cache gives it a Custom Edition map's size (a
+32nd of the computer's memory, the whole 256 MB from 8 GB): a map's
+preparation (render_enumerate.c) then reads each of an Xbox campaign level's
+textures once, not again pass after pass in the Xbox's 22 MB (a10's 518:
+about 570 MB read and sent to the GPU again in one enumeration, measured on
+a desktop, halo_port_capacity.h; the VR mode has two, the scope's and the
+eyes'), and play reads fewer back */
 void texture_cache_size_for_map(
 	void)
 {
 	extern long mods_bitmap_count(void); /* port/linux/game/mods.c */
+	boolean large = HALO_PORT_TEXTURE_CACHE_XBOX_MAP_PAGE_COUNT < HALO_PORT_TEXTURE_CACHE_PAGE_COUNT &&
+		config_boolean("display.large_texture_cache");
 	long page_count = texture_cache_map_page_count(
-		custom_edition_cache_tags_loaded(),
+		custom_edition_cache_tags_loaded() || large,
 		mods_bitmap_count() > 0,
 		texture_cache_memory_bytes());
 

@@ -189,7 +189,12 @@ def test_more_than_the_cache_holds_is_stabbed(game, tmp_path):
 
 def test_an_xbox_map_keeps_its_size(game, tmp_path):
     # (an Xbox map takes no more of the cache than it did: the AArch64 guests
-    # but the Mac's keep the Xbox's 22 MB for it, the desktop builds their 256)
+    # but the Mac's keep the Xbox's 22 MB for it, the desktop builds their 256;
+    # display.large_texture_cache, on by default, gives it a Custom Edition
+    # map's share on those AArch64 guests)
     log, _ = run_game(game, tmp_path)
-    assert cache_sizes(log) == [], cache_sizes(log)
+    if ARM64 and not MAC:
+        assert cache_sizes(log)[-1:] == [min(max(memory_bytes() // 32 >> 20, 64), 256)], cache_sizes(log)
+    else:
+        assert cache_sizes(log) == [], cache_sizes(log)
     assert STABBED not in log, log[-4000:]
