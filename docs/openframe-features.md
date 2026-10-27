@@ -62,6 +62,46 @@ port change), the hands from `port/linux/src/vr.c`.
   aim assist's pill, and a strong hit's stagger the game's own stun and
   stumble.
 
+### Weapon pull, prop throw and hand swap (untested in the headset)
+
+`port/linux/game/vr_grab.c` (OpenH1's grab, extended), its hands from
+`vr_fists.c`'s tick; the grips' sharing in `port/linux/src/vr.c`. All for
+the hand without the weapon.
+
+- Weapon pull: reach the hand out (40 cm from your eyes or more) and point
+  it at a weapon lying within `vr.weapon_pull_range` (within 20 degrees of
+  where it points, in sight; it lights up), grip (it lights up fully), and flick the hand back toward
+  you or up: the weapon flies to the hand in an arc in about half a second.
+  Still gripping as it arrives, it is picked up as the right hand's grab
+  picks one up (the game's pick-up, as X held: in hand, or swapped for the
+  one held); open, it drops at your feet. One like a weapon you carry is
+  not offered by the game: it drops.
+- Prop throw: grip at a loose weapon or piece of equipment (within 15 cm
+  of the hand; it lights up) to hold it, turned as the hand points; let go
+  to throw it at the hand's speed (its fastest of the last few ticks) times
+  `vr.prop_throw_strength`, at most 24 m/s, as the game drops a weapon (your
+  body passed through, kept inside the level). The weapon hand's grab takes
+  the one held, as ever.
+- Hand swap: palms together (within 10 cm), the weapon's grip open, and the
+  other hand's grip takes the weapon: everything of the weapon's hand
+  (trigger, aim, melee swing, holsters, pouches) moves to that hand, as
+  `vr.dominant_hand` would, until you pass it back. The sticks stay as they
+  were. Both grips are nothing until both are let go. The HUD says which
+  hand the weapon is in.
+- The grip goes to the pull or the prop only while the hand points at a
+  weapon to pull or is at a thing to hold; a pouch's magazine comes first,
+  and the grenade (`vr.grenade_throw`) and the foregrip otherwise, as ever.
+- Keys: `vr.weapon_pull` (default `false`), `vr.weapon_pull_range` (metres,
+  1 to 5, default `3`, moistman42069's), `vr.prop_throw` (default `false`),
+  `vr.prop_throw_strength` (0.5 to 3, default `2`, moistman42069's OBJECT
+  THROW), `vr.hand_swap` (default `false`).
+- Input: the grip of the hand without the weapon; no new binding.
+- Where: on foot, the controllers aiming, in a game of this computer alone
+  (never online, split screen or with bots), the hand swap's gesture too.
+- Not carried over: moistman42069's scenery props (a collision solver of
+  their own), lifting vehicles and grabbing bodies, PULL STYLE GRIP and
+  PULL GLOW's outline (the game's own highlight lights it instead).
+
 ### Third person on foot (untested in the headset)
 
 On foot, the view from behind and above you, your body drawn as the game

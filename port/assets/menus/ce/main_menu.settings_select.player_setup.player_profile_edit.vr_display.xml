@@ -198,6 +198,6 @@
 		<string text="The headset's rate, if it offers it; the game\ndraws a frame each refresh. From the next start."/>
 		<string text="The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy."/>
 		<string text="The comfort vignette, sprinting, bullet time,\nthe third person and parkour."/>
-		<string text="Punching your enemies and parrying their blows\nwith your hands."/>
+		<string text="Punching and parrying, pulling a weapon to your\nhand, passing it across, holding and throwing things."/>
 	</strings>
 </menus>

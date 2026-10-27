@@ -68,7 +68,7 @@ VR_DISPLAY = f"{PE}/vr_display/vr_display_screen"
 VR_VISOR = f"{PE}/vr_visor/vr_visor_screen"
 # (OpenFrame: comfort and movement, docs/openframe-features.md)
 VR_COMFORT = f"{PE}/vr_comfort/vr_comfort_screen"
-# (OpenFrame: the hands' fists, docs/openframe-features.md)
+# (OpenFrame: the hands' fists, pull, swap and throw, docs/openframe-features.md)
 VR_HANDS_EXTRA = f"{PE}/vr_hands_extra/vr_hands_extra_screen"
 VR_SCREENS = {
     "vr_controls": {
@@ -163,7 +163,7 @@ VR_SCREENS = {
             ("COMFORT, SPRINT...", None, VR_COMFORT,
              "The comfort vignette, sprinting, bullet time,\nthe third person and parkour.", None),
             ("HANDS, FISTS...", None, VR_HANDS_EXTRA,
-             "Punching your enemies and parrying their blows\nwith your hands.",
+             "Punching and parrying, pulling a weapon to your\nhand, passing it across, holding and throwing things.",
              None),
         ],
     },
@@ -275,6 +275,18 @@ VR_SCREENS["vr_hands_extra"] = {
         ("PUNCH DAMAGE:", "vr.fist_damage",
          [(f"{round(damage * 100)}%", f"{damage:g}") for damage in (0.15, 0.25, 0.33, 0.5, 0.75, 1)],
          "A punch's damage, of the weapon's melee blow.", None),
+        ("WEAPON PULL:", "vr.weapon_pull", ON_OFF,
+         "Offline: point your free hand at a weapon, grip,\nand flick the hand back: it flies to you.", None),
+        ("PULL RANGE:", "vr.weapon_pull_range",
+         [(f"{distance:g} M", f"{distance:g}") for distance in (1, 2, 3, 4, 5)],
+         "How far away a weapon can be pulled.", None),
+        ("HAND SWAP:", "vr.hand_swap", ON_OFF,
+         "Offline: palms together, the free hand's grip\ntakes the weapon into that hand.", None),
+        ("PROP THROW:", "vr.prop_throw", ON_OFF,
+         "Offline: your free hand grips a loose weapon or\nitem to hold it, and lets go to throw it.", None),
+        ("THROW STRENGTH:", "vr.prop_throw_strength",
+         [(f"{strength:g}X", f"{strength:g}") for strength in (0.5, 1, 1.5, 2, 2.5, 3)],
+         "How hard a thing let go of flies, times your\nhand's speed.", None),
     ],
 }
 SCREENS.update(VR_SCREENS)

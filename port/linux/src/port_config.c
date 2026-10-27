@@ -660,6 +660,26 @@ static const struct config_setting config_settings[] =
 	{ "vr.fist_damage", _config_real, "0.33", "HALO_VR_FIST_DAMAGE", _environment_value, _platform_desktop,
 		"Fists, a punch's damage, 0.1 to 1, of the weapon's melee blow (less on\n"
 		"the harder difficulties)." },
+	{ "vr.weapon_pull", _config_boolean, "false", "HALO_VR_WEAPON_PULL", _environment_value, _platform_desktop,
+		"Weapon pull, in a game of this computer alone: point the hand without\n"
+		"the weapon at a weapon lying within vr.weapon_pull_range, grip, and\n"
+		"flick the hand back: it flies to the hand; still gripped as it comes,\n"
+		"it is picked up." },
+	{ "vr.weapon_pull_range", _config_real, "3.0", "HALO_VR_WEAPON_PULL_RANGE", _environment_value, _platform_desktop,
+		"Weapon pull, how far from the hand a weapon can be pulled, in metres,\n"
+		"1 to 5." },
+	{ "vr.hand_swap", _config_boolean, "false", "HALO_VR_HAND_SWAP", _environment_value, _platform_desktop,
+		"Hand swap, in a game of this computer alone: palms together, the other\n"
+		"hand's grip takes the weapon (the weapon's grip open). The sticks stay\n"
+		"as they were." },
+	{ "vr.prop_throw", _config_boolean, "false", "HALO_VR_PROP_THROW", _environment_value, _platform_desktop,
+		"Prop throw, in a game of this computer alone: the hand without the\n"
+		"weapon holds a loose weapon or piece of equipment it grips at, and\n"
+		"throws it as it lets go." },
+	{ "vr.prop_throw_strength", _config_real, "2.0", "HALO_VR_PROP_THROW_STRENGTH", _environment_value,
+		_platform_desktop,
+		"Prop throw, how hard a thing let go of flies: the hand's speed times\n"
+		"this, 0.5 to 3." },
 	{ "vr.death_view", _config_string, "\"crt\"", "HALO_VR_DEATH_VIEW", _environment_value, _platform_desktop,
 		"As you die: \"crt\" the helmet's view switches off as a CRT does and\n"
 		"cuts to a death cam, a feed from beside your body (the right stick\n"

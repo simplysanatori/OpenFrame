@@ -1058,10 +1058,11 @@ static struct
 	float bullet_time_scale;
 	/* vr.third_person (comfort_update) */
 	int third_person;
-	/* (OpenFrame) vr.fists and vr.fist_speed (metres a second)
-	(hands_update) */
+	/* (OpenFrame) vr.fists and vr.fist_speed (metres a second), and
+	vr.hand_swap (hands_update) */
 	int fists;
 	float fist_speed;
+	int hand_swap;
 	/* vr.late_latch */
 	int late_latch;
 	float test_turn;
@@ -1181,6 +1182,13 @@ static void settings_read(void)
 	settings.left_handed = !settings.gamepad_aim && !strcmp(config_string("vr.dominant_hand"), "left");
 	settings.swap_sticks = !settings.gamepad_aim && (!strcmp(config_string("vr.swap_sticks"), "yes") ||
 		(settings.left_handed && strcmp(config_string("vr.swap_sticks"), "no") != 0));
+	/* (OpenFrame: the weapon passed to the other hand, vr.hand_swap; the
+	sticks stay as the dominant hand set them) */
+	settings.hand_swap = config_boolean("vr.hand_swap");
+	if (!settings.hand_swap || settings.gamepad_aim)
+		vr.hands_swapped = 0;
+	if (vr.hands_swapped)
+		settings.left_handed = !settings.left_handed;
 	settings.gamepad_snap = !strcmp(config_string("vr.gamepad_view"), "snap");
 	settings.gamepad_pitch = !settings.gamepad_snap && strcmp(config_string("vr.gamepad_view"), "level") != 0;
 	settings.melee_gesture = config_boolean("vr.melee_gesture");
@@ -4296,6 +4304,21 @@ static int hands_velocity(int hand, float seconds, float velocity[3], float from
 	return 0;
 }
 
+/* the places a hand was at are no longer its (the controllers swapped) */
+static void hands_forget(void)
+{
+	unsigned int index;
+
+	for (index = 0; index < HANDS_SAMPLES; index++)
+		vr.hands_valid[index][0] = vr.hands_valid[index][1] = 0;
+	for (index = 0; index < MELEE_SAMPLES; index++)
+		vr.melee_valid[index] = 0;
+	for (index = 0; index < THROW_SAMPLES; index++)
+		vr.throw_places_valid[index] = 0;
+	vr.fist_swinging[0] = vr.fist_swinging[1] = 0;
+	vr.melee_swinging = 0;
+}
+
 /* the left hand is free of the other uses of its grip (the foregrip, a
 magazine, a grenade, a vehicle's lift or hold) */
 static int hands_left_free(void)
@@ -4354,6 +4377,32 @@ static void hands_update(float seconds)
 		}
 		if (!pressing || hand != 0 || !able)
 			continue;
+		/* the weapon passed to the other hand: the palms together, the
+		weapon's grip open (vr.hand_swap, a game of this computer alone) */
+		if (settings.hand_swap && vr.hands_local_game && hands_left_free() && !settings.gamepad_aim &&
+			vr.input.right_grip < HANDS_GRIP_RELEASED && vr.views.grip[0].valid && vr.views.grip[1].valid)
+		{
+			float apart[3];
+
+			for (axis = 0; axis < 3; axis++)
+				apart[axis] = vr.views.grip[0].position[axis] - vr.views.grip[1].position[axis];
+			if (length3(apart) < HAND_SWAP_DISTANCE)
+			{
+				vr.hands_swapped = !vr.hands_swapped;
+				settings.left_handed = !settings.left_handed;
+				vr.hands_swap_latch = 1;
+				vr.hands_grip_down[0] = vr.hands_grip_down[1] = 0;
+				vr.hands_taken[0] = vr.hands_taken[1] = 0;
+				vr.input.left_grip = vr.input.right_grip = 0.0f;
+				vr.melee_guard_ticks = GetTickCount();
+				hands_forget();
+				hand_haptic(0, 0.5f, 0.06f);
+				hand_haptic(1, 0.5f, 0.06f);
+				platform_log("vr: hands: the weapon passes to the %s hand (palms %.2f m apart)",
+					settings.left_handed ? "left" : "right", length3(apart));
+				return;
+			}
+		}
 		if (vr.hands_claim[0] && vr.hands_clock - vr.hands_claim_clock <= HANDS_CLAIM_SECONDS && hands_left_free())
 		{
 			vr.hands_taken[0] = 1;
