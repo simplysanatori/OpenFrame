@@ -77,3 +77,7 @@ The packaging layer in `steam-frame/` follows the shape of the author's other St
 ## AI assistance
 
 OpenFrame's packaging layer and documentation are written by Claude, Anthropic's AI model, with Claude Code running on the Steam Frame: Fable 5.1, Opus 5.5 and Sonnet 5.5. The ported VR features are written by Claude from the mods' sources. The author chose what to build, reviews it and tests it in the headset. It has not been tested in a headset yet. The upstream projects' authors have not reviewed this fork.
+
+## Artwork
+
+The Steam library artwork of the owner's OpenFrame entry (capsules, hero, logo, icon) comes from [SteamGridDB](https://www.steamgriddb.com), by its community artists: UncookedMoa (portrait capsule), ender-blade (wide capsule), Gector(lint)Nathan (hero), Bcoder (logo) and Onyx8011 (icon). The asset ids are in `steam-frame/art/SOURCES.md`. The images are not part of this repository or of its releases. The Halo artwork in them belongs to Microsoft, 343 Industries and Bungie; it is used only for the owner's own library entry.

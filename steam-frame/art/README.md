@@ -1,6 +1,6 @@
 # Steam library art
 
-Placeholder. No art is committed yet. `install.sh` copies these files, when they exist, into Steam's
+No images are committed here (they are Halo artwork, see below); `SOURCES.md` lists the SteamGridDB assets the owner's library entry uses. `install.sh` copies these files, when they exist, into Steam's
 grid folder under the shortcut's app id (`steam-frame/steam-cef.py` and `install.sh` do the naming):
 
 | File here | Steam's name | Size |
@@ -11,8 +11,8 @@ grid folder under the shortcut's app id (`steam-frame/steam-cef.py` and `install
 | `logo.png` | `<id>_logo.png` | logo, transparent PNG |
 | `icon.ico` | `<id>_icon.ico` | library icon |
 
-Until then the library entry has Steam's default look, and `install.sh` says so. `release.sh` packs
-whatever images are in this folder.
+Without images the library entry has Steam's default look, and `install.sh` says so. `release.sh` packs
+whatever images are in this folder, so keep the Halo images out of it when building a release.
 
 Use art you made or may use. Do not use Halo artwork, Bungie's or Microsoft's logos or screenshots of
 the game as the store art of a release without checking the terms. OpenH1's own library artwork
