@@ -112,6 +112,28 @@ finger pulling is on it, whatever the touch says), or always where the
 trigger senses no touch; it comes on and off over TRIGGER_TOUCH_SECONDS */
 #define TRIGGER_TOUCH_PULL 0.02f
 #define TRIGGER_TOUCH_SECONDS 0.08f
+/* (OpenFrame) the hands (vr.fists, vr.weapon_pull, vr.prop_throw,
+vr.hand_swap: hands_update, halo_vr_hands; docs/openframe-features.md).
+Each hand's places kept (HANDS_SAMPLES, a power of two), its velocity over
+HANDS_VELOCITY_SECONDS. A punch: a swing (from faster than FIST_REARM_SPEED
+until slower again) past vr.fist_speed, no faster than FIST_FASTEST (the
+tracking lost and found), its speed from the head at least FIST_CARRIED of
+its own (not a turn of the body, a step). A grip past HANDS_GRIP_PRESSED
+takes what the game claims for it (told within HANDS_CLAIM_SECONDS), held
+until it is under HANDS_GRIP_RELEASED. The weapon passes to the other hand
+as that hand's grip closes with the palms within HAND_SWAP_DISTANCE and the
+weapon's grip open (under HANDS_GRIP_RELEASED); both grips are then nothing
+until both are let go. (Metres and metres a second; HaloCE-DecompRemix-VR's
+tuning, by moistman42069, AGPL-3.0-or-later.) */
+#define HANDS_SAMPLES 16
+#define HANDS_VELOCITY_SECONDS 0.03f
+#define FIST_REARM_SPEED 1.0f
+#define FIST_FASTEST 15.0f
+#define FIST_CARRIED 0.5f
+#define HANDS_GRIP_PRESSED 0.6f
+#define HANDS_GRIP_RELEASED 0.3f
+#define HANDS_CLAIM_SECONDS 0.15
+#define HAND_SWAP_DISTANCE 0.10f
 /* a melee's hit (halo_vr_melee_hit): a knock in the right controller */
 #define MELEE_HIT_AMPLITUDE 0.8f
 #define MELEE_HIT_SECONDS 0.06f
@@ -686,6 +708,33 @@ static struct
 	int stick_down_taken;
 	int third_person_on;
 	int third_person_was;
+	/* (OpenFrame) the hands (hands_update): each hand's places (game axes
+	from the recentred head) and from the head (the head's axes), kept with
+	their times; each hand's swing (on, counted), a punch in it since the
+	game last asked, its fastest since then and its velocity at that (game
+	axes); the grip (closed, and taken by what the game claimed), the claims
+	told and when (hands_clock), the player unarmed and the game this
+	computer's alone, as told; the weapon passed to the other hand
+	(vr.hand_swap), and the grips held off after it */
+	unsigned int hands_sample;
+	double hands_clock;
+	float hands_place[HANDS_SAMPLES][2][3];
+	float hands_from_head[HANDS_SAMPLES][2][3];
+	double hands_times[HANDS_SAMPLES];
+	int hands_valid[HANDS_SAMPLES][2];
+	int fist_swinging[2];
+	unsigned long fist_swings[2];
+	int fist_punch[2];
+	float hands_peak[2];
+	float hands_peak_velocity[2][3];
+	int hands_grip_down[2];
+	int hands_taken[2];
+	int hands_claim[2];
+	double hands_claim_clock;
+	int hands_unarmed;
+	int hands_local_game;
+	int hands_swapped;
+	int hands_swap_latch;
 	/* debug.vr_test_target: the right controller pointed along this
 	(halo_vr_test_point: game axes from the recentred head), if set */
 	int test_point_valid;
@@ -1009,6 +1058,11 @@ static struct
 	float bullet_time_scale;
 	/* vr.third_person (comfort_update) */
 	int third_person;
+	/* (OpenFrame) vr.fists and vr.fist_speed (metres a second), and
+	vr.hand_swap (hands_update) */
+	int fists;
+	float fist_speed;
+	int hand_swap;
 	/* vr.late_latch */
 	int late_latch;
 	float test_turn;
@@ -1128,6 +1182,13 @@ static void settings_read(void)
 	settings.left_handed = !settings.gamepad_aim && !strcmp(config_string("vr.dominant_hand"), "left");
 	settings.swap_sticks = !settings.gamepad_aim && (!strcmp(config_string("vr.swap_sticks"), "yes") ||
 		(settings.left_handed && strcmp(config_string("vr.swap_sticks"), "no") != 0));
+	/* (OpenFrame: the weapon passed to the other hand, vr.hand_swap; the
+	sticks stay as the dominant hand set them) */
+	settings.hand_swap = config_boolean("vr.hand_swap");
+	if (!settings.hand_swap || settings.gamepad_aim)
+		vr.hands_swapped = 0;
+	if (vr.hands_swapped)
+		settings.left_handed = !settings.left_handed;
 	settings.gamepad_snap = !strcmp(config_string("vr.gamepad_view"), "snap");
 	settings.gamepad_pitch = !settings.gamepad_snap && strcmp(config_string("vr.gamepad_view"), "level") != 0;
 	settings.melee_gesture = config_boolean("vr.melee_gesture");
@@ -1172,6 +1233,11 @@ static void settings_read(void)
 		settings.bullet_time_scale = settings.bullet_time_scale > 0.8f ? 0.8f :
 			settings.bullet_time_scale > 0.0f && settings.bullet_time_scale < 0.2f ? 0.2f : 0.4f;
 	settings.third_person = config_boolean("vr.third_person");
+	settings.fists = config_boolean("vr.fists");
+	settings.fist_speed = (float)config_real("vr.fist_speed");
+	if (!(settings.fist_speed >= 1.0f && settings.fist_speed <= 4.0f))
+		settings.fist_speed = settings.fist_speed > 4.0f ? 4.0f :
+			settings.fist_speed > 0.0f && settings.fist_speed < 1.0f ? 1.0f : 2.0f;
 	settings.late_latch = config_boolean("vr.late_latch");
 	settings.test_turn = (float)config_real("debug.vr_test_turn") * (float)M_PI / 180.0f;
 	settings.test_jitter = (float)config_real("debug.vr_test_jitter") * 0.001f;
@@ -1523,6 +1589,15 @@ static void hands_assign_input(void)
 		input->active[0] = input->active[1];
 		input->active[1] = flag;
 	}
+	/* (OpenFrame: just after the weapon passed to the other hand, both grips
+	are nothing until both are let go: hands_update) */
+	if (vr.hands_swap_latch)
+	{
+		if (input->left_grip < HANDS_GRIP_RELEASED && input->right_grip < HANDS_GRIP_RELEASED)
+			vr.hands_swap_latch = 0;
+		else
+			input->left_grip = input->right_grip = 0.0f;
+	}
 	if (settings.swap_sticks)
 	{
 		memcpy(stick, input->left_stick, sizeof(stick));
@@ -1564,7 +1639,7 @@ static void two_handed_update(float seconds)
 	const struct vr_host_pose *right = &vr.views.grip[1], *left = &vr.views.grip[0];
 	int able = settings.two_handed && settings.controller_aim && vr.long_gun && vr.aimed &&
 		right->valid && left->valid && vr.views.aim[1].valid && !vr.reload.held && !vr.reload_grip_taken &&
-		!vr.flip_grip[0] && !CLIMB_BUSY(0);
+		!vr.flip_grip[0] && !CLIMB_BUSY(0) && !vr.hands_taken[0];
 	float line[3], pointing[3], along = 0.0f, across = 0.0f, length;
 	int axis;
 
@@ -1820,7 +1895,7 @@ static void throw_update(float seconds)
 
 	able = settings.throw_gesture && settings.controller_aim && vr.aimed && hand->valid &&
 		vr.views.head.valid && !vr.two_handed && vr.input.right_grip <= 0.8f && !vr.reload.held &&
-		!vr.reload_grip_taken && !vr.flip_grip[0] && !CLIMB_BUSY(0);
+		!vr.reload_grip_taken && !vr.flip_grip[0] && !CLIMB_BUSY(0) && !vr.hands_taken[0];
 	switch (vr.throw_state)
 	{
 	case THROW_IDLE:
@@ -2871,7 +2946,8 @@ static void reload_update(void)
 		&vr.views.aim[1];
 	float v[3], eyes[3], place[3], stick = vr.input.right_stick[1], hip_distance;
 	/* (not a grip the lift of a vehicle has) */
-	int pressed = vr.input.left_grip > RELOAD_GRIP_PRESSED && !vr.flip_grip[0] && !CLIMB_BUSY(0);
+	int pressed = vr.input.left_grip > RELOAD_GRIP_PRESSED && !vr.flip_grip[0] && !CLIMB_BUSY(0) &&
+		!vr.hands_taken[0];
 	int pressing = pressed && !vr.reload_grip_pressed;
 	int pouch, in_pouch, near_pouch, axis;
 	unsigned long now = GetTickCount();
@@ -3177,6 +3253,10 @@ static void melee_update(float seconds)
 		guard = "just after a grab";
 	else if (vr.press_ticks && now - vr.press_ticks < PRESS_NO_MELEE_MS)
 		guard = "just after a press";
+	/* (OpenFrame: an empty hand's swing is a fist's, vr.fists:
+	hands_update) */
+	else if (settings.fists && vr.hands_unarmed)
+		guard = "a fist: the hand is empty (vr.fists)";
 
 	/* the swing: from faster than MELEE_REARM_SPEED until slower again */
 	if (speed < MELEE_REARM_SPEED)
@@ -4179,6 +4259,249 @@ int halo_vr_foveation(float centres[2][2])
 	return vr.foveation;
 }
 
+/* ---------- (OpenFrame) the hands: punches, claims, the weapon passed across
+
+vr.fists, vr.weapon_pull, vr.prop_throw, vr.hand_swap
+(docs/openframe-features.md); the game's side is port/linux/game/vr_fists.c
+and vr_grab.c, which ask once a tick (halo_vr_hands). After
+HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later): its impact
+fists (a hand's own speed past MELEE SPEED, 2 m/s), its parry's swipe and
+its HAND SWAP (the other hand's grip with the palms within 10 cm), made
+again on this file's hands. */
+
+/* a hand's velocity (game axes, metres a second) and from the head (the
+head's axes) over seconds, from its places kept; 0 when not known */
+static int hands_velocity(int hand, float seconds, float velocity[3], float from_head[3])
+{
+	unsigned int newest = vr.hands_sample & (HANDS_SAMPLES - 1), back;
+	int axis;
+
+	if (!vr.hands_valid[newest][hand])
+		return 0;
+	for (back = 1; back < HANDS_SAMPLES; back++)
+	{
+		unsigned int older = (vr.hands_sample - back) & (HANDS_SAMPLES - 1);
+		double span;
+
+		if (!vr.hands_valid[older][hand])
+			break;
+		span = vr.hands_times[newest] - vr.hands_times[older];
+		if (span >= seconds || back == HANDS_SAMPLES - 1 ||
+			!vr.hands_valid[(vr.hands_sample - back - 1) & (HANDS_SAMPLES - 1)][hand])
+		{
+			if (span <= 0.0)
+				return 0;
+			for (axis = 0; axis < 3; axis++)
+			{
+				velocity[axis] = (float)((vr.hands_place[newest][hand][axis] - vr.hands_place[older][hand][axis]) /
+					span);
+				from_head[axis] = (float)((vr.hands_from_head[newest][hand][axis] -
+					vr.hands_from_head[older][hand][axis]) / span);
+			}
+			return 1;
+		}
+	}
+	return 0;
+}
+
+/* the places a hand was at are no longer its (the controllers swapped) */
+static void hands_forget(void)
+{
+	unsigned int index;
+
+	for (index = 0; index < HANDS_SAMPLES; index++)
+		vr.hands_valid[index][0] = vr.hands_valid[index][1] = 0;
+	for (index = 0; index < MELEE_SAMPLES; index++)
+		vr.melee_valid[index] = 0;
+	for (index = 0; index < THROW_SAMPLES; index++)
+		vr.throw_places_valid[index] = 0;
+	vr.fist_swinging[0] = vr.fist_swinging[1] = 0;
+	vr.melee_swinging = 0;
+}
+
+/* the left hand is free of the other uses of its grip (the foregrip, a
+magazine, a grenade, a vehicle's lift or hold) */
+static int hands_left_free(void)
+{
+	return !vr.two_handed && !vr.reload.held && !vr.reload_grip_taken && vr.throw_state == THROW_IDLE &&
+		!vr.flip_grip[0] && !CLIMB_BUSY(0);
+}
+
+/* once a frame, after reload_update (a pouch's grip is the magazine's) and
+before two_handed_update and throw_update (which the hands' take keeps off
+the left grip) */
+static void hands_update(float seconds)
+{
+	const struct vr_host_pose *head = &vr.views.head;
+	float inverse[4] = { -head->orientation[0], -head->orientation[1], -head->orientation[2],
+		head->orientation[3] };
+	int able = settings.controller_aim && vr.aimed && vr.crouch_able_frame && !vr.menus && vr.origin_valid;
+	unsigned int sample;
+	int hand, axis;
+
+	/* the hands' places, kept */
+	vr.hands_clock += seconds;
+	sample = ++vr.hands_sample & (HANDS_SAMPLES - 1);
+	vr.hands_times[sample] = vr.hands_clock;
+	for (hand = 0; hand < 2; hand++)
+	{
+		const struct vr_host_pose *grip = vr.views.grip[hand].valid ? &vr.views.grip[hand] : &vr.views.aim[hand];
+		float v[3];
+
+		vr.hands_valid[sample][hand] = grip->valid && head->valid && vr.origin_valid && seconds > 0.0f;
+		for (axis = 0; axis < 3; axis++)
+			v[axis] = grip->position[axis] - vr.origin_position[axis];
+		game_axes(v, vr.origin_yaw, vr.hands_place[sample][hand]);
+		for (axis = 0; axis < 3; axis++)
+			v[axis] = grip->position[axis] - head->position[axis];
+		quaternion_rotate(inverse, v, vr.hands_from_head[sample][hand]);
+	}
+
+	/* the grips: each closed past HANDS_GRIP_PRESSED until under
+	HANDS_GRIP_RELEASED; the left's take of what the game claims, as it
+	closes */
+	for (hand = 0; hand < 2; hand++)
+	{
+		float value = hand ? vr.input.right_grip : vr.input.left_grip;
+		int pressing = 0;
+
+		if (!vr.hands_grip_down[hand] && value > HANDS_GRIP_PRESSED)
+		{
+			vr.hands_grip_down[hand] = 1;
+			pressing = 1;
+		}
+		else if (vr.hands_grip_down[hand] && value < HANDS_GRIP_RELEASED)
+		{
+			vr.hands_grip_down[hand] = 0;
+			vr.hands_taken[hand] = 0;
+		}
+		if (!pressing || hand != 0 || !able)
+			continue;
+		/* the weapon passed to the other hand: the palms together, the
+		weapon's grip open (vr.hand_swap, a game of this computer alone) */
+		if (settings.hand_swap && vr.hands_local_game && hands_left_free() && !settings.gamepad_aim &&
+			vr.input.right_grip < HANDS_GRIP_RELEASED && vr.views.grip[0].valid && vr.views.grip[1].valid)
+		{
+			float apart[3];
+
+			for (axis = 0; axis < 3; axis++)
+				apart[axis] = vr.views.grip[0].position[axis] - vr.views.grip[1].position[axis];
+			if (length3(apart) < HAND_SWAP_DISTANCE)
+			{
+				vr.hands_swapped = !vr.hands_swapped;
+				settings.left_handed = !settings.left_handed;
+				vr.hands_swap_latch = 1;
+				vr.hands_grip_down[0] = vr.hands_grip_down[1] = 0;
+				vr.hands_taken[0] = vr.hands_taken[1] = 0;
+				vr.input.left_grip = vr.input.right_grip = 0.0f;
+				vr.melee_guard_ticks = GetTickCount();
+				hands_forget();
+				hand_haptic(0, 0.5f, 0.06f);
+				hand_haptic(1, 0.5f, 0.06f);
+				platform_log("vr: hands: the weapon passes to the %s hand (palms %.2f m apart)",
+					settings.left_handed ? "left" : "right", length3(apart));
+				return;
+			}
+		}
+		if (vr.hands_claim[0] && vr.hands_clock - vr.hands_claim_clock <= HANDS_CLAIM_SECONDS && hands_left_free())
+		{
+			vr.hands_taken[0] = 1;
+			hand_haptic(0, 0.3f, 0.03f);
+		}
+	}
+
+	/* the swings: a punch while past vr.fist_speed (the left hand free, the
+	right only empty), the fastest of each hand kept for the game (a parry's
+	swipe: not the left on the foregrip) */
+	for (hand = 0; hand < 2; hand++)
+	{
+		float velocity[3], from_head[3], speed;
+		int allowed;
+
+		if (!able || !settings.fists || !hands_velocity(hand, HANDS_VELOCITY_SECONDS, velocity, from_head))
+		{
+			vr.fist_swinging[hand] = 0;
+			vr.fist_punch[hand] = 0;
+			continue;
+		}
+		speed = length3(velocity);
+		allowed = hand == 0 ? hands_left_free() && !vr.hands_taken[0] :
+			vr.hands_unarmed && !vr.holster_gripped && !vr.grab_gripped && !vr.flip_grip[1] && !CLIMB_BUSY(1);
+		if (speed > vr.hands_peak[hand] && speed <= FIST_FASTEST && (hand == 1 || !vr.two_handed))
+		{
+			vr.hands_peak[hand] = speed;
+			memcpy(vr.hands_peak_velocity[hand], velocity, sizeof(velocity));
+		}
+		if (speed < FIST_REARM_SPEED)
+		{
+			vr.fist_swinging[hand] = 0;
+			continue;
+		}
+		if (!vr.fist_swinging[hand])
+		{
+			vr.fist_swinging[hand] = 1;
+			vr.fist_swings[hand]++;
+		}
+		if (allowed && speed >= settings.fist_speed && speed <= FIST_FASTEST &&
+			length3(from_head) >= FIST_CARRIED * speed)
+		{
+			vr.fist_punch[hand] = 1;
+		}
+	}
+}
+
+/* the game, once a tick (port/linux/game/vr_fists.c) */
+int halo_vr_hands(struct halo_vr_hands *hands)
+{
+	static const float backwards[3] = { 0.0f, 0.0f, -1.0f };
+	unsigned int newest = vr.hands_sample & (HANDS_SAMPLES - 1);
+	int hand, axis;
+
+	hands->enabled = 0;
+	hands->swapped = 0;
+	if (!vr.initialized)
+		return 0;
+	settings_read();
+	vr.hands_claim[0] = hands->claim[0];
+	vr.hands_claim[1] = hands->claim[1];
+	vr.hands_claim_clock = vr.hands_clock;
+	vr.hands_unarmed = hands->unarmed;
+	vr.hands_local_game = hands->local_game;
+	hands->enabled = settings.controller_aim && vr.aimed && vr.crouch_able_frame && !vr.menus && vr.origin_valid;
+	hands->swapped = vr.hands_swapped;
+	hands->world_units_per_metre = settings.world_scale / METRES_PER_WORLD_UNIT;
+	for (hand = 0; hand < 2; hand++)
+	{
+		float from_head[3], v[3];
+
+		hands->valid[hand] = hands->enabled && vr.hands_valid[newest][hand] && vr.views.aim[hand].valid;
+		memcpy(hands->place[hand], vr.hands_place[newest][hand], sizeof(hands->place[hand]));
+		quaternion_rotate(vr.views.aim[hand].orientation, backwards, v);
+		game_axes(v, vr.origin_yaw, hands->forward[hand]);
+		/* (the places kept are in game axes already) */
+		if (!hands_velocity(hand, HANDS_VELOCITY_SECONDS, hands->velocity[hand], from_head))
+			hands->velocity[hand][0] = hands->velocity[hand][1] = hands->velocity[hand][2] = 0.0f;
+		hands->punch[hand] = hands->enabled && vr.fist_punch[hand];
+		hands->swing[hand] = vr.fist_swings[hand];
+		hands->peak[hand] = hands->enabled ? vr.hands_peak[hand] : 0.0f;
+		memcpy(hands->peak_velocity[hand], vr.hands_peak_velocity[hand], sizeof(hands->peak_velocity[hand]));
+		hands->taken[hand] = hands->enabled && vr.hands_taken[hand];
+		vr.fist_punch[hand] = 0;
+		vr.hands_peak[hand] = 0.0f;
+		for (axis = 0; axis < 3; axis++)
+			vr.hands_peak_velocity[hand][axis] = 0.0f;
+	}
+	if (!hands->enabled)
+		vr.hands_taken[0] = vr.hands_taken[1] = 0;
+	return 1;
+}
+
+void halo_vr_hand_pulse(int hand, float amplitude, float seconds)
+{
+	if (vr.initialized && (hand == 0 || hand == 1))
+		hand_haptic(hand, amplitude, seconds);
+}
+
 /* the controllers' turning and recentring, once a frame */
 static void input_update(void)
 {
@@ -4198,6 +4521,9 @@ static void input_update(void)
 	holsters_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 	grab_update();
 	reload_update();
+	/* (OpenFrame: the hands' punches, claims and the weapon passed across,
+	before the foregrip and the grenade take the left grip) */
+	hands_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 	haptics_update();
 	/* a swing of the right controller melees (vr.melee_gesture) */
 	melee_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);

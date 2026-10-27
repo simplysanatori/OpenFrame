@@ -195,6 +195,10 @@ boolean network_game_distributed_client(void);
 void network_actors_drive(void);
 /* port: port/linux/game/network_substeps.c */
 void network_substeps_actions_given(void);
+#ifdef HALO_VR
+/* port: the VR mode's hands, a tick of them (port/linux/game/vr_fists.c) */
+void vr_hands_tick(void);
+#endif
 
 /* ---------- constants */
 
@@ -370,6 +374,13 @@ static void game_tick_macro_step(
 	else
 		profile_scope(game_tick_actors_drive_section, network_actors_drive();)
 	profile_scope(game_tick_players_before_section, players_update_before_game();)
+#ifdef HALO_VR
+	/* port: the VR mode's hands (vr.fists, vr.weapon_pull, vr.prop_throw,
+	vr.hand_swap; port/linux/game/vr_fists.c), the first local player's in
+	a game of this computer alone: its punches and parries, the weapon
+	pulled and the thing held, before the units and items move */
+	vr_hands_tick();
+#endif
 	/* port: an OpenH1 game's client: the other players' controls of their
 	later sub-steps, as they ran, where they are later than the input just
 	given (port/linux/game/network_substeps.c) */

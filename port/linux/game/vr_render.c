@@ -1830,6 +1830,28 @@ boolean vr_render_head_forward(real_vector3d *forward)
 	return normalize3d(forward) > 0.0f;
 }
 
+/* (OpenFrame) vr_fists.c, vr_grab.c: a hand's place (game axes from the
+recentred head, metres) in the world, and a direction there (game axes; NULL
+none) in the world's, as the last eye pass had the head while the VR mode
+aimed the player (no older than a tick or two); the world's units a metre.
+FALSE, none */
+boolean vr_render_hand_world(const float place[3], const float direction[3], real_point3d *point,
+	real_vector3d *world_direction, real *units)
+{
+	long now = game_time_get();
+
+	if (!vr_render.aim_base_valid || vr_render.view.world_units_per_metre <= 0.0f ||
+		now - vr_render.aim_base_tick > 2 || now < vr_render.aim_base_tick)
+	{
+		return FALSE;
+	}
+	hand_point(place, point);
+	if (direction && world_direction)
+		yaw_rotate(vr_render.base_yaw, direction, world_direction);
+	*units = vr_render.view.world_units_per_metre;
+	return TRUE;
+}
+
 /* first_person_legs.c: where the player's body is drawn in the eye pass,
 under the real head rather than the game's eye: the top of the neck
 (halo_vr_view's body_neck) in the world, and the body's heading there;

@@ -851,6 +851,42 @@ int halo_vr_third_person(void);
 /* a pulse in both controllers, this strong (0 to 1) for this long
 (seconds): the parkour's slide and wall jump (vr_parkour.c) */
 void halo_vr_pulse(float amplitude, float seconds);
+/* (OpenFrame) the hands (vr.fists, vr.weapon_pull, vr.prop_throw,
+vr.hand_swap; port/linux/game/vr_fists.c, vr_grab.c): asked once a tick by
+the game. Told: what the game has for each hand's grip (claim: a weapon the
+hand points at to pull, a loose thing in its reach to hold), whose grip then
+takes it (taken) rather than a grenade or the foregrip; that the player
+holds no weapon (the weapon's hand punches too); and that the game is one
+of this computer alone (the hand swap). Given: whether the controllers aim
+on foot; each hand's place (game axes from the recentred head, metres),
+where it points and its velocity (metres a second, the room's: not the
+body's moving or turning); whether it punched (a swing past vr.fist_speed,
+neither carried by the head nor holding anything) since the last call, the
+swing's count (a blow a swing), the fastest it went since then and its
+velocity at that; whether its grip took the claim (held since); whether the
+weapon has passed to the other hand (vr.hand_swap); the world's units a
+metre. Hand 1 is the weapon's, 0 the other. */
+struct halo_vr_hands
+{
+	int claim[2];
+	int unarmed;
+	int local_game;
+	int enabled;
+	int valid[2];
+	float place[2][3];
+	float forward[2][3];
+	float velocity[2][3];
+	int punch[2];
+	unsigned long swing[2];
+	float peak[2];
+	float peak_velocity[2][3];
+	int taken[2];
+	int swapped;
+	float world_units_per_metre;
+};
+int halo_vr_hands(struct halo_vr_hands *hands);
+/* a pulse in one hand's controller (1 the weapon's, 0 the other) */
+void halo_vr_hand_pulse(int hand, float amplitude, float seconds);
 /* this frame's eyes' images multiplied by this colour as they are
 presented, all of each, before the helmet's rim; each call multiplies it
 further (vr_seat.c's blinks, vr_death.c's dimming: the game's screen flash

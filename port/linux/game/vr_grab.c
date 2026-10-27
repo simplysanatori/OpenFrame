@@ -41,6 +41,33 @@ reticle, the weapon and the view follow the controller), for a few ticks;
 the controls of the campaign are large (a Forerunner holo panel, 2 m
 across) and the game mostly offers them at arm's length whatever the aim.
 Entering a vehicle stays on X.
+
+(OpenFrame) The hand without the weapon (docs/openframe-features.md), in a
+game of this computer alone (game_connection local: the campaign; never
+online, split screen or with bots), on foot: vr_fists.c's hands' tick
+gives it the hands once a tick (vr_grab_hands_tick), and it tells vr.c what
+that hand's grip would take (vr_grab_hands_claims), which then takes it
+rather than a grenade or the foregrip.
+- vr.weapon_pull: the hand pointed at a weapon lying within
+  vr.weapon_pull_range (within 20 degrees of where it points, in sight of
+  the eyes; it lights up), the grip locks on it (it lights up fully) and a
+  flick of the hand back toward you or up (1 m/s) throws it to the hand, in
+  an arc, in about half a second; still gripped as it arrives, it is
+  picked up as the right hand's grab picks one up (the game's pick-up, as X
+  held: it is offered first), open, it drops at your feet.
+- vr.prop_throw: the hand at a loose weapon or piece of equipment (within
+  15 cm of it; it lights up) holds it while the grip is closed, turned as
+  the hand points, and throws it as it opens, at the hand's speed (its
+  fastest of the last few ticks) times vr.prop_throw_strength, as the game
+  drops a weapon (the player's body passed through, kept inside the level).
+  The right hand's grab takes the one held as ever.
+- vr.hand_swap (vr.c): the HUD says which hand the weapon is in.
+Ported from HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later): its
+WEAPON PULL (vr_weapon_pickup.c: the candidate, its scoring and sight, the
+lock, the flick, the flight's time and arc, the catch) and its world grab's
+loose items (vr_world_interaction.c: held at the hand, thrown at the hand's
+peak speed times OBJECT THROW, at most 24 m/s). Its scenery props (their
+own collision solver), vehicles and bodies are not carried over.
 */
 
 #ifdef HALO_VR
@@ -53,6 +80,7 @@ Entering a vehicle stays on X.
 #include "devices/devices.h"
 #include "game/game.h"
 #include "game/players.h"
+#include "items/items.h"
 #include "items/weapon_definitions.h"
 #include "items/weapons.h"
 #include "networking/network_game_globals.h"
@@ -108,6 +136,43 @@ it one more */
 aims, this many at most */
 #define VR_GRAB_TEST_SECONDS 3
 #define VR_GRAB_TEST_THINGS 2
+/* (OpenFrame) the pull: a weapon within PULL_FACING (a cosine: 20 degrees)
+of where the hand points, or PULL_KEPT for the one it pointed at, or within
+PULL_NEAR of the hand, the arm reached out (PULL_ARM_OUT); the flick PULL_FLICK_SPEED (metres a second); the
+flight PULL_FLIGHT_BASE seconds and its distance at PULL_FLIGHT_SPEED, at
+least PULL_FLIGHT_SHORTEST and at most PULL_FLIGHT_LONGEST, arcing up a
+quarter of its distance (at most PULL_ARC_HIGHEST) and PULL_ARC_LEAST; it
+arrives within PULL_ARRIVED of the hand. The weapon caught is picked up
+once the game offers it, within VR_GRAB_WAIT_TICKS. A prop: within
+PROP_REACH of the hand; thrown at the fastest of the hand's last
+PROP_HISTORY ticks times vr.prop_throw_strength, at most PROP_FASTEST
+(metres a second) */
+#define PULL_FACING 0.94f
+#define PULL_KEPT 0.82f
+#define PULL_NEAR 0.30f
+#define PULL_FLICK_SPEED 1.0f
+#define PULL_FLIGHT_BASE 0.25f
+#define PULL_FLIGHT_SPEED 8.0f
+#define PULL_FLIGHT_SHORTEST 0.30f
+#define PULL_FLIGHT_LONGEST 0.70f
+#define PULL_ARC_HIGHEST 0.6f
+#define PULL_ARC_LEAST 0.10f
+#define PULL_ARRIVED 0.22f
+#define PULL_SEARCH_COUNT 32
+/* (the arm reached out for a pull: the hand this far from the eyes at
+least, so that a grenade taken by the body is a grenade) */
+#define PULL_ARM_OUT 0.40f
+#define PROP_REACH 0.15f
+#define PROP_HISTORY 4
+#define PROP_FASTEST 24.0f
+
+/* port/linux/src/port_config.c */
+int config_boolean(char const *name);
+double config_real(char const *name);
+unsigned long config_changes(void);
+/* port/linux/game/vr_render.c */
+boolean vr_render_hand_world(const float place[3], const float direction[3], real_point3d *point,
+	real_vector3d *world_direction, real *units);
 
 static struct
 {
@@ -483,6 +548,558 @@ static void vr_grab_test(long player_index, boolean aiming)
 	}
 }
 
+/* ---------- (OpenFrame) the hand without the weapon: the pull, props */
+
+enum
+{
+	_vr_pull_idle,
+	_vr_pull_locked,
+	_vr_pull_flying,
+};
+
+static struct
+{
+	unsigned long changes;
+	boolean pull;
+	real pull_range;
+	boolean props;
+	real strength;
+} vr_hands_settings = { (unsigned long)-1, FALSE, 3.0f, FALSE, 2.0f };
+
+static struct
+{
+	/* the game's tick last seen, the player's unit, the world's units a
+	metre; the hand's grip taken last tick */
+	long tick;
+	long unit_index;
+	real units;
+	boolean taken;
+	/* the weapon to pull the hand points at, the loose thing in its reach
+	(NONE: none), as the claim told vr.c */
+	long pull_candidate;
+	long prop_candidate;
+	/* the pull: its state, its weapon, where and when it began to fly, its
+	ticks and its arc's height (world units); the weapon caught, to be
+	picked up once the game offers it, until this tick */
+	short pull_state;
+	long pull_target;
+	real_point3d pull_start;
+	long pull_start_tick;
+	long pull_ticks;
+	real pull_arc;
+	long caught;
+	long caught_until;
+	/* the prop held (NONE: none), its middle from its origin in its own
+	axes (forward, left, up), and the hand's velocities of the last ticks
+	(the world's, metres a second) */
+	long held;
+	real held_offset[3];
+	real_vector3d history[PROP_HISTORY];
+	short history_count;
+	short history_next;
+} vr_hands = { NONE, NONE, 0.0f, FALSE, NONE, NONE, _vr_pull_idle, NONE, { 0.0f, 0.0f, 0.0f }, NONE, 0, 0.0f, NONE,
+	NONE, NONE };
+
+static void vr_hands_settings_read(void)
+{
+	if (vr_hands_settings.changes == config_changes())
+		return;
+	vr_hands_settings.changes = config_changes();
+	vr_hands_settings.pull = config_boolean("vr.weapon_pull") != 0;
+	vr_hands_settings.pull_range = (real)config_real("vr.weapon_pull_range");
+	if (!(vr_hands_settings.pull_range >= 1.0f && vr_hands_settings.pull_range <= 5.0f))
+		vr_hands_settings.pull_range = 3.0f;
+	vr_hands_settings.props = config_boolean("vr.prop_throw") != 0;
+	vr_hands_settings.strength = (real)config_real("vr.prop_throw_strength");
+	if (!(vr_hands_settings.strength >= 0.5f && vr_hands_settings.strength <= 3.0f))
+		vr_hands_settings.strength = 2.0f;
+}
+
+/* a loose thing lying in the level (a weapon, a piece of equipment; mask),
+not anyone's */
+static struct item_datum *vr_hands_loose(long object_index, unsigned long mask)
+{
+	struct item_datum *item = object_index != NONE ?
+		(struct item_datum *)object_try_and_get_and_verify_type(object_index, mask) : NULL;
+
+	if (!item || item->object.parent_object_index != NONE ||
+		!TEST_FLAG(item->object.flags, _object_connected_to_map_bit))
+	{
+		return NULL;
+	}
+	return item;
+}
+
+/* the pull let go of (the weapon left where it is, falling) */
+static void vr_hands_pull_end(char const *why)
+{
+	if (vr_hands.pull_state != _vr_pull_idle)
+		platform_log("vr hands: pull: %s", why);
+	vr_hands.pull_state = _vr_pull_idle;
+	vr_hands.pull_target = NONE;
+}
+
+/* the prop let go of: thrown (the hand's fastest of its last ticks, times
+the strength) as the game drops a weapon, or dropped (throw FALSE) */
+static void vr_hands_prop_end(long unit_index, boolean throw_it)
+{
+	struct item_datum *item = vr_hands_loose(vr_hands.held, _object_mask_item);
+
+	if (item && unit_index != NONE && vr_hands.units > 0.0f)
+	{
+		real_vector3d velocity = *global_zero_vector3d, body;
+		real_point3d eye;
+		real speed = 0.0f;
+		short index;
+
+		for (index = 0; throw_it && index < vr_hands.history_count; index++)
+		{
+			real each = magnitude3d(&vr_hands.history[index]);
+
+			if (each > speed)
+			{
+				speed = each;
+				velocity = vr_hands.history[index];
+			}
+		}
+		scale_vector3d(&velocity, vr_hands_settings.strength, &velocity);
+		speed *= vr_hands_settings.strength;
+		if (speed > PROP_FASTEST)
+			scale_vector3d(&velocity, PROP_FASTEST / speed, &velocity);
+		scale_vector3d(&velocity, vr_hands.units / (real)TICKS_PER_SECOND, &velocity);
+		object_get_velocities(unit_index, &body, NULL);
+		add_vectors3d(&velocity, &body, &velocity);
+		item->object.translational_velocity = *global_zero_vector3d;
+		item->object.angular_velocity = *global_zero_vector3d;
+		item->item.ignore_object_index = unit_index;
+		item_accelerate(vr_hands.held, &velocity, FALSE);
+		unit_get_camera_position(unit_index, &eye);
+		object_force_inside_bsp(vr_hands.held, &eye);
+		platform_log("vr hands: %s %s at %.1f m/s", throw_it ? "threw" : "let go of",
+			tag_get_name(item->definition_index), (double)(speed > PROP_FASTEST ? PROP_FASTEST : speed));
+	}
+	vr_hands.held = NONE;
+	vr_hands.history_count = 0;
+	vr_hands.history_next = 0;
+}
+
+static void vr_hands_reset(long unit_index)
+{
+	vr_hands_pull_end("reset");
+	vr_hands_prop_end(unit_index, FALSE);
+	vr_hands.pull_candidate = NONE;
+	vr_hands.prop_candidate = NONE;
+	vr_hands.caught = NONE;
+	vr_hands.taken = FALSE;
+}
+
+/* in sight of the eyes: aimed a little over the weapon's middle (one
+lying on the ground has its middle in the ground), what the ray meets
+within 15 cm of the weapon, or past nine tenths of the way, clear. Ported
+from HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later):
+vr_weapon_pickup.c's pickup_in_sight */
+static boolean vr_hands_in_sight(long unit_index, long object_index, real_point3d const *eye, real units)
+{
+	struct object_datum *object = object_get(object_index);
+	real_point3d aim = object->object.bounding_sphere_center;
+	struct collision_result collision;
+	real_vector3d ray;
+	real length;
+
+	aim.z += 0.06f * units;
+	vector_from_points3d(eye, &aim, &ray);
+	length = magnitude3d(&ray);
+	if (!collision_test_vector(_collision_test_for_line_of_sight_flags, eye, &ray, unit_index, &collision))
+		return TRUE;
+	if (collision.type == _collision_result_object && collision.object_index == object_index)
+		return TRUE;
+	return collision.t >= 0.92f || (1.0f - collision.t) * length <= 0.15f * units;
+}
+
+/* the weapon the hand (at point, pointing along forward) points at within
+the pull's range: nearest the line first, the one pointed at kept a little
+longer, one right by the hand too. Ported from HaloCE-DecompRemix-VR by
+moistman42069 (AGPL-3.0-or-later): vr_weapon_pickup.c's pickup_candidate */
+static long vr_hands_pull_candidate(long unit_index, real_point3d const *point, real_vector3d const *forward)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	real units = vr_hands.units;
+	real reach = vr_hands_settings.pull_range * units, best = 1e30f;
+	long candidates[PULL_SEARCH_COUNT], choice = NONE;
+	real_point3d eye;
+	short count, index;
+
+	unit_get_camera_position(unit_index, &eye);
+	count = objects_in_sphere(0, _object_mask_weapon, &unit->object.location, point, reach + 0.5f * units, candidates,
+		PULL_SEARCH_COUNT);
+	for (index = 0; index < count; index++)
+	{
+		struct item_datum *weapon = vr_hands_loose(candidates[index], _object_mask_weapon);
+		real_vector3d to;
+		real distance, facing, score;
+		boolean kept = candidates[index] == vr_hands.pull_candidate;
+
+		if (!weapon || !unit_can_use_weapon(unit_index, candidates[index]))
+			continue;
+		vector_from_points3d(point, &weapon->object.bounding_sphere_center, &to);
+		distance = magnitude3d(&to);
+		if (distance > reach + weapon->object.bounding_sphere_radius)
+			continue;
+		facing = distance > 0.0001f ? dot_product3d(&to, forward) / distance : 1.0f;
+		if (!(distance <= PULL_NEAR * units || facing >= PULL_FACING || (kept && facing >= PULL_KEPT)))
+			continue;
+		if (!vr_hands_in_sight(unit_index, candidates[index], &eye, units))
+			continue;
+		score = (1.0f - facing) * 4.0f + distance / reach - (kept ? 0.25f : 0.0f);
+		if (score < best)
+		{
+			best = score;
+			choice = candidates[index];
+		}
+	}
+	return choice;
+}
+
+/* the loose thing (a weapon, a piece of equipment) within PROP_REACH of the
+hand: along a weapon's length (as the grab has it), about a piece of
+equipment's middle */
+static long vr_hands_prop_candidate(long unit_index, real_point3d const *point)
+{
+	struct unit_datum *unit = unit_get(unit_index);
+	real units = vr_hands.units, best = PROP_REACH * units;
+	long candidates[PULL_SEARCH_COUNT], choice = NONE;
+	short count, index;
+
+	count = objects_in_sphere(0, _object_mask_weapon | _object_mask_equipment, &unit->object.location, point,
+		0.5f * units, candidates, PULL_SEARCH_COUNT);
+	for (index = 0; index < count; index++)
+	{
+		struct item_datum *item = vr_hands_loose(candidates[index], _object_mask_weapon | _object_mask_equipment);
+		real distance;
+
+		if (!item)
+			continue;
+		if (item->object.type == _object_type_weapon && item->object.bounding_sphere_radius > 0.0f)
+		{
+			real half = item->object.bounding_sphere_radius * VR_GRAB_WEAPON_LENGTH;
+			real_point3d base;
+			real_vector3d height;
+
+			point_from_line3d(&item->object.bounding_sphere_center, &item->object.forward, -half, &base);
+			scale_vector3d(&item->object.forward, 2.0f * half, &height);
+			distance = square_root(point_to_line_distance_squared3d(point, &base, &height));
+		}
+		else
+		{
+			distance = distance3d(point, &item->object.bounding_sphere_center) -
+				item->object.bounding_sphere_radius * 0.5f;
+		}
+		if (distance < best)
+		{
+			best = distance;
+			choice = candidates[index];
+		}
+	}
+	return choice;
+}
+
+/* the prop held at the hand (point, pointing along forward), its middle
+there, turned as the hand points, inside the level, still */
+static void vr_hands_prop_hold(long unit_index, real_point3d const *point, real_vector3d const *forward)
+{
+	struct item_datum *item = vr_hands_loose(vr_hands.held, _object_mask_item);
+	real_vector3d f = *forward, up, left;
+	real_point3d position, eye;
+
+	if (!item)
+		return;
+	if (normalize3d(&f) <= 0.0f)
+		f = item->object.forward;
+	/* (up: the world's, square to where the hand points; straight up or
+	down, the thing's own) */
+	cross_product3d(global_up3d, &f, &left);
+	if (normalize3d(&left) <= 0.0f)
+		cross_product3d(&item->object.up, &f, &left);
+	normalize3d(&left);
+	cross_product3d(&f, &left, &up);
+	normalize3d(&up);
+	position.x = point->x - (f.i * vr_hands.held_offset[0] + left.i * vr_hands.held_offset[1] +
+		up.i * vr_hands.held_offset[2]);
+	position.y = point->y - (f.j * vr_hands.held_offset[0] + left.j * vr_hands.held_offset[1] +
+		up.j * vr_hands.held_offset[2]);
+	position.z = point->z - (f.k * vr_hands.held_offset[0] + left.k * vr_hands.held_offset[1] +
+		up.k * vr_hands.held_offset[2]);
+	object_set_position(vr_hands.held, &position, &f, &up);
+	unit_get_camera_position(unit_index, &eye);
+	object_force_inside_bsp(vr_hands.held, &eye);
+	item->object.translational_velocity = *global_zero_vector3d;
+	item->object.angular_velocity = *global_zero_vector3d;
+	item->item.ignore_object_index = unit_index;
+	SET_FLAG(item->object.flags, _object_at_rest_bit, FALSE);
+}
+
+/* the prop taken by the hand: its middle from its origin, in its own axes */
+static void vr_hands_prop_take(long object_index)
+{
+	struct item_datum *item = vr_hands_loose(object_index, _object_mask_item);
+	real_vector3d offset, left;
+
+	if (!item)
+		return;
+	vector_from_points3d(&item->object.position, &item->object.bounding_sphere_center, &offset);
+	cross_product3d(&item->object.up, &item->object.forward, &left);
+	vr_hands.held = object_index;
+	vr_hands.held_offset[0] = dot_product3d(&offset, &item->object.forward);
+	vr_hands.held_offset[1] = dot_product3d(&offset, &left);
+	vr_hands.held_offset[2] = dot_product3d(&offset, &item->object.up);
+	vr_hands.history_count = 0;
+	vr_hands.history_next = 0;
+	object_activate(object_index);
+	platform_log("vr hands: holding %s", tag_get_name(item->definition_index));
+}
+
+/* the pull's flight, a tick of it: along the line to the hand (point) as
+it is now, eased, over it in an arc; arrived, caught (the grip closed) or
+dropped. Ported from HaloCE-DecompRemix-VR by moistman42069
+(AGPL-3.0-or-later): vr_weapon_pickup.c's flight and catch */
+static void vr_hands_pull_fly(boolean closed, real_point3d const *point)
+{
+	struct item_datum *weapon = vr_hands_loose(vr_hands.pull_target, _object_mask_weapon);
+	long now = game_time_get();
+	real_point3d position;
+	real s, eased;
+
+	if (!weapon)
+	{
+		vr_hands_pull_end("the weapon in flight was taken or gone");
+		return;
+	}
+	s = (real)(now - vr_hands.pull_start_tick) / (real)vr_hands.pull_ticks;
+	if (s >= 1.0f || distance3d(&weapon->object.bounding_sphere_center, point) <= PULL_ARRIVED * vr_hands.units)
+	{
+		weapon->object.translational_velocity = *global_zero_vector3d;
+		if (closed)
+		{
+			vr_hands.caught = vr_hands.pull_target;
+			vr_hands.caught_until = now + VR_GRAB_WAIT_TICKS;
+			halo_vr_hand_pulse(0, 0.85f, 0.07f);
+			vr_hands_pull_end("caught: picked up once the game offers it");
+		}
+		else
+		{
+			vr_hands_pull_end("arrived at an open hand: it drops");
+		}
+		return;
+	}
+	s = s < 0.0f ? 0.0f : s;
+	eased = s * s * (3.0f - 2.0f * s);
+	position.x = vr_hands.pull_start.x + (point->x - vr_hands.pull_start.x) * eased;
+	position.y = vr_hands.pull_start.y + (point->y - vr_hands.pull_start.y) * eased;
+	position.z = vr_hands.pull_start.z + (point->z - vr_hands.pull_start.z) * eased +
+		vr_hands.pull_arc * 4.0f * s * (1.0f - s);
+	/* (the weapon's middle along the way, its origin with it) */
+	position.x -= weapon->object.bounding_sphere_center.x - weapon->object.position.x;
+	position.y -= weapon->object.bounding_sphere_center.y - weapon->object.position.y;
+	position.z -= weapon->object.bounding_sphere_center.z - weapon->object.position.z;
+	object_set_position(vr_hands.pull_target, &position, NULL, NULL);
+	weapon->object.translational_velocity = *global_zero_vector3d;
+	weapon->object.angular_velocity = *global_zero_vector3d;
+	SET_FLAG(weapon->object.flags, _object_at_rest_bit, FALSE);
+}
+
+/* vr_fists.c, before it asks vr.c for the hands each tick: what the hand
+without the weapon's grip would take (the pull's candidate, a prop) */
+void vr_grab_hands_claims(int claim[2])
+{
+	claim[0] = vr_hands.pull_state == _vr_pull_idle && vr_hands.held == NONE &&
+		(vr_hands.pull_candidate != NONE || vr_hands.prop_candidate != NONE);
+	claim[1] = 0;
+}
+
+/* vr_fists.c, once a tick: the hands as vr.c has them, and the player's
+unit (on foot, alive, in control, in a game of this computer alone; NONE
+otherwise) */
+void vr_grab_hands_tick(struct halo_vr_hands const *hands, long unit_index)
+{
+	long now = game_time_get();
+	boolean taken = hands->taken[0] != 0;
+	boolean pressing = taken && !vr_hands.taken;
+	real_point3d point;
+	real_vector3d forward, velocity = *global_zero_vector3d;
+	real units = 0.0f;
+	boolean valid;
+
+	vr_hands_settings_read();
+	if (vr_hands.tick != NONE && now < vr_hands.tick)
+		vr_hands_reset(NONE);
+	vr_hands.tick = now;
+	if (unit_index != vr_hands.unit_index)
+	{
+		vr_hands_reset(vr_hands.unit_index != NONE && unit_try_and_get(vr_hands.unit_index) ? vr_hands.unit_index : NONE);
+		vr_hands.unit_index = unit_index;
+	}
+	vr_hands.taken = taken;
+	vr_hands.pull_candidate = NONE;
+	vr_hands.prop_candidate = NONE;
+	valid = unit_index != NONE && hands->valid[0] &&
+		vr_render_hand_world(hands->place[0], hands->forward[0], &point, &forward, &units);
+	if (valid)
+	{
+		vr_hands.units = units;
+		vr_render_hand_world(hands->place[0], hands->velocity[0], &point, &velocity, &units);
+		normalize3d(&forward);
+	}
+	if (!valid || (!vr_hands_settings.pull && !vr_hands_settings.props))
+	{
+		/* (a flight goes on to where the hand was) */
+		if (vr_hands.pull_state == _vr_pull_locked || (!valid && vr_hands.pull_state == _vr_pull_flying))
+			vr_hands_pull_end(valid ? "turned off" : "the hand lost, or not in play");
+		if (vr_hands.held != NONE)
+			vr_hands_prop_end(unit_index, FALSE);
+		if (!valid)
+			return;
+	}
+
+	/* the prop held: at the hand while the grip is closed, thrown as it
+	opens */
+	if (vr_hands.held != NONE)
+	{
+		if (!vr_hands_loose(vr_hands.held, _object_mask_item))
+		{
+			platform_log("vr hands: the thing held was taken");
+			vr_hands.held = NONE;
+		}
+		else if (!taken || !vr_hands_settings.props)
+		{
+			vr_hands_prop_end(unit_index, vr_hands_settings.props);
+		}
+		else
+		{
+			vr_hands.history[vr_hands.history_next] = velocity;
+			vr_hands.history_next = (short)((vr_hands.history_next + 1) % PROP_HISTORY);
+			if (vr_hands.history_count < PROP_HISTORY)
+				vr_hands.history_count++;
+			vr_hands_prop_hold(unit_index, &point, &forward);
+			return;
+		}
+	}
+
+	/* the pull: locked on, a flick throws it to the hand; flying */
+	if (vr_hands.pull_state == _vr_pull_flying)
+	{
+		vr_hands_pull_fly(taken, &point);
+		return;
+	}
+	if (vr_hands.pull_state == _vr_pull_locked)
+	{
+		struct item_datum *weapon = vr_hands_loose(vr_hands.pull_target, _object_mask_weapon);
+		real_vector3d away;
+		real speed, distance;
+
+		if (!weapon)
+		{
+			vr_hands_pull_end("the weapon was taken or gone");
+		}
+		else if (!taken)
+		{
+			vr_hands_pull_end("the grip let go before the pull");
+		}
+		else
+		{
+			/* (a flick: the hand yanked away from the weapon, toward you,
+			or up) */
+			vector_from_points3d(&weapon->object.bounding_sphere_center, &point, &away);
+			if (normalize3d(&away) <= 0.0f)
+				away = *global_up3d;
+			speed = dot_product3d(&velocity, &away);
+			if (velocity.k > speed)
+				speed = velocity.k;
+			if (speed >= PULL_FLICK_SPEED)
+			{
+				vr_hands.pull_state = _vr_pull_flying;
+				vr_hands.pull_start = weapon->object.bounding_sphere_center;
+				vr_hands.pull_start_tick = now;
+				distance = distance3d(&vr_hands.pull_start, &point) / units;
+				vr_hands.pull_ticks = (long)((PIN(PULL_FLIGHT_BASE + distance / PULL_FLIGHT_SPEED,
+					PULL_FLIGHT_SHORTEST, PULL_FLIGHT_LONGEST)) * TICKS_PER_SECOND + 0.999f);
+				if (vr_hands.pull_ticks < 1)
+					vr_hands.pull_ticks = 1;
+				vr_hands.pull_arc = ((distance * 0.25f < PULL_ARC_HIGHEST ? distance * 0.25f : PULL_ARC_HIGHEST) +
+					PULL_ARC_LEAST) * units;
+				object_activate(vr_hands.pull_target);
+				halo_vr_hand_pulse(0, 0.55f, 0.05f);
+				platform_log("vr hands: pull: %s flies to the hand (%.1f m, %.2f s)",
+					tag_get_name(weapon->definition_index), (double)distance,
+					(double)vr_hands.pull_ticks / TICKS_PER_SECOND);
+			}
+		}
+		return;
+	}
+
+	/* the grip closed on what the hand was claimed for (vr.c took it so):
+	a prop held, else a weapon locked on */
+	if (pressing && vr_hands_settings.props && vr_hands.held == NONE)
+	{
+		long prop = vr_hands_prop_candidate(unit_index, &point);
+
+		if (prop != NONE)
+		{
+			vr_hands_prop_take(prop);
+			vr_hands_prop_hold(unit_index, &point, &forward);
+			return;
+		}
+	}
+	if (pressing && vr_hands_settings.pull)
+	{
+		long weapon_index = vr_hands_pull_candidate(unit_index, &point, &forward);
+
+		if (weapon_index != NONE)
+		{
+			vr_hands.pull_state = _vr_pull_locked;
+			vr_hands.pull_target = weapon_index;
+			platform_log("vr hands: pull: locked on %s (%.1f m away): flick the hand back",
+				tag_get_name(object_get(weapon_index)->definition_index),
+				(double)(distance3d(&point, &object_get(weapon_index)->object.bounding_sphere_center) / units));
+			return;
+		}
+	}
+	/* (what the hand's grip would take next: vr_grab_hands_claims) */
+	if (vr_hands_settings.props && !taken)
+		vr_hands.prop_candidate = vr_hands_prop_candidate(unit_index, &point);
+	if (vr_hands_settings.pull && !taken && vr_hands.prop_candidate == NONE)
+	{
+		real_point3d eye;
+
+		unit_get_camera_position(unit_index, &eye);
+		if (distance3d(&eye, &point) >= PULL_ARM_OUT * units)
+			vr_hands.pull_candidate = vr_hands_pull_candidate(unit_index, &point, &forward);
+	}
+}
+
+/* the thing the hand without the weapon is at or points at, lit up as the
+grab's is (lighting set; FALSE, not one) */
+static boolean vr_hands_highlight(long object_index, struct render_lighting const *given,
+	struct render_lighting *lighting, struct render_model_effect *model_effect)
+{
+	long unit_index = vr_hands.unit_index;
+	real distance;
+
+	if (object_index == NONE || !given || unit_index == NONE || vr_hands.units <= 0.0f ||
+		!object_try_and_get_and_verify_type(unit_index, _object_mask_unit))
+	{
+		return FALSE;
+	}
+	if (object_index == vr_hands.pull_target)
+		distance = 0.0f;
+	else if (object_index == vr_hands.pull_candidate || object_index == vr_hands.prop_candidate)
+		distance = 0.15f;
+	else
+		return FALSE;
+	*lighting = *given;
+	vr_holster_highlight_object(unit_index, distance, vr_hands.units, model_effect, lighting);
+	return TRUE;
+}
+
 /* players.c, as the game offers a player something to do with the action
 button (player_set_action_result), and would offer it (set_action): the
 weapons offered to the first local player kept, and among them the one its
@@ -505,6 +1122,14 @@ boolean vr_grab_offer(long player_index, short action_result, long object_index,
 	}
 	if (vr_grab.offered_count < HALO_VR_GRAB_THINGS)
 		vr_grab.offered[vr_grab.offered_count++] = object_index;
+	/* (OpenFrame: the weapon the pull caught, offered first) */
+	if (vr_hands.caught != NONE && action_result == player->action_result && player->action_object_index != NONE)
+	{
+		if (object_index == vr_hands.caught)
+			return TRUE;
+		if (player->action_object_index == vr_hands.caught)
+			return FALSE;
+	}
 	if (!vr_grab.enabled || vr_grab.nearest == NONE || vr_grab.distance >= VR_GRAB_PREFER_DISTANCE ||
 		action_result != player->action_result || player->action_object_index == NONE)
 	{
@@ -708,6 +1333,23 @@ void vr_grab_input(long player_index, unsigned long *unit_control_flags)
 			vr_grab.taken = NONE;
 		}
 	}
+	/* (OpenFrame: the weapon the pull caught, once the game offers it:
+	picked up as the grip's is) */
+	if (vr_hands.caught != NONE)
+	{
+		if (!unit || now > vr_hands.caught_until || now < vr_hands.caught_until - VR_GRAB_WAIT_TICKS)
+		{
+			platform_log("vr hands: pull: the weapon caught was not offered (one like it carried?): it drops");
+			vr_hands.caught = NONE;
+		}
+		else if (weapon_offered && player->action_object_index == vr_hands.caught)
+		{
+			platform_log("vr hands: pull: %s %s", player->action_result == _player_action_result_swap_for_weapon ?
+				"swapped for" : "picked up", tag_get_name(object_get(vr_hands.caught)->definition_index));
+			vr_grab.press_until = now + VR_GRAB_PRESS_TICKS;
+			vr_hands.caught = NONE;
+		}
+	}
 	if (vr_grab.press_until != NONE && (now >= vr_grab.press_until || now < vr_grab.press_until - VR_GRAB_PRESS_TICKS))
 		vr_grab.press_until = NONE;
 	if (vr_grab.press_until != NONE)
@@ -765,6 +1407,9 @@ boolean vr_grab_highlight(long object_index, struct render_lighting const *given
 
 	/* (a vehicle a hand comes to a hold of: vr_climb.c) */
 	if (halo_vr_running() && vr_climb_highlight(object_index, given, lighting, model_effect))
+		return TRUE;
+	/* (OpenFrame: a weapon to pull, a thing to hold) */
+	if (halo_vr_running() && vr_hands_highlight(object_index, given, lighting, model_effect))
 		return TRUE;
 	if (object_index == NONE || object_index != vr_grab.nearest || !vr_grab.enabled || !given || player_index == NONE ||
 		!halo_vr_running())

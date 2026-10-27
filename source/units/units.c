@@ -992,6 +992,9 @@ boolean network_game_distributed_client(void);
 boolean vr_grenade_throw_advance(long unit_index, short *frame_index, short key_frame_index, boolean first_person);
 boolean vr_grenade_release(long unit_index, long grenade_index, real_vector3d *initial_velocity);
 boolean vr_grenade_first_person_throw(long unit_index);
+/* port: an enemy staggered by the VR mode's fists (vr.fists,
+port/linux/game/vr_fists.c) */
+boolean vr_fists_staggered(long unit_index);
 #endif
 static void unit_drop_grenades(
 	long unit_index);
@@ -4379,6 +4382,12 @@ boolean unit_melee_attack_begin(
 	char previous_animation_state = unit->unit.animation.state;
 	boolean result = FALSE;
 
+#ifdef HALO_VR
+	/* port: staggered by the VR mode's fists, an enemy begins no melee
+	attack (port/linux/game/vr_fists.c) */
+	if (vr_fists_staggered(unit_index))
+		return FALSE;
+#endif
 	switch (previous_animation_state)
 	{
 	case _unit_state_hard_ping:
