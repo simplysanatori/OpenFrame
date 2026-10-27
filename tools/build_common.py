@@ -229,12 +229,17 @@ def musl_math_cflags(abi: str) -> str:
 # Wayland (with libdecor's window decorations, which GNOME's Wayland asks
 # for), PipeWire, PulseAudio and ALSA loaded when it starts (dlopen), less
 # what the game does not use (KMS/DRM without a desktop, input methods,
-# libusb, JACK, sndio, io_uring) and SDL's own tests
+# libusb, JACK, sndio, io_uring) and SDL's own tests. XSCRNSAVER is off
+# because the game keeps no X11 screensaver state, and its header
+# (X11/extensions/scrnsaver.h, libXss) is missing from some distributions
+# (stock SteamOS), where SDL3's configure would otherwise stop; X11 itself
+# stays on
 SDL_OPTIONS = [
     "-DCMAKE_BUILD_TYPE=Release", "-DSDL_SHARED=ON", "-DSDL_STATIC=OFF", "-DSDL_TEST_LIBRARY=OFF",
     "-DSDL_TESTS=OFF", "-DSDL_EXAMPLES=OFF", "-DSDL_KMSDRM=OFF", "-DSDL_WAYLAND_LIBDECOR=ON",
     "-DSDL_WAYLAND_LIBDECOR_SHARED=ON", "-DSDL_IBUS=OFF", "-DSDL_HIDAPI_LIBUSB=OFF", "-DSDL_JACK=OFF",
     "-DSDL_SNDIO=OFF", "-DSDL_LIBURING=OFF", "-DSDL_FRIBIDI=OFF", "-DSDL_LIBTHAI=OFF", "-DSDL_X11_XTEST=OFF",
+    "-DSDL_X11_XSCRNSAVER=OFF",
 ]
 # (the linker's options for the executable that loads the SDL it brings:
 # beside it in a build, in ../lib/openh1 in the release's tree
