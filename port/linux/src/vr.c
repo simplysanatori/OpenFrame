@@ -143,6 +143,18 @@ tuning, by moistman42069, AGPL-3.0-or-later.) */
 /* (OpenFrame, vr.auto_recentre) how many frames the aim is let go before
 play coming back recentres: half a second at 90 Hz */
 #define AUTO_RECENTRE_FRAMES 45
+/* (OpenFrame) whether the loading picture is up (sdl_platform.c) */
+int halo_loading_owned(void);
+/* (OpenFrame, vr.auto_recentre) no recentre of its own within this long
+(seconds) after one by hand (both grips, a gamepad's Back, SteamVR's); one
+waiting for the sticks to be let go waits this long at most; and a level's
+first seconds (halo_vr_level_start) keep the eye near the player's, as the
+scripts' holds do (vr.held_lean: halo_vr_level_settling) */
+#define AUTO_RECENTRE_MANUAL_SECONDS 5.0
+#define AUTO_RECENTRE_WAIT_SECONDS 2.0
+#define LEVEL_SETTLE_SECONDS 2.0
+/* (the sticks pushed this far are in use: turning, walking) */
+#define AUTO_RECENTRE_STICK 0.3f
 /* a vehicle's seat ridden first-person (port/linux/game/vr_vehicle.c, which
 places it each frame and turns the view with the vehicle: the stick turns
 the view nothing there, but steers a seat steered by its controls while the
@@ -658,6 +670,22 @@ static struct
 	unsigned long aim_released_at;
 	int menu_anchor_valid;
 	int menu_anchor_pending;
+	/* (OpenFrame, vr.auto_recentre) the frames' clock (seconds, the
+	displays' periods added up), when the user last recentred by hand, when
+	play came back (a recentre waiting for the sticks to be let go), when a
+	level last started (its first rendered frame: halo_vr_level_start) and
+	whether its recentre still waits, and the head's rise above the origin
+	as last recentred (standing: the head's height less vr.player_height;
+	seated: none) */
+	double clock;
+	int manual_recentred;
+	double manual_recentre_clock;
+	int resume_waiting;
+	double resume_wait_clock;
+	int level_started;
+	double level_start_clock;
+	int level_recentre_pending;
+	float recentre_rise;
 	float menu_position[3];
 	float menu_yaw;
 	/* the turn, and whether the aim follows the head */
@@ -1523,20 +1551,64 @@ static void menu_anchor(void)
 	vr.menu_anchor_pending = 0;
 }
 
-static void recentre(void)
+/* (OpenFrame) where the head is from the recentred origin (game axes,
+metres: forward, left, up; and the yaw it turned, degrees), logged on one
+line, so a trial's log shows how far off the eye was and why it moved */
+static void head_offset_log(const char *reason)
 {
 	const struct vr_host_pose *head = &vr.views.head;
-	float yaw;
+	float offset[3], game[3], yaw;
+	int axis;
 
 	if (!head->valid)
 		return;
+	if (!vr.origin_valid)
+	{
+		platform_log("vr: head offset: none yet (no origin) at %s", reason);
+		return;
+	}
+	for (axis = 0; axis < 3; axis++)
+		offset[axis] = head->position[axis] - vr.origin_position[axis];
+	game_axes(offset, vr.origin_yaw, game);
+	yaw = remainderf(quaternion_yaw(head->orientation) - vr.origin_yaw, 2.0f * (float)M_PI) * 180.0f /
+		(float)M_PI;
+	platform_log("vr: head offset: %.2f %.2f %.2f m (yaw %.0f\xc2\xb0) at %s", game[0], game[1],
+		game[2] - vr.recentre_rise, yaw, reason);
+}
+
+/* the origin where the head is now, facing where it looks; manual: the
+user's own (both grips, a gamepad's Back, SteamVR's recentre), which the
+automatic ones then leave alone a while (AUTO_RECENTRE_MANUAL_SECONDS);
+whether it did (the head located) */
+static int recentre(const char *reason, int manual)
+{
+	const struct vr_host_pose *head = &vr.views.head;
+	char cause[96];
+	float yaw;
+
+	if (!head->valid)
+		return 0;
+	snprintf(cause, sizeof(cause), "recentre (%s)", reason);
+	head_offset_log(cause);
 	yaw = quaternion_yaw(head->orientation);
 	/* (OpenFrame, vr.auto_recentre: the first play recentres again, as the
-	headset is on by then) */
+	headset is on by then; a later recentre is the one play coming back
+	would make: it is not made again, unless the aim is let go again) */
 	if (!vr.origin_valid && !vr.aim_released)
 	{
 		vr.aim_released = 1;
 		vr.aim_released_at = vr.presents;
+	}
+	else if (vr.origin_valid)
+	{
+		vr.aim_released = 0;
+		vr.resume_waiting = 0;
+	}
+	if (manual)
+	{
+		vr.manual_recentred = 1;
+		vr.manual_recentre_clock = vr.clock;
+		vr.level_recentre_pending = 0;
 	}
 	/* the aim keeps pointing where it did; the gamepad's is where the head
 	looks now (halo_vr_aim) */
@@ -1550,10 +1622,80 @@ static void recentre(void)
 	vr.origin_position[0] = head->position[0];
 	vr.origin_position[1] = settings.standing ? settings.player_height : head->position[1];
 	vr.origin_position[2] = head->position[2];
+	vr.recentre_rise = settings.standing ? head->position[1] - settings.player_height : 0.0f;
 	vr.origin_valid = 1;
 	/* (OpenFrame: the menus too, before the head) */
 	menu_anchor();
 	platform_log("vr: recentred (%s)", settings.standing ? "standing" : "seated");
+	return 1;
+}
+
+/* (OpenFrame, vr.auto_recentre) whether a recentre of the game's own may
+be made now: 0; 1, not yet (the sticks in use: turning, walking); 2, not at
+all (the user recentred by hand moments ago) */
+static int auto_recentre_blocked(void)
+{
+	if (vr.manual_recentred && vr.clock - vr.manual_recentre_clock < AUTO_RECENTRE_MANUAL_SECONDS)
+		return 2;
+	if (fabsf(vr.input.left_stick[0]) > AUTO_RECENTRE_STICK || fabsf(vr.input.left_stick[1]) > AUTO_RECENTRE_STICK ||
+		fabsf(vr.input.right_stick[0]) > AUTO_RECENTRE_STICK || fabsf(vr.input.right_stick[1]) > AUTO_RECENTRE_STICK)
+	{
+		return 1;
+	}
+	return 0;
+}
+
+/* (OpenFrame, vr.auto_recentre) a level's start waiting to recentre:
+now if it may, else once the sticks are let go, for a moment at most */
+static void level_recentre_try(void)
+{
+	int blocked;
+
+	if (!vr.level_recentre_pending || !vr.views.head.valid)
+		return;
+	blocked = auto_recentre_blocked();
+	if (!blocked)
+	{
+		if (recentre("level start", 0))
+		{
+			vr.level_recentre_pending = 0;
+			vr.aim_synced = 0;
+		}
+	}
+	else if (blocked == 2)
+	{
+		platform_log("vr: level start: no recentre (recentred by hand %.1f s before)",
+			vr.clock - vr.manual_recentre_clock);
+		vr.level_recentre_pending = 0;
+	}
+	else if (vr.clock - vr.level_start_clock > AUTO_RECENTRE_WAIT_SECONDS)
+	{
+		platform_log("vr: level start: no recentre (the sticks in use)");
+		vr.level_recentre_pending = 0;
+	}
+}
+
+void halo_vr_level_start(const char *why)
+{
+	char reason[96];
+
+	snprintf(reason, sizeof(reason), "level start (%s)", why);
+	head_offset_log(reason);
+	vr.level_started = 1;
+	vr.level_start_clock = vr.clock;
+	vr.level_recentre_pending = settings.auto_recentre;
+	level_recentre_try();
+}
+
+int halo_vr_level_settling(void)
+{
+	return settings.auto_recentre && (vr.level_recentre_pending ||
+		(vr.level_started && vr.clock - vr.level_start_clock < LEVEL_SETTLE_SECONDS));
+}
+
+float halo_vr_recentred_rise(void)
+{
+	return vr.recentre_rise;
 }
 
 static void normalize(float v[3])
@@ -4581,7 +4723,7 @@ static void input_update(void)
 		if (vr.gamepad_recentre_time >= GAMEPAD_RECENTRE_SECONDS &&
 			vr.gamepad_recentre_time - seconds < GAMEPAD_RECENTRE_SECONDS)
 		{
-			recentre();
+			recentre("the gamepad's View held", 1);
 		}
 	}
 	else
@@ -4624,7 +4766,7 @@ static void input_update(void)
 	{
 		vr.recentre_time += seconds;
 		if (vr.recentre_time >= RECENTRE_SECONDS && vr.recentre_time - seconds < RECENTRE_SECONDS)
-			recentre();
+			recentre("both grips held", 1);
 	}
 	else
 	{
@@ -5397,6 +5539,7 @@ static int frame_begin(void)
 	jitter_new();
 	shake_new(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : vr.views.display_period);
 	vr.test_head_seconds += vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : vr.views.display_period;
+	vr.clock += vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : vr.views.display_period;
 	if (host_vr_locate(&vr.views))
 	{
 		latch_located();
@@ -5407,12 +5550,19 @@ static int frame_begin(void)
 		/* (OpenFrame: and as the runtime recentres its play space, SteamVR's
 		own recentre, which moves the head in it: the origin kept from before
 		would put the eye and the menus off to the side) */
-		if (!vr.origin_valid || (vr.views.focused && !vr.was_focused) || vr.views.space_changed)
-			recentre();
+		if (vr.views.space_changed)
+			recentre("SteamVR's recentre", 1);
+		else if (!vr.origin_valid)
+			recentre("the first head pose", 0);
+		else if (vr.views.focused && !vr.was_focused)
+			recentre("the headset put on (focus)", 0);
 		/* (OpenFrame, vr.auto_recentre: the menus as they open, in front of
 		the head) */
 		else if (vr.menu_anchor_pending && vr.views.head.valid && vr.views.focused)
 			menu_anchor();
+		/* (OpenFrame, vr.auto_recentre: a level's start still waiting for
+		the sticks to be let go) */
+		level_recentre_try();
 	}
 	if (vr.views.head.valid)
 		vr.was_focused = vr.views.focused;
@@ -6010,6 +6160,7 @@ int halo_vr_aim(float current_yaw, int long_gun, float *yaw, float *pitch)
 {
 	static const float backwards[3] = { 0.0f, 0.0f, -1.0f };
 	float v[3], f[3], head_yaw;
+	int keep_released = 0;
 
 	if (!(vr.frame || vr.pending) || !vr.views.should_render || !vr.views.head.valid)
 	{
@@ -6023,13 +6174,45 @@ int halo_vr_aim(float current_yaw, int long_gun, float *yaw, float *pitch)
 	ahead where it looks, so a head moved or turned since the last recentre
 	(or SteamVR's) does not put the eye outside the player (the view keeps
 	the player's facing: aim_synced) */
+	/* (OpenFrame: not while the loading picture is up, the map's pipelines
+	still being made, which the level's start (halo_vr_level_start) follows;
+	not moments after the user recentred by hand; and with the sticks in use,
+	once they are let go, if soon) */
 	if (vr.aim_released && settings.auto_recentre && vr.presents - vr.aim_released_at >= AUTO_RECENTRE_FRAMES)
 	{
-		platform_log("vr: play resumes: recentring (vr.auto_recentre)");
-		recentre();
-		vr.aim_synced = 0;
+		int blocked = halo_loading_owned() ? 1 : auto_recentre_blocked();
+
+		if (!vr.resume_waiting)
+		{
+			vr.resume_waiting = 1;
+			vr.resume_wait_clock = vr.clock;
+		}
+		if (!blocked)
+		{
+			platform_log("vr: play resumes: recentring (vr.auto_recentre)");
+			recentre("play resumes", 0);
+			vr.aim_synced = 0;
+		}
+		else if (blocked == 2)
+		{
+			platform_log("vr: play resumes: no recentre (recentred by hand %.1f s before)",
+				vr.clock - vr.manual_recentre_clock);
+		}
+		else if (halo_loading_owned() || vr.clock - vr.resume_wait_clock <= AUTO_RECENTRE_WAIT_SECONDS)
+		{
+			/* (kept for a later frame) */
+			keep_released = 1;
+		}
+		else
+		{
+			platform_log("vr: play resumes: no recentre (the sticks in use)");
+		}
 	}
-	vr.aim_released = 0;
+	if (!keep_released)
+	{
+		vr.aim_released = 0;
+		vr.resume_waiting = 0;
+	}
 	if (settings.gamepad_aim)
 	{
 		/* the gamepad aims, as on the flat screen: the facing stays the

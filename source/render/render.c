@@ -198,6 +198,9 @@ void vr_trigger_dispose_from_old_map(void);
 made as a map is loaded */
 void vr_cabin_initialize_for_new_map(void);
 void vr_cabin_dispose_from_old_map(void);
+/* port (OpenFrame): a level's start, which recentres the VR view at its
+first frame drawn (port/linux/game/vr_render.c) */
+void vr_render_initialize_for_new_map(void);
 
 static boolean render_vr_eye_pass;
 static boolean render_vr_scope_pass;
@@ -243,6 +246,9 @@ void render_initialize_for_new_map(
 	/* port: the VR mode's cabins about a vehicle's seat
 	(port/linux/game/vr_cabin.c) */
 	vr_cabin_initialize_for_new_map();
+	/* port (OpenFrame): the VR view recentred as the map's first frame is
+	drawn (port/linux/game/vr_render.c) */
+	vr_render_initialize_for_new_map();
 #endif
 }
 
