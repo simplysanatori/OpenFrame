@@ -84,10 +84,15 @@ the hand without the weapon.
   the one held, as ever.
 - Hand swap: palms together (within 10 cm), the weapon's grip open, and the
   other hand's grip takes the weapon: everything of the weapon's hand
-  (trigger, aim, melee swing, holsters, pouches) moves to that hand, as
-  `vr.dominant_hand` would, until you pass it back. The sticks stay as they
-  were. Both grips are nothing until both are let go. The HUD says which
-  hand the weapon is in.
+  (trigger, aim, melee swing, holsters, pouches, the wrist HUD's side)
+  moves to that hand: the swap sets `vr.dominant_hand` to that hand, for
+  now and in `config.toml`, as VR Setup's DOMINANT HAND does, so the menu
+  and the hands never disagree; it stays so (next start too) until you pass
+  it back or choose the hand in VR Setup. It works from either hand, and
+  back. The sticks stay as they were: with `vr.swap_sticks = "auto"` (as the
+  hand) the swap first writes it as what it does then (`"no"` or `"yes"`).
+  Both grips are nothing until both are let go. The HUD says which hand the
+  weapon is in.
 - The grip goes to the pull or the prop only while the hand points at a
   weapon to pull or is at a thing to hold; a pouch's magazine comes first,
   and the grenade (`vr.grenade_throw`) and the foregrip otherwise, as ever.
@@ -110,7 +115,8 @@ moves: you still aim with the controller from where your body's hand is
 (the reticle where it points), the HUD is as ever, and you hear from your
 body. The view sits back along your body's heading (the head's, which it
 follows past a turn and slowly, so aiming and glancing about swing
-nothing), 0.3 m above the head and 0.25 m to its right; your head looks and
+nothing), 0.3 m above the head and 0.25 m to the weapon hand's side (its
+right, or its left with `vr.dominant_hand = "left"`); your head looks and
 leans about from there. A wall between brings it in at once, and it eases
 back out. The first-person weapon and hands (and what they hold: a
 grenade, a magazine, the holstered weapon) are not drawn. It is OpenH1's
@@ -284,3 +290,46 @@ glass, glow and reaction to the world (`port/linux/vulkan/host_vulkan_vr.c`).
   the temple hides the HUD) and the menus' placement (`vr.menu_anchor`
   head, world, follow). A lag for the HUD following the head needs nothing
   new: OpenH1 has `vr.hud_lag`.
+
+## Left-handed
+
+Set VR Setup > HAND, HEIGHT, HUD... > DOMINANT HAND to LEFT
+(`vr.dominant_hand = "left"`). OpenH1 swaps the two controllers as their
+input comes in (`port/linux/src/vr.c`, `hands_assign_views` and
+`hands_assign_input`): from there on everything that says "the weapon's
+hand" is the left controller and "the other hand" the right one, so every
+feature below follows without a check of its own. `vr.swap_sticks`
+(SWAP STICKS, default AS THE HAND) then swaps the sticks too: the right
+stick moves, the left turns; NO keeps them where they are. Not with
+`vr.aim = "gamepad"`. The buttons stay where they are on the controllers
+(A, B, X, Y and Menu on the right, the d-pad and View on the left), as the
+game's prompts name them.
+
+How each feature behaves, left-handed:
+
+- Weapon, aim, trigger, melee swing (`vr.melee_gesture`), scopes'
+  smart-link zoom: the left hand; the weapon and the hands drawn mirrored.
+- Foregrip (`vr.two_handed`), magazines (`vr.manual_reload`) and the hand
+  grenade (`vr.grenade_throw`): the right hand. The grenade's prompt says
+  "Right Hand Throw".
+- Holsters (`vr.holsters`): over the left shoulder and at the left hip; the
+  magazines' pouches at the right hip (and the right shoulder).
+- Turning stick: whichever stick turns you (the left with SWAP STICKS as
+  the hand or YES; the right with NO). Sprint's flick up, bullet time's
+  hold up and the third person's hold down are all on it, as is the
+  magazine's eject (pushed down) and the smart-link's zoom (its click).
+- Third person on foot: the view sits over the left shoulder instead of
+  the right.
+- Wrist HUD (`vr.hud_mode = "wrist"`): on the right wrist, read the same
+  way up (its top toward the little finger, the shields across the top).
+- Fists (`vr.fists`): both hands punch, as for a right-hander: the free
+  (right) hand always, the left (weapon) hand while it holds no weapon;
+  either hand parries, the right not while it holds the foregrip.
+- Weapon pull and prop throw: the free (right) hand.
+- Hand swap (`vr.hand_swap`): from a left-handed start, palms together and
+  the right grip takes the weapon; DOMINANT HAND becomes RIGHT. Again with
+  the left grip, and it is LEFT again. The sticks do not move.
+- Parkour: the game's own crouch, jump and moving stick; no hand.
+- Vehicles: each hand takes the handle on its own side, as ever.
+- HUD messages: "Weapon in the left hand" / "Weapon in the right hand"
+  after a hand swap.
