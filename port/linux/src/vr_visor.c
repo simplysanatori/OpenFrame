@@ -149,7 +149,24 @@ static struct
 	float wrap;
 	float rim, rim_depth, rim_reach;
 	float energy;
+	/* (OpenFrame) vr.hud_mode (HUD_MODE_*), and the wrist HUD's size
+	(vr.wrist_hud_scale) and its place moved from its own (metres:
+	vr.wrist_hud_offset_along, _across, _out) */
+	int hud_mode;
+	float wrist_scale;
+	float wrist_offset[3];
 } settings = { (unsigned long)-1 };
+
+/* (OpenFrame) vr.hud_mode: the HUD's corners (the weapon's, the shields'
+and the motion tracker's panels) on the visor as ever, on the off hand's
+wrist, or not shown; the rest of the HUD (the reticle, the messages, the
+waypoints and the names) stays on the visor in every mode */
+enum
+{
+	HUD_MODE_VISOR = 0,
+	HUD_MODE_WRIST,
+	HUD_MODE_HIDDEN,
+};
 
 /* the HUD's panels: the group each shows, the HUD's region it is in (0 to
 1, across and down), and the setting of its distance from the HUD's (at
@@ -181,6 +198,35 @@ across (radians for a radian squared); the most of vr.hud_wrap */
 #define WRAP_UP (5.0f * (float)M_PI / 180.0f)
 #define WRAP_BEND 0.25f
 #define WRAP_MOST 2.0f
+
+/* (OpenFrame) the wrist HUD (vr.hud_mode = "wrist"): ported from
+HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later), its vr_frame.c's
+wrist_crops, WRIST_HUD_BACK, WRIST_HUD_OUT and place_wrist's sizes and test.
+Each corner's panel shows only the part of its region its elements fill (the
+HUD's, 0 to 1 across and down: the weapon's ammunition and grenades top
+left, the shields and health top right, the motion tracker bottom left; a
+little wider than its crops, as each group's image holds its own elements
+alone); laid out on a panel WRIST_WIDTH across (times vr.wrist_hud_scale) as
+its panel is: the shields and health across its top, the motion tracker under
+them on the left, the ammunition beside it. The panel is WRIST_BACK behind
+the grip along the arm and WRIST_OUT out of the back of the wrist (metres),
+shown while that faces the head within WRIST_FACING (the cosine of the
+angle between the way out of the wrist and the way to the head), fading in
+and out over WRIST_FADE (seconds, a time constant: OpenFrame's; theirs shows
+or hides at once) */
+static const float wrist_regions[VR_PANEL_COUNT][4] =
+{
+	{ 0.0f, 0.0f, 1.0f, 1.0f },
+	{ 0.0f, 0.0f, 0.42f, 0.29f },
+	{ 0.58f, 0.0f, 1.0f, 0.19f },
+	{ 0.0f, 0.64f, 0.32f, 1.0f },
+};
+#define WRIST_WIDTH 0.11f
+#define WRIST_ASPECT 0.75f
+#define WRIST_BACK 0.10f
+#define WRIST_OUT 0.045f
+#define WRIST_FACING 0.45f
+#define WRIST_FADE 0.06f
 
 static struct
 {
@@ -223,7 +269,18 @@ static struct
 	float hit_time;
 	/* the shields' look on the armour (halo_vr_visor_state) */
 	struct halo_vr_visor_state look;
+	/* (OpenFrame) the wrist HUD this frame (wrist_follow): the corners on
+	the wrist (it is tracked and free; else they are on the visor), how much
+	they show (0 to 1, eased), and its panel's frame (play space: its
+	middle, and its axes across, up and out of the wrist) */
+	int wrist_on;
+	int wrist_logged;
+	float wrist_opacity;
+	float wrist_centre[3], wrist_right[3], wrist_up[3], wrist_out[3];
 } visor;
+
+static void wrist_follow(void);
+static void wrist_layout(int index, const struct vr_visor_panel *panel, float centre[2], float size[2]);
 
 static float clamp(float value, float low, float high)
 {
@@ -255,6 +312,12 @@ static void settings_read(void)
 	settings.rim_depth = clamp((float)config_real("vr.helmet_rim_depth"), 0.05f, 0.25f);
 	settings.rim_reach = clamp((float)config_real("vr.helmet_rim_reach"), 0.0f, 0.2f);
 	settings.energy = clamp((float)config_real("vr.visor_energy"), 0.0f, 2.0f);
+	settings.hud_mode = !strcmp(config_string("vr.hud_mode"), "wrist") ? HUD_MODE_WRIST :
+		!strcmp(config_string("vr.hud_mode"), "hidden") ? HUD_MODE_HIDDEN : HUD_MODE_VISOR;
+	settings.wrist_scale = clamp((float)config_real("vr.wrist_hud_scale"), 0.5f, 2.0f);
+	settings.wrist_offset[0] = clamp((float)config_real("vr.wrist_hud_offset_along"), -0.2f, 0.2f);
+	settings.wrist_offset[1] = clamp((float)config_real("vr.wrist_hud_offset_across"), -0.2f, 0.2f);
+	settings.wrist_offset[2] = clamp((float)config_real("vr.wrist_hud_offset_out"), -0.2f, 0.2f);
 }
 
 int vr_visor_enabled(void)
@@ -371,6 +434,7 @@ void vr_visor_follow(const struct vr_host_pose *head, const struct vr_host_pose 
 	/* (a quad's tangents grow without bound toward 90 degrees) */
 	visor.half_angles[0] = clamp(size, 20.0f, 120.0f) * 0.5f * (float)M_PI / 180.0f;
 	visor.half_angles[1] = visor.half_angles[0] * HUD_ASPECT;
+	wrist_follow();
 	if (!head->valid)
 		return;
 	if (!visor.orientation_valid || settings.lag <= 0.0f || visor.seconds <= 0.0f)
@@ -609,17 +673,20 @@ static void wrapped_direction(float across, float up, const float wrap[3], float
 }
 
 /* a panel's plane, for the HUD's half angles (radians), its distance
-(metres), vr.hud_depth, its tilt (radians) and vr.hud_wrap */
-static void panel_geometry(int index, const float half_angles[2], float distance, float depth, float tilt,
+(metres), vr.hud_depth, its tilt (radians) and vr.hud_wrap; (OpenFrame)
+plain: on the wrist (its elements' part of its region alone) */
+static void panel_geometry(int index, int plain, const float half_angles[2], float distance, float depth, float tilt,
 	float wrap, struct vr_visor_panel *panel)
 {
 	static const float world_up[3] = { 0.0f, 1.0f, 0.0f };
-	const float *region = panel_layout[index].region;
+	const float *region = plain ? wrist_regions[index] : panel_layout[index].region;
 	float across, up, normal[3], half[2] = { 0.0f, 0.0f };
 	int axis, edge, step;
 
 	memset(panel, 0, sizeof(*panel));
 	panel->group = panel_layout[index].group;
+	panel->opacity = 1.0f;
+	panel->plain = plain;
 	memcpy(panel->region, region, sizeof(panel->region));
 	panel_wrap(index, wrap, panel->wrap);
 	/* its middle, facing the head, tilted back (its top farther) */
@@ -681,7 +748,7 @@ void vr_visor_panel_sizes(int width[VR_PANEL_COUNT], int height[VR_PANEL_COUNT])
 		if (!settings.visor)
 			continue;
 		/* (the most the tilt, the region's curve and its bend may take) */
-		panel_geometry(index, half_angles, 2.0f, 1.0f, index == TRACKER_PANEL ? TILT_MOST : 0.0f, WRAP_MOST, &panel);
+		panel_geometry(index, 0, half_angles, 2.0f, 1.0f, index == TRACKER_PANEL ? TILT_MOST : 0.0f, WRAP_MOST, &panel);
 		width[index] = ((int)(2.0f * panel.half_size[0] * density) + 15) & ~15;
 		height[index] = ((int)(2.0f * panel.half_size[1] * density) + 15) & ~15;
 		if (width[index] > 2048)
@@ -696,11 +763,25 @@ int vr_visor_panels(struct vr_visor_panel panels[VR_PANEL_COUNT])
 	int index;
 
 	settings_read();
-	if (!settings.visor || visor.menus || settings.depth <= 0.0f)
+	/* (OpenFrame: the corners apart from the rest in every vr.hud_mode
+	but "visor", at vr.hud_depth 0 too) */
+	if (!settings.visor || visor.menus || (settings.depth <= 0.0f && settings.hud_mode == HUD_MODE_VISOR))
 		return 0;
 	for (index = 0; index < VR_PANEL_COUNT; index++)
-		panel_geometry(index, visor.half_angles, visor.distance, settings.depth,
-			index == TRACKER_PANEL ? settings.tracker_tilt : 0.0f, settings.wrap, &panels[index]);
+	{
+		int corner = panel_layout[index].group != HALO_VR_HUD_GROUP_WORLD;
+		int plain = corner && settings.hud_mode == HUD_MODE_WRIST && visor.wrist_on;
+
+		/* (OpenFrame) vr.hud_mode: the corners on the wrist, plain and
+		unbent, as much as it faces the head, or not shown */
+		panel_geometry(index, plain, visor.half_angles, visor.distance, settings.depth,
+			index == TRACKER_PANEL && !plain ? settings.tracker_tilt : 0.0f, plain ? 0.0f : settings.wrap,
+			&panels[index]);
+		if (plain)
+			panels[index].opacity = visor.wrist_opacity;
+		else if (corner && settings.hud_mode == HUD_MODE_HIDDEN)
+			panels[index].opacity = 0.0f;
+	}
 	return 1;
 }
 
@@ -747,7 +828,9 @@ void vr_visor_layers(struct vr_host_layers *layers)
 {
 	static const float forward[3] = { 0.0f, 0.0f, -1.0f };
 	float d = visor.distance, tangent_up = tanf(visor.half_angles[1]);
-	int follows = settings.lag > 0.0f && visor.orientation_valid && visor.head.valid;
+	/* (OpenFrame: with the wrist HUD the layers are all the play space's,
+	the HUD's on the head as located without a lag) */
+	int follows = (settings.lag > 0.0f || visor.wrist_on) && visor.orientation_valid && visor.head.valid;
 	int axis;
 	float base[3];
 
@@ -801,9 +884,28 @@ void vr_visor_layers(struct vr_host_layers *layers)
 			const struct vr_visor_panel *panel = &panels[index];
 			float offset[3], back[3], orientation[4];
 
-			if (!any || !layers->panels[index].shown)
+			if (!any || !layers->panels[index].shown || !(panel->opacity > 0.0f))
 			{
 				memset(&layers->panels[index], 0, sizeof(layers->panels[index]));
+				continue;
+			}
+			if (panel->plain)
+			{
+				/* (OpenFrame) on the wrist (wrist_follow), over the HUD's
+				layer: its place in the wrist's panel (wrist_layout), facing
+				out of the wrist */
+				float place[2], size[2];
+
+				wrist_layout(index, panel, place, size);
+				for (axis = 0; axis < 3; axis++)
+					layers->panels[index].pose.position[axis] = visor.wrist_centre[axis] +
+						visor.wrist_right[axis] * place[0] + visor.wrist_up[axis] * place[1];
+				quaternion_from_axes(visor.wrist_right, visor.wrist_up, visor.wrist_out,
+					layers->panels[index].pose.orientation);
+				layers->panels[index].pose.valid = 1;
+				layers->panels[index].size[0] = size[0];
+				layers->panels[index].size[1] = size[1];
+				layers->panels[index].over_hud = 1;
 				continue;
 			}
 			for (axis = 0; axis < 3; axis++)
@@ -1288,5 +1390,122 @@ void vr_visor_composite(unsigned char *eyes[2], int width, int height, const str
 			}
 		}
 	}
+}
+/* ---------- (OpenFrame) the wrist HUD (vr.hud_mode = "wrist") */
+
+/* once a frame (vr_visor_follow): where the wrist's panel is and how much
+it shows. On the back of the off hand's wrist, as a watch is read, facing
+out of it, its top toward the grip's -y. Ported from HaloCE-DecompRemix-VR
+by moistman42069 (AGPL-3.0-or-later): vr_frame.c's place_wrist (its place,
+from the grip, and its test of facing the head); the fade is OpenFrame's */
+static void wrist_follow(void)
+{
+	static const float grip_down[3] = { 0.0f, -1.0f, 0.0f };
+	struct vr_host_pose grip;
+	float back[3], offset[3], out_axis[3], to_head[3], length, target;
+	int right = 0, busy = 0, axis;
+
+	if (settings.hud_mode != HUD_MODE_WRIST || visor.menus || !visor.head.valid ||
+		!halo_vr_wrist(&grip, &right, &busy) || !grip.valid)
+	{
+		visor.wrist_on = 0;
+		visor.wrist_opacity = 0.0f;
+		return;
+	}
+	if (!visor.wrist_logged)
+	{
+		platform_log("vr: the wrist HUD on the %s controller's wrist (moved %.0f/%.0f/%.0f cm along/across/out, "
+			"%.0f%% of %.0f cm)", right ? "right" : "left", settings.wrist_offset[0] * 100.0f,
+			settings.wrist_offset[1] * 100.0f, settings.wrist_offset[2] * 100.0f, settings.wrist_scale * 100.0f,
+			WRIST_WIDTH * 100.0f);
+		visor.wrist_logged = 1;
+	}
+	/* (OpenXR's grip: +x out of a left palm and into a right one, so the
+	back of a left hand is -x, of a right one +x; along the arm +z, across
+	it +y) */
+	back[0] = 0.0f;
+	back[1] = settings.wrist_offset[1];
+	back[2] = WRIST_BACK + settings.wrist_offset[0];
+	out_axis[0] = right ? 1.0f : -1.0f;
+	out_axis[1] = out_axis[2] = 0.0f;
+	quaternion_rotate(grip.orientation, back, offset);
+	quaternion_rotate(grip.orientation, out_axis, visor.wrist_out);
+	quaternion_rotate(grip.orientation, grip_down, visor.wrist_up);
+	cross(visor.wrist_up, visor.wrist_out, visor.wrist_right);
+	normalize(visor.wrist_right);
+	for (axis = 0; axis < 3; axis++)
+	{
+		visor.wrist_centre[axis] = grip.position[axis] + offset[axis] +
+			visor.wrist_out[axis] * (WRIST_OUT + settings.wrist_offset[2]);
+		to_head[axis] = visor.head.position[axis] - visor.wrist_centre[axis];
+	}
+	length = sqrtf(dot(to_head, to_head));
+	/* (not while that hand holds the long gun's foregrip) */
+	target = !busy && length > 0.05f && dot(visor.wrist_out, to_head) >= WRIST_FACING * length ? 1.0f : 0.0f;
+	visor.wrist_opacity = visor.wrist_on ? ease(visor.wrist_opacity, target, visor.seconds, WRIST_FADE) : 0.0f;
+	visor.wrist_on = 1;
+}
+
+/* a corner's place on the wrist's panel (metres from its middle: across,
+up) and its size (metres), the panel WRIST_WIDTH times vr.wrist_hud_scale
+across and WRIST_ASPECT of that high. Laid out as vr_frame.c's
+copy_wrist lays out its image (ported from HaloCE-DecompRemix-VR by
+moistman42069, AGPL-3.0-or-later): the shields and health across the top,
+as high as their part's shape on the 640x480 screen leaves them (at most
+half), the motion tracker under them on the left (at most half across), the
+ammunition beside it; each corner as large as its slot holds it in its own
+shape (its panel's) */
+static void wrist_layout(int index, const struct vr_visor_panel *panel, float centre[2], float size[2])
+{
+	float width = WRIST_WIDTH * settings.wrist_scale, height = width * WRIST_ASPECT;
+	float aspect[VR_PANEL_COUNT], slot[4], top, rest, tracker, shape;
+	int region;
+
+	/* (each part's shape on the 4:3 screen: across over down) */
+	for (region = 0; region < VR_PANEL_COUNT; region++)
+		aspect[region] = (wrist_regions[region][2] - wrist_regions[region][0]) * 4.0f /
+			((wrist_regions[region][3] - wrist_regions[region][1]) * 3.0f);
+	top = width / aspect[2];
+	if (top > height * 0.5f)
+		top = height * 0.5f;
+	rest = height - top;
+	tracker = rest * aspect[TRACKER_PANEL];
+	if (tracker > width * 0.5f)
+		tracker = width * 0.5f;
+	/* (its slot: left, top, across, down, from the panel's top left) */
+	slot[0] = slot[1] = 0.0f;
+	slot[2] = width;
+	slot[3] = height;
+	if (panel_layout[index].group == HALO_VR_HUD_GROUP_STATUS)
+		slot[3] = top;
+	else if (panel_layout[index].group == HALO_VR_HUD_GROUP_TRACKER)
+	{
+		slot[1] = top;
+		slot[2] = tracker;
+		slot[3] = rest;
+	}
+	else if (panel_layout[index].group == HALO_VR_HUD_GROUP_WEAPON)
+	{
+		slot[0] = tracker;
+		slot[1] = top;
+		slot[2] = width - tracker;
+		slot[3] = slot[2] / aspect[index];
+		if (slot[3] > rest)
+			slot[3] = rest;
+	}
+	/* (in its panel's own shape, which its geometry gives it) */
+	shape = panel->half_size[1] > 0.0f ? panel->half_size[0] / panel->half_size[1] : aspect[index];
+	if (slot[2] > slot[3] * shape)
+	{
+		size[1] = slot[3];
+		size[0] = slot[3] * shape;
+	}
+	else
+	{
+		size[0] = slot[2];
+		size[1] = slot[2] / shape;
+	}
+	centre[0] = slot[0] + slot[2] * 0.5f - width * 0.5f;
+	centre[1] = height * 0.5f - (slot[1] + slot[3] * 0.5f);
 }
 #endif

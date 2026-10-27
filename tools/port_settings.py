@@ -66,6 +66,8 @@ VR_HANDS = [("ARMS", "arms"), ("FLOATING HANDS", "floating"), ("GAME ARMS", "gam
 VR_AIM = [("CONTROLLER", "controller"), ("HEAD", "head"), ("GAMEPAD", "gamepad")]
 VR_DISPLAY = f"{PE}/vr_display/vr_display_screen"
 VR_VISOR = f"{PE}/vr_visor/vr_visor_screen"
+# (OpenFrame: where the HUD's corners are, docs/openframe-features.md)
+VR_HUD = f"{PE}/vr_hud/vr_hud_screen"
 # (OpenFrame: comfort and movement, docs/openframe-features.md)
 VR_COMFORT = f"{PE}/vr_comfort/vr_comfort_screen"
 VR_SCREENS = {
@@ -168,8 +170,8 @@ VR_SCREENS = {
 VR_SCREENS["vr_visor"] = {
     "screen": "vr_visor_screen",
     "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
-    # (twelve rows: closer than VR Display's 28px, the help line lower)
-    "spacing": 24,
+    # (thirteen rows: closer than VR Display's 28px, the help line lower)
+    "spacing": 22,
     "help_top": 366,
     "rows": [
         ("HUD:", "vr.hud", [("VISOR", "visor"), ("FLAT", "flat")],
@@ -206,6 +208,34 @@ VR_SCREENS["vr_visor"] = {
         ("SHIELD ENERGY:", "vr.visor_energy",
          [(f"{round(energy * 100)}%", f"{energy:g}") for energy in (0.25, 0.5, 0.75, 1, 1.5, 2)],
          "How strong the shields' energy across the glass\nis, as they are hit and as they recharge.", None),
+        ("HUD, DISPLAY...", None, VR_HUD,
+         "Where the HUD's corners are: on the visor, on\nyour wrist, or hidden.", None),
+    ],
+}
+# (OpenFrame) where the HUD's corners are, a page of the visor's (titled as
+# VR Display is), every value of it read again as it changes (vr_visor.c).
+# The wrist HUD ported from HaloCE-DecompRemix-VR by moistman42069
+# (AGPL-3.0-or-later): docs/openframe-features.md
+WRIST_OFFSETS = [(f"{round(offset * 100):+d} CM" if offset else "0 CM", f"{offset:g}")
+                 for offset in (-0.1, -0.05, -0.02, 0, 0.02, 0.05, 0.1)]
+VR_SCREENS["vr_hud"] = {
+    "screen": "vr_hud_screen",
+    "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
+    "spacing": 28,
+    "help_top": 366,
+    "rows": [
+        ("HUD MODE:", "vr.hud_mode", [("VISOR", "visor"), ("WRIST", "wrist"), ("HIDDEN", "hidden")],
+         "The shields, ammunition and tracker on the visor,\non your other wrist (turn it to your face), or hidden.",
+         None),
+        ("WRIST HUD SIZE:", "vr.wrist_hud_scale",
+         [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.5, 0.75, 1, 1.25, 1.5, 2)],
+         "How large the wrist HUD is (100%: 11 cm across).", None),
+        ("ALONG THE ARM:", "vr.wrist_hud_offset_along", WRIST_OFFSETS,
+         "Moves the wrist HUD along your forearm (more:\ntoward the elbow).", None),
+        ("ACROSS THE WRIST:", "vr.wrist_hud_offset_across", WRIST_OFFSETS,
+         "Moves the wrist HUD across your wrist (more:\ntoward the thumb).", None),
+        ("OFF THE WRIST:", "vr.wrist_hud_offset_out", WRIST_OFFSETS,
+         "Raises the wrist HUD off your wrist, or lowers it.", None),
     ],
 }
 # (OpenFrame) comfort and movement, a page of VR Display's (titled as VR

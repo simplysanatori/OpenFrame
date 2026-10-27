@@ -686,6 +686,28 @@ static const struct config_setting config_settings[] =
 		"shields' effects on the glass (vr.hud_depth, vr.hud_wrap, vr.hud_lag,\n"
 		"vr.hud_glow, vr.hud_glass, vr.hud_react, vr.helmet_rim, vr.visor_frame,\n"
 		"vr.visor_effects); \"flat\" a flat screen before your eyes." },
+	{ "vr.hud_mode", _config_string, "\"visor\"", "HALO_VR_HUD_MODE", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", where the HUD's corners are (the shields and\n"
+		"health, the weapon's ammunition and grenades, the motion tracker):\n"
+		"\"visor\" on the visor as ever; \"wrist\" on a panel on the back of\n"
+		"your other hand's wrist, shown as you turn it to your face (as a watch\n"
+		"is read; on the visor again in a vehicle's seat); \"hidden\" not shown.\n"
+		"The reticle, the messages and the waypoints stay where they are." },
+	{ "vr.wrist_hud_scale", _config_real, "1.0", "HALO_VR_WRIST_HUD_SCALE", _environment_value, _platform_desktop,
+		"With vr.hud_mode = \"wrist\", the wrist HUD's size, 0.5 to 2 (1 is 11 cm\n"
+		"across)." },
+	{ "vr.wrist_hud_offset_along", _config_real, "0.0", "HALO_VR_WRIST_HUD_OFFSET_ALONG", _environment_value,
+		_platform_desktop,
+		"With vr.hud_mode = \"wrist\", moves the wrist HUD along your forearm from\n"
+		"its place on the wrist, in metres (-0.2 to 0.2; more toward the elbow)." },
+	{ "vr.wrist_hud_offset_across", _config_real, "0.0", "HALO_VR_WRIST_HUD_OFFSET_ACROSS", _environment_value,
+		_platform_desktop,
+		"With vr.hud_mode = \"wrist\", moves the wrist HUD across the wrist, in\n"
+		"metres (-0.2 to 0.2; more toward the thumb)." },
+	{ "vr.wrist_hud_offset_out", _config_real, "0.0", "HALO_VR_WRIST_HUD_OFFSET_OUT", _environment_value,
+		_platform_desktop,
+		"With vr.hud_mode = \"wrist\", raises the wrist HUD off the wrist, in\n"
+		"metres (-0.2 to 0.2; less lowers it)." },
 	{ "vr.hud_distance", _config_real, "2.0", "HALO_VR_HUD_DISTANCE", _environment_value, _platform_desktop,
 		"How far in front of your eyes the HUD is, in meters." },
 	{ "vr.hud_size", _config_real, "60.0", "HALO_VR_HUD_SIZE", _environment_value, _platform_desktop,

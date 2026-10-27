@@ -341,7 +341,8 @@ static int copy_hud_image(struct xgpu_vulkan_image *source, struct xgpu_vulkan_i
 		return 0;
 	uniform2f(&draw, "size", (float)size->width, (float)size->height);
 	uniform2f(&draw, "half_angles", look->half_angles[0], look->half_angles[1]);
-	uniform1f(&draw, "opacity", look->opacity);
+	/* (OpenFrame, vr.hud_mode: a panel's own, the wrist HUD's fade) */
+	uniform1f(&draw, "opacity", look->opacity * (panel ? panel->opacity : 1.0f));
 	uniform1f(&draw, "glow", look->curve ? look->glow : 0.0f);
 	uniform1f(&draw, "glass", look->curve ? look->glass : 0.0f);
 	uniform1f(&draw, "react", look->curve && light ? look->react : 0.0f);
@@ -396,15 +397,22 @@ static void hud_compose(struct xgpu_vulkan_image *hud)
 		{
 			int group = panels[panel].group, width, height;
 			unsigned int token;
+			struct vr_visor_hud_image plain = look;
 
 			halo_vr_panel_size(panel, &width, &height);
+			/* (OpenFrame, vr.hud_mode: a corner not shown, the wrist HUD
+			faded out or "hidden", is not made) */
 			if (group < 0 || group >= HALO_VR_HUD_GROUPS || !(vr.groups_drawn & (1u << group)) ||
-				!vr.groups[group] || width <= 0)
+				!vr.groups[group] || width <= 0 || !(panels[panel].opacity > 0.0f))
 				continue;
+			/* (OpenFrame: a corner on the wrist drawn plain: no visor's
+			glass, glow, reaction to the world nor hits) */
+			if (panels[panel].plain)
+				plain.glow = plain.glass = plain.react = plain.hit = plain.warning = 0.0f;
 			/* Acquisition marks a panel for submission in the shared stream.
 			Do it only once this frame's pixels have been made successfully. */
 			if (image_keep(&vr.panels[panel], width, height, 1, color_format(VR_SWAPCHAIN_PANEL + panel)) &&
-				copy_hud_image(vr.groups[group], vr.panels[panel], &look, &panels[panel], light) &&
+				copy_hud_image(vr.groups[group], vr.panels[panel], &plain, &panels[panel], light) &&
 				(token = halo_vr_image(VR_SWAPCHAIN_PANEL + panel)))
 				vr.panel_tokens[panel] = token;
 		}
