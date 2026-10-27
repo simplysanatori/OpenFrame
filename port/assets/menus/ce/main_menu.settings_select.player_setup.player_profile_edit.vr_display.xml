@@ -130,7 +130,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="HEADSET'S|72 HZ|80 HZ|90 HZ|120 HZ|144 HZ" setting="vr.refresh_rate" values="0|72|80|90|120|144" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="72 HZ|90 HZ|120 HZ" setting="vr.refresh_rate" values="72|90|120" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_vr_visor_screen" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -195,7 +195,7 @@
 		<string text="How far in front of you the menus are."/>
 		<string text="How wide the menus are."/>
 		<string text="Of the size the headset recommends: less is\nfaster, more sharper. From the next start."/>
-		<string text="The headset's rate, if it offers it; the game\ndraws a frame each refresh. From the next start."/>
+		<string text="The headset's rate (72, 90 or 120 Hz); the game\ndraws a frame each refresh. From the next start."/>
 		<string text="The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy."/>
 		<string text="The comfort vignette, sprinting, bullet time,\nthe third person and parkour."/>
 		<string text="Punching and parrying, pulling a weapon to your\nhand, passing it across, holding and throwing things."/>

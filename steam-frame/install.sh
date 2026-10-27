@@ -153,7 +153,7 @@ import os, re, sys
 path, home = sys.argv[1], sys.argv[2]
 want = [("paths", "data", '"%s"' % home), ("paths", "saves", '"%s/saves"' % home),
         ("update", "auto", "false"), ("vr", "refresh_rate", "90.0")]
-# vr.refresh_rate is set only when the file does not have it yet (the wrapper's OPENFRAME_REFRESH_HZ wins at run time anyway)
+# vr.refresh_rate is set only when the file does not have it yet (the game uses it unless the wrapper's OPENFRAME_REFRESH_HZ is given)
 # (the other VR defaults are OpenH1's, reviewed for the Frame in docs/steam-frame-defaults.md)
 try:
     lines = open(path, encoding="utf-8").read().split("\n")

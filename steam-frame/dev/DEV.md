@@ -56,7 +56,7 @@ folders"):
   `saves/`, `brokers.txt`, `sessions/`, and the game's own `debug.txt`.
 - `config.toml` is written once. `install.sh` sets `paths.data` (the folder that contains `maps/`),
   `paths.saves` (`$OPENFRAME_HOME/saves`, so the fork's saves and map cache stay apart from an OpenH1
-  install's `~/.local/share/halo-linux`), `update.auto = false`, and `vr.refresh_rate` when the file has
+  install's `~/.local/share/halo-linux`), `update.auto = false`, and `vr.refresh_rate` (90.0) when the file has
   none. Every other line is left as it is. The wrapper points the game at it with `HALO_CONFIG_FILE`.
 - `update.auto = false` matters: OpenH1's self-updater downloads OpenH1's own release package and would
   replace this fork. The wrapper also exports `HALO_UPDATE_AUTO=false` on every launch, and never sets
@@ -75,8 +75,11 @@ program `<app>/halo`. Steam's `%command%` is a chain of its own helpers ending i
 wrapper runs the chain as given and does not `exec` it, so it can stop the timing logger and collect the
 logs afterwards. Per launch it writes `$OPENFRAME_HOME/sessions/<stamp>/` (`launch.log`, `stdout.log`,
 `vrtiming.log`, plus `debug.txt` and `perfcriteria.txt` when this run wrote them), a `latest` symlink, and
-prunes to the newest 30. Settings (environment, or `session.env`): `OPENFRAME_REFRESH_HZ` (default 90,
-asked of SteamVR as `preferredRefreshRate` and of the game as `HALO_VR_REFRESH_RATE`),
+prunes to the newest 30. Settings (environment, or `session.env`): `OPENFRAME_REFRESH_HZ` (72, 90 or 120;
+when given, asked of SteamVR as `preferredRefreshRate` and of the game as `HALO_VR_REFRESH_RATE`; when not,
+nothing is exported and the game uses `vr.refresh_rate` from `config.toml`, so VR Setup's REFRESH RATE works,
+and SteamVR is asked for that same rate: 90 when the file has none, and 90 with a warning in `launch.log`
+when it holds a rate the Frame lacks),
 `OPENFRAME_PACING` (reserved; passed through), `OPENFRAME_SYSMEM` (default on, `TU_DEBUG=sysmem`),
 `OPENFRAME_MOTION_SMOOTHING`, `OPENFRAME_VRTIMING=0`, `OPENFRAME_KEEP_SESSIONS`. Each launch re-applies
 SteamVR's per-app settings with `vrcmd` (`preferredRefreshRate`, `framesToThrottle=0`,

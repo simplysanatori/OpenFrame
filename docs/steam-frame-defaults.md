@@ -18,7 +18,7 @@ measure, before it becomes a default.
 
 | Setting | OpenH1 default | OpenFrame default | Why | Risk of changing it |
 | --- | --- | --- | --- | --- |
-| `vr.refresh_rate` | `90` | `90` (the installer writes it when `config.toml` lacks it; the wrapper's `OPENFRAME_REFRESH_HZ`, default 90, wins at run time) | 11.1 ms a frame leaves the GPU room at 1728x1728 (OpenH1 measured about 8 ms GPU there with its older renderer); 72 Hz for heavy levels | 120 Hz needs the GPU under about 7 ms: unmeasured with the Vulkan renderer, SteamVR halves the rate when it is missed |
+| `vr.refresh_rate` | `90` | `90` (the installer writes it when `config.toml` lacks it; the wrapper's `OPENFRAME_REFRESH_HZ`, when given, wins at run time) | 11.1 ms a frame leaves the GPU room at 1728x1728 (OpenH1 measured about 8 ms GPU there with its older renderer); 72 Hz for heavy levels | 120 Hz needs the GPU under about 7 ms: unmeasured with the Vulkan renderer, SteamVR halves the rate when it is missed |
 | `vr.resolution_scale` | `1.0` (1728x1728) | `1.0` | The runtime's recommended size; 1.25 was at the edge of 72 Hz, 1.5 dropped to 36 Hz (OpenH1's Frame numbers) | Above 1.0 at 90 Hz drops frames |
 | `vr.foveation` | `"eye"` | `"eye"` | SteamVR on the Frame offers `XR_EXT_eye_gaze_interaction` (its client logs list it); half the eyes' pixels drawn; without tracking it falls back to `"fixed"` | `"off"` doubles the eye pass's pixels |
 | `vr.foveation_inset` | `0.5` | `0.5` | 864x864 inset of 1728; the blend hides its edge | 0.4 is faster but its edge may show where the eye tracker lags (unmeasured on the Frame) |
@@ -46,15 +46,14 @@ either; its server names the controller type `frame_controller`). OpenH1
 suggests its bindings for both (`port/linux/host/host_vr.c`,
 `actions_create`), the same bindings, so their order does not matter.
 
-Known gap: the wrapper (`steam-frame/openframe.sh`) always exports
-`HALO_VR_REFRESH_RATE` (from `OPENFRAME_REFRESH_HZ`, default 90), and an
-environment value wins over `config.toml`, so VR Setup's REFRESH RATE and
-`vr.refresh_rate` in `config.toml` have no effect under the wrapper: only
-`OPENFRAME_REFRESH_HZ` (in `session.env`, or Steam's launch options)
-changes the rate. The wrapper should export it only when
-`OPENFRAME_REFRESH_HZ` is set. VR Setup also offers 80 and 144 Hz, which
-the Frame does not have (the runtime rounds the request or refuses it;
-the log says `vr: ... Hz refused`).
+The refresh rate: the wrapper (`steam-frame/openframe.sh`) exports
+`HALO_VR_REFRESH_RATE` only when `OPENFRAME_REFRESH_HZ` (72, 90 or 120) is
+given, in the environment or `session.env`, because an environment value
+wins over `config.toml`. Otherwise the game reads `vr.refresh_rate` (VR
+Setup's REFRESH RATE) and the wrapper asks SteamVR's per-app
+`preferredRefreshRate` for that same rate (90 when `config.toml` has none, or
+holds a rate the Frame lacks). VR Setup's REFRESH RATE offers 72, 90 and 120
+Hz only: the Frame has no 80 or 144, and the headset's own (0) is not offered.
 
 To measure before changing a default: `HALO_GPU_STATS=1` and
 `HALO_VR_GPU_TIME=1` in `session.env` (the log's `vr: elapsed render GPU

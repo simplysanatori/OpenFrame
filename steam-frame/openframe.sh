@@ -14,7 +14,8 @@
 #                      folder with maps/, which is $OPENFRAME_HOME)
 #   HALO_UPDATE_AUTO   false, always: OpenH1's self-updater would replace this fork with OpenH1's own
 #                      release. Update OpenFrame by installing a newer OpenFrame release.
-#   HALO_VR_REFRESH_RATE  from OPENFRAME_REFRESH_HZ
+#   HALO_VR_REFRESH_RATE  only when OPENFRAME_REFRESH_HZ is given; otherwise the game reads vr.refresh_rate
+#                      from config.toml (VR Setup's REFRESH RATE), and SteamVR is asked for that same rate
 #   XR_RUNTIME_JSON    passed through when you set it (an OpenXR runtime's manifest to use instead of
 #                      the active one); unset, the game uses the active runtime (SteamVR's)
 # Any other HALO_* variable (HALO_VR=0, HALO_VR_TURN=smooth, ...) set in the environment, in Steam's
@@ -22,7 +23,8 @@
 #
 # Environment (all optional; session.env below is the way to set them from the Steam library):
 #   OPENFRAME_HOME         data folder, default ~/.local/share/OpenFrame (config.toml, maps/, saves/, sessions/)
-#   OPENFRAME_REFRESH_HZ   refresh rate asked of SteamVR and of the game, 72, 90 or 120 (default 90)
+#   OPENFRAME_REFRESH_HZ   refresh rate asked of SteamVR and of the game, 72, 90 or 120. Unset (the default): the
+#                          game's own vr.refresh_rate (default 90) is used, and SteamVR is asked for the same
 #   OPENFRAME_PACING       reserved for the game's pacing modes; passed through, the game ignores it today
 #   OPENFRAME_SYSMEM=0     leaves TU_DEBUG unset (Turnip's tiled rendering). By default the wrapper
 #                          sets TU_DEBUG=sysmem (renders straight to memory, as the sibling Frame ports do)
@@ -71,10 +73,34 @@ export HALO_CONFIG_FILE=$OFHOME/config.toml
 export HALO_UPDATE_AUTO=false          # never OpenH1's updater (it would replace this fork)
 unset HALO_FRAME_LAUNCHER HALO_FRAME_UPDATED
 cd "$OFHOME" || exit 1                 # the game's current folder: debug.txt and the data lookup
-HZ=${OPENFRAME_REFRESH_HZ:-90}
-case "$HZ" in 72 | 90 | 120) ;; *) log "OPENFRAME_REFRESH_HZ=$HZ is not 72, 90 or 120, using 90"; HZ=90 ;; esac
-export HALO_VR_REFRESH_RATE=$HZ.0
-log "refresh rate $HZ Hz (HALO_VR_REFRESH_RATE=$HALO_VR_REFRESH_RATE)"
+# The refresh rate. OPENFRAME_REFRESH_HZ, when given (environment or session.env), is asked of the game
+# (HALO_VR_REFRESH_RATE, which wins over config.toml) and of SteamVR. Otherwise nothing is exported, so
+# the game takes vr.refresh_rate from config.toml (VR Setup's REFRESH RATE writes it), and SteamVR is
+# asked for that same rate (90 when config.toml has none) so that the two agree. The Frame has 72, 90
+# and 120 Hz only.
+if [ -n "$OPENFRAME_REFRESH_HZ" ]; then
+    HZ=$OPENFRAME_REFRESH_HZ
+    case "$HZ" in 72 | 90 | 120) ;; *) log "OPENFRAME_REFRESH_HZ=$HZ is not 72, 90 or 120, using 90"; HZ=90 ;; esac
+    export HALO_VR_REFRESH_RATE=$HZ.0
+    log "refresh rate $HZ Hz, from OPENFRAME_REFRESH_HZ (HALO_VR_REFRESH_RATE=$HALO_VR_REFRESH_RATE)"
+else
+    if [ -n "$HALO_VR_REFRESH_RATE" ]; then
+        WANT=$HALO_VR_REFRESH_RATE; FROM="HALO_VR_REFRESH_RATE in the environment"
+    else
+        # [vr] refresh_rate = 90.0 in config.toml (a commented line, or none, is the default, 90)
+        WANT=$(awk -F= '/^[ \t]*\[/ { vr = ($0 ~ /^[ \t]*\[vr\][ \t]*(#.*)?$/) }
+            vr && $1 ~ /^[ \t]*refresh_rate[ \t]*$/ { v = $2; sub(/#.*/, "", v); gsub(/[ \t"]/, "", v); r = v }
+            END { print r }' "$HALO_CONFIG_FILE" 2> /dev/null)
+        FROM="vr.refresh_rate in $HALO_CONFIG_FILE"
+        [ -n "$WANT" ] || { WANT=90; FROM="the default (config.toml has no vr.refresh_rate)"; }
+    fi
+    HZ=${WANT%.*}
+    case "$WANT" in
+        72 | 72.0 | 90 | 90.0 | 120 | 120.0) ;;
+        *) log "WARNING: the game will ask for $WANT Hz ($FROM), which is not 72, 90 or 120: SteamVR is asked for 90 Hz"; HZ=90 ;;
+    esac
+    log "refresh rate $HZ Hz, the game's own setting ($FROM); HALO_VR_REFRESH_RATE ${HALO_VR_REFRESH_RATE:-not exported}"
+fi
 [ -n "$XR_RUNTIME_JSON" ] && log "XR_RUNTIME_JSON=$XR_RUNTIME_JSON"
 [ -n "$OPENFRAME_PACING" ] && { export OPENFRAME_PACING; log "OPENFRAME_PACING=$OPENFRAME_PACING (reserved: the game ignores it today)"; }
 # Direct rendering by default (the GPU renders straight to memory instead of in tiles).

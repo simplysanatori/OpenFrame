@@ -155,9 +155,11 @@ VR_SCREENS = {
             (f"RESOLUTION {RESTART}:", "vr.resolution_scale",
              [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.5, 0.6, 0.75, 0.9, 1, 1.1, 1.25, 1.5)],
              "Of the size the headset recommends: less is\nfaster, more sharper. From the next start.", None),
+            # (OpenFrame: the Steam Frame has 72, 90 and 120 Hz only, no 80 or 144, and no use for "the
+            # headset's"; OpenH1's list was HEADSET'S, 72, 80, 90, 120, 144)
             (f"REFRESH RATE {RESTART}:", "vr.refresh_rate",
-             [("HEADSET'S", "0"), *((f"{rate} HZ", str(rate)) for rate in (72, 80, 90, 120, 144))],
-             "The headset's rate, if it offers it; the game\ndraws a frame each refresh. From the next start.",
+             [(f"{rate} HZ", str(rate)) for rate in (72, 90, 120)],
+             "The headset's rate (72, 90 or 120 Hz); the game\ndraws a frame each refresh. From the next start.",
              None),
             ("HUD AND VISOR...", None, VR_VISOR,
              "The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy.",
