@@ -2,7 +2,7 @@
 
 Halo: Combat Evolved in VR, running natively on the Valve Steam Frame.
 
-OpenFrame is the Steam Frame fork of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo: Combat Evolved. The game is the Xbox build's own code, compiled for 64-bit Arm Linux and drawn with Vulkan, with OpenXR VR through the Frame's SteamVR. There is no emulator, no Lepton, no APK and no PC. OpenFrame adds the Steam Frame packaging layer (install, launch wrapper, Steam shortcut, logs, release) and brings VR gameplay features from the Halo VR mods into OpenH1's VR mode.
+OpenFrame is the Steam Frame fork of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo: Combat Evolved. The game is the Xbox build's own code, compiled for 64-bit Arm Linux and drawn with Vulkan, with OpenXR VR through the Frame's SteamVR. There is no emulator, no Lepton, no APK and no PC. OpenFrame adds the Steam Frame packaging layer (install, launch wrapper, Steam shortcut, logs, release) and brings VR gameplay features from the Halo VR mods (sprint, bullet time, parkour, fists, a wrist HUD and more) into OpenH1's VR mode.
 
 You need your own Xbox disc of Halo: Combat Evolved. No game data is in this repository or its releases.
 
@@ -28,7 +28,7 @@ What it does:
 Known:
 
 - Nothing is confirmed in a headset, so nothing is promised here. The notes in [dev/DEV.md](steam-frame/dev/DEV.md) list what has and has not been run.
-- The moistman VR features listed below are not in the game yet.
+- The VR features ported from the Halo VR mods are in the game and build, but none has been played in a headset (each is marked below).
 - OpenH1's self-updater is turned off in OpenFrame (see [Updates](#updates)). A code-level disable is still to do.
 - There is no Steam library art yet; the library entry has Steam's default look.
 
@@ -82,30 +82,161 @@ OpenH1 updates itself from its own GitHub releases. That would replace OpenFrame
 
 ## Controls
 
-The Steam Frame's controllers are the halves of an Xbox controller. This is OpenH1's default VR mapping; the full list, with every `vr.*` setting that changes it, is in the "VR" section of [port/linux/README.md](port/linux/README.md#vr).
+How the Steam Frame's controllers play Halo in OpenH1's VR mode, as the game binds them (`port/linux/host/host_vr.c`, `port/linux/src/vr.c`). The Frame's controllers are the halves of an Xbox controller: on the **right** controller are the trigger, grip, bumper, thumbstick (with its click), **A, B, X, Y** and **Menu**; on the **left** are the trigger, grip, bumper, thumbstick (with its click), the **D-pad** and **View**. Settings below say "the weapon's hand" for the right controller (the left, if you play left-handed: see [Accessibility](#accessibility-left-handed-play)).
 
-| Steam Frame | Game |
+**Controls on the Steam Frame controllers**
+
+| Physical input | Action |
 |---|---|
-| Left stick | Move (click: crouch) |
-| Right stick, left and right | Turn, in steps (`vr.turn = "snap"`) or smoothly |
+| Right trigger | Fire |
+| Left trigger | Throw a grenade only if `vr.grenade_throw` is `"both"` or `"button"`. By default the left trigger does nothing on foot: you throw by hand (see the left grip). It is the vehicle's second weapon in a Banshee |
+| Right grip | Draw a weapon from a holster (the right hand over the shoulder or at the hip, gripping); a softer melee swing when held. With the left grip, recentre |
+| Left grip | Closes the left hand. On a long gun's foregrip: aim it with both hands. Held, drawn back, swung and let go: throw a grenade where the hand threw it. At the left hip: take a magazine (reload by hand) |
+| Both grips, held | Recentre: the head's place and heading become your eye and facing |
+| Left stick | Move |
+| Left stick click | Crouch (you also crouch by crouching in the room: `vr.physical_crouch`) |
+| Right stick, left and right | Turn, in steps (`vr.turn = "snap"`, the default) or smoothly. This is not "look": the head looks |
+| Right stick, down | Eject the magazine (reload by hand, `vr.manual_reload`) |
 | Right stick click | Zoom: a magnified window about the reticle (smart-link), or a raised scope's magnification |
+| Right stick, pushed up | OpenFrame's sprint (flick) and bullet time (hold), if you turned them on: see [Features ported](#features-ported-from-haloce-decompremix-vr) |
+| Right stick, held down | OpenFrame's third-person view switch, if you turned it on (it shares the push with the magazine eject) |
+| A | Jump |
+| B | Melee (a hard swing of the right controller melees too: `vr.melee_gesture`) |
+| X | Action and reload (hold X to pick up a weapon; X reloads even with reload by hand on) |
+| Y | Switch weapon (a gun drawn from a holster switches to it) |
+| Left bumper | Flashlight |
+| Right bumper | Switch grenade type |
+| D-pad (left controller) | The menus' d-pad (move through the menus; also the Xbox game's d-pad) |
+| View (left controller) | Back: the multiplayer scoreboard, and back in the menus |
+| Menu (right controller) | Start: pause, and the pause menu |
+| Both grips on a Ghost's handles, turned | Steer it, its guns aiming where the bars point (`vr.ghost_steering`) |
+| Both grips on a Warthog's wheel, turned | Steer it (`vr.warthog_steering`) |
+| Hands off the handles or the wheel, either stick pushed sideways | Steer a Ghost or Warthog; in a Scorpion the left stick turns you and the aim. The left stick's forward and back are the throttle |
 | Head | Look. Crouch in the room and the game crouches |
 | Right controller | Aim: it holds the weapon and the reticle shows where it points |
-| Left controller | The left hand; the left grip closes it |
-| Right trigger | Fire |
-| Left grip held, the left hand drawn back and swung, the grip let go | Throw a grenade where the hand threw it (`vr.grenade_throw`; the left trigger throws nothing on foot by default) |
-| A, B, X, Y | Jump, melee, action and reload, switch weapon |
-| Left grip on a long gun's foregrip | Aim it with both hands |
-| A swing of the right controller | Melee |
-| Right hand over the shoulder or at the hip, gripping | Draw the weapon carried there (holsters) |
-| The sniper rifle's or pistol's scope raised to an eye | Look through it, magnified |
-| Left hand at the left hip, then pushed into the weapon | Reload by hand |
-| Left bumper, right bumper | Flashlight, switch grenade |
-| D-pad, View, Menu | Menu d-pad, Back (scoreboard), Start (pause) |
-| Both grips, held | Recentre |
-| Both grips on a Ghost's handles or a Warthog's wheel, turned | Steer it |
+| The sniper rifle's or pistol's scope raised to an eye | Look through it, magnified (`vr.scope_view = "eye"`) |
+| Right hand reaching to a weapon on the ground, gripping | Pick it up, or swap the one in hand for it (`vr.grab_world`) |
+| Either hand pushed into a control (a door panel, a lift) | Press it, as X does |
 
-Left-handed play (`vr.dominant_hand = "left"`) mirrors the weapon, the hands and the holsters.
+Notes:
+
+- The right stick's up and down are no game control while the controllers aim, so OpenFrame's gestures use them without taking a binding from anything. With `vr.aim = "gamepad"` the controllers play as a gamepad's halves and those gestures are off.
+- Every gesture and setting above is OpenH1's, from `build-734`; the full list, with each `vr.*` setting, is in the "VR" section of [port/linux/README.md](port/linux/README.md#vr). The HUD's button prompts name these buttons on the Frame (`Right Bumper`, `A`, ...).
+- Controllers that SteamVR maps to the Touch layout also work, with the bumpers on the grips, X and Y on the left and Menu on the left controller; this README is written for the Frame.
+- None of OpenH1's VR mode has been confirmed in a headset by OpenFrame yet (see [Status](#status)).
+
+## Features ported from HaloCE-DecompRemix-VR
+
+These come from [moistman42069's HaloCE-DecompRemix-VR-PC-Android](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android), a Quest-focused fork of OpenCE, re-implemented on OpenH1's VR layer with credit (AGPL-3.0-or-later, as OpenH1 is). The two VR layers share almost no code, so mostly the ideas and the tuning were carried over. **They are built and compile, and every one of them is not yet tested in a headset.** Every one is off, or as OpenH1 had it, until you choose it.
+
+All of them are set in the headset under **Settings > Controls tab > VR SETUP** (the last row; it appears only while the game plays in VR, and also sits at the foot of the player profile menu). Its first page is "VR Controls"; its last row, **HAND, HEIGHT, HUD...**, opens "VR Display", and from there **COMFORT, SPRINT...**, **HANDS, FISTS...** and **HUD AND VISOR...** open the pages below. A setting applies at once. Each is also a `config.toml` key under `[vr]` (and an environment variable `HALO_VR_*`). The full list of tunables, every range and the reasons for them are in [docs/openframe-features.md](docs/openframe-features.md); the short form follows.
+
+Nearly all of these are **offline only**: in a game of this computer alone (the campaign: never online, in split screen or with bots), on foot, with the controllers aiming. Where a feature says so (bullet time, the third person), the HUD tells you when it is not available.
+
+### Comfort vignette (not yet tested in a headset)
+
+- What it does: dims the edges of your view while you move, turn or sprint, not only in vehicles (OpenH1's vignette covers vehicles only).
+- Turn it on: VR Setup > HAND, HEIGHT, HUD... > COMFORT, SPRINT... > **VIGNETTE** = ALWAYS (`vr.vignette`, default `"vehicle"`; `"off"` too), and **VIGNETTE STRENGTH** (`vr.vignette_strength`, 25 to 150%, default 100%).
+- In play: automatic. It dims as the left stick moves you (more while sprinting), as the right stick turns you smoothly, and for a moment at each snap turn.
+- Caveats: none known beyond being untested. The older `vr.comfort_vignette = false` still turns it off.
+
+### Sprint, by toggle or arm swing (not yet tested in a headset)
+
+- What it does: runs faster than the game's run (1.5 times by default), on foot, standing, forward and sideways but not backing.
+- Turn it on: COMFORT, SPRINT... > **SPRINT** = TOGGLE or ARM SWING (`vr.sprint_mode`, default `"off"`), **SPRINT SPEED** (`vr.sprint_speed`, 1.25 to 2 times, default 1.5).
+- In play, TOGGLE: push the right (turning) stick up and let go within half a second ("flick it up") to start sprinting; flick again to stop. A sprint also ends if you let the left stick go for a second, crouch, or leave your feet (a vehicle, a cinematic, the menus, death). The HUD says "Sprint". With bullet time on too, a flick is sprint and a half-second hold is bullet time.
+- In play, ARM SWING: swing both arms up and down as you run; the faster the slower arm moves (from 0.6 m/s, full at 1.5 m/s) the faster you go, up to the sprint speed. With the left stick let go, the swing walks you forward along your aim.
+- Caveats: offline only.
+
+### Bullet time (not yet tested in a headset)
+
+- What it does: slows the world to 40% (default) while your head and hands keep the display's rate. It eases in and out over about a sixth of a second.
+- Turn it on: COMFORT, SPRINT... > **BULLET TIME** = ON (`vr.bullet_time`, default off), **BULLET TIME SPEED** (`vr.bullet_time_scale`, 25 to 80%, default 40%).
+- In play: hold the right (turning) stick pushed up for half a second; hold it again to end it. Both controllers pulse, and the HUD says "Bullet time" and "Bullet time off". It also ends in a cinematic, at death and where the game takes your control.
+- Caveats: **offline only** (network games must step alike; the HUD says "Bullet time: offline only"). **The sounds keep their normal pitch and speed**, so a slowed world sounds as fast as ever. Nothing of it is saved in a checkpoint, and a revert turns it off.
+
+### Third person on foot (not yet tested in a headset)
+
+- What it does: the view from behind and above your body, drawn as the game animates it for everyone else, its weapon in its hands. Only the view moves: you still aim with the controller (the reticle where it points) and the HUD is as ever. The view sits 1.7 m behind your head by default, 0.3 m above it and 0.25 m to the weapon hand's side; a wall brings it in.
+- Turn it on: COMFORT, SPRINT... > **THIRD PERSON** = ON (`vr.third_person`, default off; it starts in the third person as you turn it on), **VIEW DISTANCE** (`vr.third_person_distance`, 1 to 4 m, default 1.7).
+- In play: hold the right (turning) stick pushed **down** for three quarters of a second to switch between third and first person. The HUD says "Third person" and "First person".
+- Caveats: the push down is also reload-by-hand's magazine eject (`vr.manual_reload`, on by default), so switching with a magazine that can be ejected **ejects it first** (they share the input). Not zoomed, not in a vehicle's seat (`vr.vehicle_view` has its own third person), not in a cinematic; never in multiplayer (the HUD says "Third person: not in multiplayer").
+
+### Parkour: slide, wall jump, wall run (not yet tested in a headset)
+
+- What it does: slide, leap off walls, and run along them. The game's own collision moves you; nothing is sent over the network.
+- Turn it on: COMFORT, SPRINT... > **PARKOUR** = ON (`vr.parkour`, default off), **SLIDE MOMENTUM** (`vr.slide_momentum`, 0.5 to 2 times, default 1), **WALL JUMP** (`vr.walljump_scale`, 0.5 to 1.5 times, default 1.5). Sprint must be on for the slide.
+- In play, slide: **crouch while sprinting** (the left stick's click, or lower your head with physical crouch) on the ground at a run or faster. You slide, crouched, at the speed you ran and 15% more, losing speed to friction; it ends as you stand, jump, leave the ground, meet a wall, or after 1.1 seconds.
+- In play, wall jump: in the air beside a wall, **press A (jump) again** to leap off it where your head looks (at least 5 m/s). Once per wall until you land.
+- In play, wall run: **jump at a wall with the left stick pushed along it**, within a second of the jump (two seconds after a wall jump, chaining wall to wall), and you run along it for up to 2 seconds. Steer away from the wall to drop off it.
+- Caveats: offline only. Grip climbing from the mod is not carried over (this port's grips are already holsters, the foregrip, magazines and vehicle holds).
+
+### Fists: punch, stagger, parry (not yet tested in a headset)
+
+- What it does: punch enemies with your hands, stagger them with a hard punch, and deflect a melee blow.
+- Turn it on: VR Setup > HAND, HEIGHT, HUD... > HANDS, FISTS... > **FISTS** = ON (`vr.fists`, default off), **PUNCH SPEED** (`vr.fist_speed`, 1.5 to 4 m/s, default 2.0), **PUNCH DAMAGE** (`vr.fist_damage`, 15 to 100% of the weapon's melee blow, default 33%).
+- In play, punch: **swing the empty hand faster than 2 m/s** into an enemy in reach and sight. The free hand always punches; the weapon's hand punches while you hold no weapon. One blow per swing, stronger the faster you swing, less on harder difficulties.
+- In play, stagger: a **hard punch** (a swing near twice the punch speed) staggers the enemy for a second: lifted off its feet a moment, slowed, and unable to start a melee attack. Never a Hunter, nor an Elite whose shields hold.
+- In play, parry: **swipe a hand across an enemy's blow** (at least 1.8 m/s, half of it across the line from your eyes to the enemy), the hand 10 to 60 cm before your eyes toward it, in the moments before the blow lands. None of the blow is dealt, the enemy is staggered a second, the HUD says "Parry". The weapon's hand parries too; the foregrip hand does not while it holds the foregrip.
+- Caveats: offline only; enemies only (no allies). A punch or parry pulses the hand. The mod's lunges, combos, takedowns and ragdoll knockdowns are not carried over.
+
+### Weapon pull (not yet tested in a headset)
+
+- What it does: pulls a weapon lying on the ground to your free hand.
+- Turn it on: HANDS, FISTS... > **WEAPON PULL** = ON (`vr.weapon_pull`, default off), **PULL RANGE** (`vr.weapon_pull_range`, 1 to 5 m, default 3).
+- In play: with the free hand, reach out (40 cm from your eyes or more) and **point it at a weapon** within range (it lights up), **grip**, and **flick the hand back toward you or up**. The weapon flies to the hand in about half a second; still gripping as it arrives, you pick it up (as X held does); open, it drops at your feet.
+- Caveats: offline only. A weapon like one you already carry is not offered by the game: it drops.
+
+### Prop throw (not yet tested in a headset)
+
+- What it does: lets you hold a loose weapon or piece of equipment in your free hand and throw it.
+- Turn it on: HANDS, FISTS... > **PROP THROW** = ON (`vr.prop_throw`, default off), **THROW STRENGTH** (`vr.prop_throw_strength`, 0.5 to 3 times, default 2).
+- In play: **grip a loose item within 15 cm of the free hand** (it lights up) to hold it, turned as the hand points; **let go to throw it** at the hand's speed times the strength, at most 24 m/s.
+- Caveats: offline only. Scenery props, lifting vehicles and grabbing bodies are not carried over.
+
+### Hand swap (not yet tested in a headset)
+
+- What it does: passes the weapon to the other hand, for left-handed play on the fly (and back).
+- Turn it on: HANDS, FISTS... > **HAND SWAP** = ON (`vr.hand_swap`, default off).
+- In play: with the weapon's grip open, **bring your palms within 10 cm of each other, then squeeze the other hand's grip**. The weapon, trigger, aim, melee swing, holsters, pouches and the wrist HUD's side all move to that hand; the HUD says "Weapon in the left hand" or "Weapon in the right hand". It works from either hand, and back.
+- Caveats: offline only. It **saves**: the swap sets `vr.dominant_hand` for now and in `config.toml`, as VR Setup's DOMINANT HAND does, so the menu and the hands never disagree and the next start keeps the hand. The sticks stay where they were (`vr.swap_sticks = "auto"` is first written as what it does then). Both grips do nothing until both are let go.
+
+### Wrist HUD and HUD modes (not yet tested in a headset)
+
+- What it does: moves the shields and health, the ammunition and grenades and the motion tracker from the visor to a small panel on the back of your other hand's wrist, read like a watch. The reticle, messages, waypoints and players' names stay on the visor.
+- Turn it on: HAND, HEIGHT, HUD... > HUD AND VISOR... > HUD, DISPLAY... > **HUD MODE** = WRIST (`vr.hud_mode`: `"visor"` default, `"wrist"`, `"hidden"` shows none of the corners). Also **WRIST HUD SIZE** (`vr.wrist_hud_scale`, 50 to 200%, default 100% = 11 cm across) and **ALONG THE ARM**, **ACROSS THE WRIST**, **OFF THE WRIST** (`vr.wrist_hud_offset_along`, `_across`, `_out`, -10 to +10 cm, default 0).
+- In play: **turn the back of the wrist toward your face**; it fades in as you do and out as you turn it away. It stays away while that hand holds a long gun's foregrip.
+- Caveats: the wrist HUD needs `vr.hud = "visor"` (the default; a flat HUD keeps the whole HUD on its screen). In a vehicle's seat, with the wrist untracked, and in the menus the corners go back to the visor. The panels are drawn plain, without the visor's glass and glow. The mod's HUD head tap and menu placement are not carried over.
+
+## Accessibility: left-handed play
+
+OpenFrame is playable left-handed, and a few comfort options help with other needs. All are in VR Setup (Settings > Controls tab > VR SETUP).
+
+**Make the left hand the weapon's hand.** VR Setup > HAND, HEIGHT, HUD... > **DOMINANT HAND** = LEFT (`vr.dominant_hand = "left"`, default `"right"`). OpenH1 swaps the two controllers as their input comes in, so everything that said "the weapon's hand" is now the left controller, and "the other hand" the right one. The left trigger fires and the left controller aims, melees, and draws from the holsters on your left; the weapon and both hands are drawn mirrored; the haptics move with the hands. The right hand holds the foregrip, takes magazines from your right hip and throws grenades.
+
+**Swap the sticks.** On the same page, **SWAP STICKS** (`vr.swap_sticks`): AS THE HAND (`"auto"`, the default: swapped when DOMINANT HAND is LEFT), NO (the left stick keeps moving, whatever the hand) or YES (swapped for a right hand too). Swapped, the right stick moves (its click crouches) and the left turns (its click zooms; pushed down it ejects the magazine). Not with `vr.aim = "gamepad"`. The buttons (A, B, X, Y, Menu, D-pad, View, bumpers) stay where they are on the controllers, as the game's prompts name them.
+
+**Hand swap while playing.** With HANDS, FISTS... > HAND SWAP on, palms together and the free hand's grip passes the weapon across (see above). It now saves `vr.dominant_hand` (and fixes the sticks as they were), so a swap in play is also your new setting.
+
+**How each feature behaves left-handed**
+
+- Weapon, aim, trigger, melee swing, smart-link zoom: the left hand; foregrip, magazines and the hand grenade: the right hand (the grenade's prompt says "Right Hand Throw"). Holsters: over the left shoulder and at the left hip; the magazine pouches at the right hip (and right shoulder).
+- Turning stick: whichever stick turns you. Sprint's flick up, bullet time's hold up and the third person's hold down are all on it, as are the magazine's eject (pushed down) and the zoom (its click).
+- Third person: the view sits over the left shoulder. Wrist HUD: on the right wrist, read the same way up.
+- Fists: both hands punch as for a right-hander, the free (right) hand always, the left while it holds no weapon; either hand parries, the right not while it holds the foregrip. Weapon pull and prop throw: the free (right) hand.
+- Hand swap: from a left-handed start, palms together and the right grip takes the weapon; DOMINANT HAND becomes RIGHT. The sticks do not move.
+- Parkour: the game's own crouch, jump and moving stick; no hand. Vehicles: each hand takes the handle on its own side.
+
+**Comfort and seated play**
+
+| Option | Where in VR Setup | What |
+|---|---|---|
+| Seated mode | HAND, HEIGHT, HUD... > **POSITION** = SEATED (`vr.height`, default `"seated"`; needs a restart) | Your eyes are wherever you recentre (hold both grips); no floor or height to get right. **EYE HEIGHT** (`vr.player_height`) is for standing |
+| Physical crouch off | VR Controls page > **PHYSICAL CROUCH** = OFF (`vr.physical_crouch`, default on) | The game crouches only on the left (move) stick's click, so lowering your head does nothing |
+| Snap turn | VR Controls page > **TURNING** = SNAP, **SNAP TURN ANGLE** 15 to 90 degrees (`vr.turn`, `vr.snap_turn_angle`, default snap, 30) | Turns in steps, not continuously. SMOOTH and **SMOOTH TURN SPEED** are the alternative |
+| Vignette always | COMFORT, SPRINT... > **VIGNETTE** = ALWAYS | Dims the edges whenever you move or turn; **VIGNETTE STRENGTH** adjusts it |
+| World scale | HAND, HEIGHT, HUD... > **WORLD SCALE** 0.75 to 1.5 times (`vr.world_scale`, default 1) | More than 1 makes the world look larger and you smaller in it |
+| HUD and menu size and distance | HAND, HEIGHT, HUD... > **HUD DISTANCE**, **HUD SIZE**, **MENU DISTANCE**, **MENU WIDTH** | Place and size the HUD and menus where you read them |
 
 ## Settings
 
@@ -113,13 +244,17 @@ Left-handed play (`vr.dominant_hand = "left"`) mirrors the weapon, the hands and
 
 | Variable | Default | What |
 |---|---|---|
-| `OPENFRAME_REFRESH_HZ` | 90 | Refresh rate asked of SteamVR (per-app `preferredRefreshRate`) and of the game (`HALO_VR_REFRESH_RATE`): 72, 90 or 120 |
+| `OPENFRAME_REFRESH_HZ` | unset | 72, 90 or 120. When given, it is asked of SteamVR (per-app `preferredRefreshRate`) and of the game (`HALO_VR_REFRESH_RATE`, which wins over `config.toml`). Unset, the game uses `vr.refresh_rate` from `config.toml` (VR Setup's REFRESH RATE; 90 if absent) and SteamVR is asked for the same rate |
 | `OPENFRAME_SYSMEM` | on | `TU_DEBUG=sysmem`: the GPU renders straight to memory instead of in tiles. `0` turns it off |
 | `OPENFRAME_PACING` | unset | Reserved for the game's pacing modes; passed through, ignored today |
 | `OPENFRAME_MOTION_SMOOTHING` | 2 (off) | SteamVR `motionSmoothingOverride` for the app |
 | `OPENFRAME_VRTIMING` | on | `0`: no SteamVR compositor timing log |
 
 At each launch the wrapper also sets SteamVR's per-app `framesToThrottle=0` and `additionalFramesToPredict=0`.
+
+### Steam Frame defaults
+
+OpenFrame keeps OpenH1's VR defaults, which were chosen and measured on a Frame: 1728x1728 eyes, eye-tracked foveation, 90 Hz, snap turn at 30 degrees, a seated position, physical crouch on, and the wrapper's `TU_DEBUG=sysmem`. [docs/steam-frame-defaults.md](docs/steam-frame-defaults.md) lists each setting, why it is where it is, and what to measure before changing it. To try something for one launch, put `NAME=value` lines in `~/.local/share/OpenFrame/session.env` (for example `OPENFRAME_REFRESH_HZ=72` for a heavy level, or `OPENFRAME_SYSMEM=0` to leave Turnip's tiled rendering on); it is read once and renamed `session.env.used`. The refresh rate you pick in VR Setup (REFRESH RATE: 72, 90 or 120 Hz, applied from the next start) is what the game and SteamVR use, unless `OPENFRAME_REFRESH_HZ` is set.
 
 ## Features
 
@@ -132,22 +267,9 @@ At each launch the wrapper also sets SteamVR's per-app `framesToThrottle=0` and 
 - The HUD on the helmet's visor, with depth, wrap, glow and the shields' effects on the glass; snap or smooth turning; physical crouch; a comfort vignette in vehicles; head-in-wall handling; death view; 3D sound from your head (HRTF).
 - Everything OpenH1 has outside VR: the Vulkan renderer with SMAA, anisotropic filtering and per-pixel lights, up to 128 players online, mods and Custom Edition maps.
 
-### Planned from the Halo VR mods (in progress)
+### Not carried over from the mods
 
-These come from [moistman42069's HaloCE-DecompRemix-VR-PC-Android](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android), a Quest-focused fork of OpenCE. They are being ported into OpenFrame's OpenH1 base with credit. **None is in a build yet; this list is the plan, not the product.**
-
-| Feature | State |
-|---|---|
-| Bullet time | in progress, not merged |
-| Sprint (toggle) | in progress, not merged |
-| General comfort vignette (OpenH1's covers vehicles only) | in progress, not merged |
-| Third-person camera in VR | planned |
-| Sliding and parkour | planned |
-| Fists, and deflecting projectiles | planned |
-| Grabbing the world with a hand | planned |
-| Wrist HUD | planned |
-| Ragdolls (needs a physics library) | planned |
-| Co-op pose sync | planned |
+The mods' ragdolls (they need a physics library), co-op pose sync, grabbing the world with a free hand (climbing), lunges and combos, takedowns and the menus' placement are not in OpenFrame. [docs/openframe-features.md](docs/openframe-features.md) lists what each ported feature leaves out.
 
 ## Files
 
