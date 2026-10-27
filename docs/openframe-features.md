@@ -237,3 +237,50 @@ snap turn.
   how much of the edges, and how dark). `vr.comfort_vignette = false`, the
   older switch, still turns it off.
 - Input: none.
+
+### Wrist HUD and HUD modes (untested in the headset)
+
+`vr.hud_mode` says where the HUD's corners are: the shields and health, the
+weapon's ammunition and grenades, and the motion tracker. `"wrist"` puts them
+on a small panel on the back of your other hand's wrist (the left, or the
+right with `vr.dominant_hand = "left"`), read as a watch is: it fades in as
+you turn the back of the wrist toward your face and out as you turn it away,
+and it stays away while that hand holds the long gun's foregrip. `"hidden"`
+shows no corners at all. The rest of the HUD (the reticle, the messages, the
+waypoints and the players' names) stays on the visor in every mode.
+
+It uses OpenH1's own HUD panels (`port/linux/src/vr_visor.c`, the per-group
+images that `vr.hud_depth` draws at their own depths): with the wrist HUD the
+three corner panels are composed as their own OpenXR quad layers on the
+wrist, in the play space, over the HUD's layer, rather than on the visor.
+Nothing is drawn into the eyes' images. Each corner's panel shows only the
+part of the 640x480 HUD its elements fill, laid out as moistman42069's panel
+is: the shields across the top, the tracker under them on the left and the
+ammunition beside it. On the wrist they are drawn plain, without the visor's
+glass, glow and reaction to the world (`port/linux/vulkan/host_vulkan_vr.c`).
+
+- Keys: `vr.hud_mode` (`"visor"`, the default and OpenH1's behaviour;
+  `"wrist"`; `"hidden"`), `vr.wrist_hud_scale` (0.5 to 2, default `1`: 11 cm
+  across), `vr.wrist_hud_offset_along`, `vr.wrist_hud_offset_across`,
+  `vr.wrist_hud_offset_out` (metres from its place, -0.2 to 0.2, default
+  `0`: along the forearm toward the elbow, across toward the thumb, and up
+  off the wrist). VR Setup > VR Display > HUD AND VISOR... > HUD, DISPLAY...
+- Where: on foot, with `vr.hud = "visor"` (the default; `"flat"` keeps the
+  whole HUD on its flat screen). In a vehicle's seat, with the wrist
+  untracked, and in the menus the corners go back to the visor. It works at
+  `vr.hud_depth` 0 as well (the corners are then on the visor at the HUD's
+  distance when not on the wrist). The HUD's layer is placed in the play
+  space while the wrist HUD is on (it was locked to the view space at
+  `vr.hud_lag` 0).
+- Its place and its test of facing the head come from moistman42069's
+  (`vr_frame.c`, `place_wrist`: 10 cm behind the grip along the arm, 4.5 cm
+  out of the back of the wrist, shown while the way out of the wrist is
+  within about 63 degrees of the way to the head, a cosine of 0.45). The fade
+  (a 0.06 s time constant) is OpenFrame's; theirs shows and hides at once.
+  Their crops of the HUD are kept, a little wider (each group's image holds
+  its own elements alone). Their dark backing behind the panel is not
+  carried over.
+- Not carried over: moistman42069's HUD head tap (the weapon hand held by
+  the temple hides the HUD) and the menus' placement (`vr.menu_anchor`
+  head, world, follow). A lag for the HUD following the head needs nothing
+  new: OpenH1 has `vr.hud_lag`.

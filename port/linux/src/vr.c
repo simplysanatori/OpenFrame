@@ -6309,4 +6309,16 @@ void halo_vr_rumble(float left, float right)
 	if (right > 0.01f && (long)(now - vr.haptic_end[1]) >= 0)
 		hand_haptic(1, right, 0.1f);
 }
+
+/* (OpenFrame) vr.hud_mode = "wrist" (vr_visor.c, wrist_follow): the off
+hand's grip, on foot (not in a seat, whose hands are its controls') */
+int halo_vr_wrist(struct vr_host_pose *grip, int *right_controller, int *busy)
+{
+	if (!vr.initialized || vr.menus || !vr.views.grip[0].valid || handlebars_active() || seat_drives())
+		return 0;
+	*grip = vr.views.grip[0];
+	*right_controller = hand_controller(0);
+	*busy = vr.two_handed;
+	return 1;
+}
 #endif

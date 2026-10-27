@@ -876,7 +876,7 @@ noise textures, which the 64-bit host's lie 4 bytes further, aligned) */
 #define XGPU_STREAM_VR_COCKPIT_WINDOW_WORDS 34
 #define XGPU_STREAM_VR_COCKPIT_DISPLAY_WORDS 19
 #define XGPU_STREAM_VR_HUD_IMAGE_WORDS 50
-#define XGPU_STREAM_VR_PANEL_WORDS 20
+#define XGPU_STREAM_VR_PANEL_WORDS 22
 #define XGPU_STREAM_VR_VISOR_IMAGE_WORDS 71
 #define XGPU_STREAM_VR_RIM_WORDS 39
 
@@ -1008,6 +1008,6 @@ XGPU_STREAM_ASSERT_SIZE(struct xgpu_stream_vr_eye_transforms, 8 + 4 * 64);
 XGPU_STREAM_ASSERT_SIZE(struct xgpu_stream_vr_screen_corrections, 4 + 4 * 14);
 XGPU_STREAM_ASSERT_SIZE(struct xgpu_stream_vr_frame_record, 44);
 XGPU_STREAM_ASSERT_SIZE(struct xgpu_stream_vr_submit, 44 + 8 + 4 * (116 + 8));
-XGPU_STREAM_ASSERT_SIZE(struct xgpu_stream_vr_state, 4 * (2 + 4 + 32 + 3 + 3 + 3 + 1 + 34 + 19 + 1 + 8 + 50 + 80 + 71 + 3 + 39));
+XGPU_STREAM_ASSERT_SIZE(struct xgpu_stream_vr_state, 4 * (2 + 4 + 32 + 3 + 3 + 3 + 1 + 34 + 19 + 1 + 8 + 50 + 88 + 71 + 3 + 39));
 
 #endif

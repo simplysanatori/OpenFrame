@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/vr_hud_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/header_vr_display"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/header_vr_display" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/help" type="text" controller="1" left="68" top="366" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/help">
+		<data input="port settings help"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_hud_mode" x="54" y="73"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_wrist_hud_scale" x="54" y="101"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_wrist_hud_offset_along" x="54" y="129"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_wrist_hud_offset_across" x="54" y="157"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_wrist_hud_offset_out" x="54" y="185"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/button_defaults" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_hud_mode" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/hud_mode_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/hud_mode_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/hud_mode_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/hud_mode_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="VISOR|WRIST|HIDDEN" setting="vr.hud_mode" values="visor|wrist|hidden" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_wrist_hud_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_scale_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_scale_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_scale_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="50%|75%|100%|125%|150%|200%" setting="vr.wrist_hud_scale" values="0.5|0.75|1|1.25|1.5|2" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_wrist_hud_offset_along" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_along_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_along_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_along_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_along_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="-10 CM|-5 CM|-2 CM|0 CM|+2 CM|+5 CM|+10 CM" setting="vr.wrist_hud_offset_along" values="-0.1|-0.05|-0.02|0|0.02|0.05|0.1" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_wrist_hud_offset_across" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_across_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_across_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_across_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_across_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="-10 CM|-5 CM|-2 CM|0 CM|+2 CM|+5 CM|+10 CM" setting="vr.wrist_hud_offset_across" values="-0.1|-0.05|-0.02|0|0.02|0.05|0.1" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/op_wrist_hud_offset_out" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_out_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_out_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_out_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/wrist_hud_offset_out_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="-10 CM|-5 CM|-2 CM|0 CM|+2 CM|+5 CM|+10 CM" setting="vr.wrist_hud_offset_out" values="-0.1|-0.05|-0.02|0|0.02|0.05|0.1" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port settings defaults"/>
+		<on event="start" run="port settings defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port settings save" back="true"/>
+		<on event="start" run="port settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/labels">
+		<string text="HUD MODE:"/>
+		<string text="WRIST HUD SIZE:"/>
+		<string text="ALONG THE ARM:"/>
+		<string text="ACROSS THE WRIST:"/>
+		<string text="OFF THE WRIST:"/>
+	</strings>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud/help_strings">
+		<string text=""/>
+		<string text="The shields, ammunition and tracker on the visor,\non your other wrist (turn it to your face), or hidden."/>
+		<string text="How large the wrist HUD is (100%: 11 cm across)."/>
+		<string text="Moves the wrist HUD along your forearm (more:\ntoward the elbow)."/>
+		<string text="Moves the wrist HUD across your wrist (more:\ntoward the thumb)."/>
+		<string text="Raises the wrist HUD off your wrist, or lowers it."/>
+	</strings>
+</menus>

@@ -73,6 +73,11 @@ struct vr_visor_panel
 	its angle across (the angles from the HUD's middle; 0 for the world's
 	panel) */
 	float wrap[3];
+	/* (OpenFrame, vr.hud_mode) how much of it shows (0 to 1: the wrist
+	HUD's fade), and whether it is drawn plain, without the visor's glass,
+	glow and reaction to the world (on the wrist, not the visor) */
+	float opacity;
+	int plain;
 };
 
 /* the helmet's rim (vr.helmet_rim): the faceplate's lip about the visor,
@@ -174,5 +179,11 @@ void vr_visor_composite(unsigned char *eyes[2], int width, int height, const str
 /* vr.c's: the layers of the frame presented last, and the head they were
 placed before; 0 if there is none */
 int halo_vr_submitted(struct vr_host_layers *layers, struct vr_host_pose *head);
+/* vr.c's (OpenFrame, vr.hud_mode = "wrist"): the weapon's other hand's
+grip (play space, this frame's), whether it is the runtime's right
+controller, and whether that hand is busy (on the long gun's foregrip);
+0 while the wrist cannot show the HUD (untracked, a vehicle's seat, the
+menus) */
+int halo_vr_wrist(struct vr_host_pose *grip, int *right_controller, int *busy);
 
 #endif
