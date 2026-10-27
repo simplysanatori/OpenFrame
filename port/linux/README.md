@@ -3099,7 +3099,7 @@ Other controllers that SteamVR maps to the Touch layout operate as well
 
 #### Left-handed (`vr.dominant_hand`, `vr.swap_sticks`)
 
-`vr.dominant_hand = "left"` (VR Display's DOMINANT HAND: LEFT) puts the
+`vr.dominant_hand = "left"` (VR Setup > PLAYER's DOMINANT HAND: LEFT) puts the
 weapon in your left hand, and all that the right hand does above the left
 does, and the other way round: the left trigger fires, its touch lays the
 index finger on it, the left controller aims (the reticle, the shot, the
@@ -3119,7 +3119,7 @@ the left controller).
   and the finger on it mirrored with it. The assault rifle's counter reads
   as it does (its digits and its compass the right way round); the other
   marks on its display are mirrored.
-- The sticks swap with the hand (`vr.swap_sticks = "auto"`, VR Display's
+- The sticks swap with the hand (`vr.swap_sticks = "auto"`, VR Setup > PLAYER's
   SWAP STICKS): the right stick moves (its click crouches) and the left
   turns, its click zooms and pushed down it ejects the magazine.
   `vr.swap_sticks = "no"` keeps the left stick moving, `"yes"` swaps them
@@ -3239,7 +3239,7 @@ vehicle's seat, what the reticle is on is what you hit.
   most, and away from an enemy catches up with it smoothly (no faster than
   6 degrees a second, more only as your hand moves). The reticle, the
   smart-link's view and the shot follow the assisted aim; the bullets' own
-  autoaim is the game's, whatever this is. VR Controls' AIM ASSIST: OFF,
+  autoaim is the game's, whatever this is. VR Setup > HANDS AND WEAPONS' AIM ASSIST: OFF,
   WEAK, ON or STRONG.
 
 #### Throwing a grenade with the left hand (`vr.grenade_throw = "gesture"`)
@@ -3341,7 +3341,7 @@ hip's does not: your hand passes by it and rests by it).
 The flat game zooms by narrowing the whole view, which in a headset would
 swing the world with your head. In the VR mode the zoom magnifies a view of
 its own instead, and the rest of your view stays as it was, in one of two
-ways (`vr.scope_view`; VR Controls' SCOPES: SMART-LINK, AT THE EYE or OFF).
+ways (`vr.scope_view`; VR Setup > HANDS AND WEAPONS' SCOPES: SMART-LINK, AT THE EYE or OFF).
 
 ##### Smart-link (`vr.scope_view = "smartlink"`, the default)
 
@@ -3581,7 +3581,7 @@ came from.
   that hand.
 - `vr.recoil` scales the kick and `vr.weapon_haptics` the feel, from 0
   (none: nor the gamepad's rumble for your firing and the hits) to 1 (not
-  in VR Controls).
+  in VR Setup > HANDS AND WEAPONS).
 - In a network game, a client fires its own weapon at once (it spends its
   ammunition as it fires), so its kick and feel are at once too; a hit is
   felt as the host's damage reaches it.
@@ -4301,19 +4301,23 @@ drawn and what they cost.
 ### Settings
 
 In the headset, Settings' VR Setup (below About; only there while the
-game plays in VR) sets most of these with the left d-pad: VR Controls
-(the hands, the aim, the gamepad's view, two-handed aiming, the aim assist, the melee
-swing, the holsters, the physical crouch, the scopes (smart-link, at the eye or off), reloading by hand, turning, the vehicles' view and the view as you die) and, from its last row, VR Display (the play position,
-the eye height, the world's scale, the HUD's and the menus' distance and
-size, the resolution and the refresh rate, and first the dominant hand and
-the sticks) and, from its last row, its
-visor page (the HUD on the visor or flat, its depth, its wrap along the
-visor, its lag and glow, its look on the glass, its reaction to the world, the
-helmet's rim and its depth, the glass's shade, the shields' effects and
-the strength of their energy). OK writes them to
+game plays in VR) sets most of these with the left d-pad, in pages of one
+purpose each. VR SETUP holds the aim and the gamepad's view, and opens
+DISPLAY (the refresh rate, the resolution, the foveation and its size, the
+late latch, the menus' distance and width), HUD (its style, shape, size,
+distance, depth, wrap and lag; from it VISOR LOOK, the visor's glow, glass,
+rim and shields' effects; WRIST HUD; and HUD LAYOUT, the corners' places),
+PLAYER (the dominant hand and the sticks, the play position, the eye
+height, the physical crouch, the world's scale, the recentring, the held
+lean and the view as you die), MOVEMENT AND COMFORT (turning, the vignette,
+sprinting, the vehicles' view, the third person, parkour, bullet time) and
+HANDS AND WEAPONS (the hands, two-handed aiming, the aim assist, the
+scopes, the holsters, reloading by hand, the melee swing, the grenades, the
+haptics; from it FISTS AND GRABBING). OK writes them to
 `config.toml`, and they apply at once, but those marked RESTART:
-`vr.height`, `vr.resolution_scale` and `vr.refresh_rate`, which the
-headset's session is opened with, apply from the next start.
+`vr.height`, `vr.resolution_scale`, `vr.refresh_rate`, `vr.foveation` and
+`vr.foveation_inset`, which the headset's session is opened with, apply from
+the next start.
 
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
@@ -4326,7 +4330,7 @@ headset's session is opened with, apply from the next start.
 | `vr.swap_sticks` | `"auto"` | `HALO_VR_SWAP_STICKS` | `"yes"`: the right stick moves (its click crouches) and the left turns (its click zooms, pushed down it ejects the magazine); `"no"`: as they are; `"auto"`: swapped with `vr.dominant_hand = "left"`. Not with `vr.aim = "gamepad"`. |
 | `vr.weapon_offset` | `"0.15, -0.22, 0.30"` | `HALO_VR_WEAPON_OFFSET` | With `vr.hands = "game"`: where the weapon's grip is from the eye that the game poses it for, in metres: right, up, forward. |
 | `vr.depth` | `false` | `HALO_VR_DEPTH` | `true`: give the runtime the eyes' depth too (`XR_KHR_composition_layer_depth`), for its reprojection. SteamVR on the Steam Frame could not make a depth swapchain for the OpenGL session the VR build had before it drew with Vulkan. |
-| `vr.foveation` | `"eye"` | `HALO_VR_FOVEATION` | Foveated rendering (below, "How it operates"): each eye's image at its full resolution in an inset where you look, and at less about it, which draws half of the eyes' pixels (at the default `vr.foveation_inset`). `"eye"`: the inset follows the eyes, where the runtime tracks them (`XR_EXT_eye_gaze_interaction`; else as `"fixed"`); `"fixed"`: it stays in the middle of each eye's view; `"off"`: all of each image at full resolution. Not in VR Display; from the next start. |
+| `vr.foveation` | `"eye"` | `HALO_VR_FOVEATION` | Foveated rendering (below, "How it operates"): each eye's image at its full resolution in an inset where you look, and at less about it, which draws half of the eyes' pixels (at the default `vr.foveation_inset`). `"eye"`: the inset follows the eyes, where the runtime tracks them (`XR_EXT_eye_gaze_interaction`; else as `"fixed"`); `"fixed"`: it stays in the middle of each eye's view; `"off"`: all of each image at full resolution. In VR Setup > DISPLAY (FOVEATION); from the next start. |
 | `vr.foveation_inset` | `0.5` | `HALO_VR_FOVEATION_INSET` | With `vr.foveation`: how much of each eye's image across and up is the inset (from `0.3` to `0.8`), at the image's resolution; about it, the image is drawn at this much of it (`0.5`: half across and up). Smaller is faster. From the next start. |
 | `vr.late_latch` | `true` | `HALO_VR_LATE_LATCH` | The late latch (below, "How it operates"): each frame is drawn from where the head and the weapon's controller are just before it goes to the headset, located again by the renderer's thread, not where they were as the game began the frame; the game's work is the frame's as it was. `false`: as located when the game began it. |
 | `vr.melee_gesture` | `true` | `HALO_VR_MELEE_GESTURE` | A swing of the right controller melees, as B does: a hard one in any direction, or a softer one with the right grip held ("Meleeing with a swing"). |
@@ -4335,14 +4339,14 @@ headset's session is opened with, apply from the next start.
 | `vr.scopes` | `true` | `HALO_VR_SCOPES` | With `vr.aim = "controller"`: the zoom magnifies a view of its own, as `vr.scope_view` says (above, "Scopes"). `false`: the game's zoom (nothing is magnified in the headset), whatever `vr.scope_view` is. |
 | `vr.scope_view` | `"smartlink"` | `HALO_VR_SCOPE_VIEW` | With `vr.scopes`: `"smartlink"`, the right stick's click zooms as the game does, wherever the weapon is, and a wide magnified window opens about the reticle, at its depth (above, "Smart-link"); `"eye"`, the sniper rifle's and the pistol's scopes magnify the view within their lens while raised to an eye, and lowered do not zoom (above, "At the eye"); `"off"`, as `vr.scopes = false`. |
 | `vr.smartlink_size` | `60.0` | `HALO_VR_SMARTLINK_SIZE` | With `vr.scope_view = "smartlink"`: how wide the zoom's window is, in degrees of the view (30 to 100); it is 16:9. The sniper rifle's and the pistol's are the flat screen's zoomed view: this is the sniper rifle's scope's frame in it, the pistol's to its scale, the zoomed view about them as wide as the HUD (`vr.hud_size`) or a fifth wider than the sniper rifle's frame. |
-| `vr.smartlink_place` | `"reticle"` | `HALO_VR_SMARTLINK_PLACE` | With `vr.scope_view = "smartlink"`: where the zoom's window is: `"reticle"`, about the reticle at its depth, where the weapon aims (it moves with your hand); `"visor"`, on your visor where the HUD is (it stays before your eyes, as the flat screen does, and the weapon aims what it shows). Not in VR Controls. |
-| `vr.scope_gun` | `"hidden"` | `HALO_VR_SCOPE_GUN` | With `vr.scope_view = "smartlink"`: how the weapon in your hand shows where it crosses the zoom's window: `"hidden"`, the window over it (no barrel in the view); `"ghost"`, faintly through the window (a fifth); `"visible"`, in front of the window. Not in VR Controls. |
+| `vr.smartlink_place` | `"reticle"` | `HALO_VR_SMARTLINK_PLACE` | With `vr.scope_view = "smartlink"`: where the zoom's window is: `"reticle"`, about the reticle at its depth, where the weapon aims (it moves with your hand); `"visor"`, on your visor where the HUD is (it stays before your eyes, as the flat screen does, and the weapon aims what it shows). Not in VR Setup. |
+| `vr.scope_gun` | `"hidden"` | `HALO_VR_SCOPE_GUN` | With `vr.scope_view = "smartlink"`: how the weapon in your hand shows where it crosses the zoom's window: `"hidden"`, the window over it (no barrel in the view); `"ghost"`, faintly through the window (a fifth); `"visible"`, in front of the window. Not in VR Setup. |
 | `vr.vehicle_climb` | `true` | `HALO_VR_VEHICLE_CLIMB` | With `vr.aim = "controller"`: a vehicle with holds (the Scorpion, the Warthog, the Ghost, the Banshee, the Shade) is climbed with the hands: grip a hold and pull, the view moving against the hands; lowered into a hatch by its rim, pulled to a seat by its holds, or with both hands on a gun's handles, you are in the seat, and pulled or pushed out of it by its holds (the Ghost: pushed off its handlebars), out ("Climbing into a vehicle"). X works as ever. |
-| `vr.vehicle_zoom` | `"2 4"` | `HALO_VR_VEHICLE_ZOOM` | With `vr.scope_view = "smartlink"`, in a vehicle's seat whose weapon you aim, seen from the seat: the magnifications the right stick's click steps through in the zoom's window, then none (up to 4, each more than 1; `""`: the click does nothing there, as before). A vehicle's weapon with zoom levels of its own (none in the game's maps) has those. Not in VR Controls. |
-| `vr.recoil` | `1.0` | `HALO_VR_RECOIL` | With `vr.aim = "controller"`: how far the weapon in your hand kicks as it fires, each its own way, from `0` (none) to `1` (above, "The weapons' feel"). Drawn alone: the aim, the shots and the scopes' views stay where you point. Not in VR Controls. |
-| `vr.weapon_haptics` | `1.0` | `HALO_VR_WEAPON_HAPTICS` | With `vr.aim = "controller"`: how strongly the controllers feel each weapon firing, each its own way, and the hits on you, in the hand on the side they came from, in place of the gamepad's rumble for them, from `0` (none) to `1` (above, "The weapons' feel"). Not in VR Controls. |
-| `vr.vehicle_flip` | `"lift"` | `HALO_VR_VEHICLE_FLIP` | How an overturned vehicle the game offers to flip is flipped (above, "Flipping a vehicle"): `"lift"`, by both hands gripping it low beside it and lifting together, fast (X reloads there); `"button"`, by X, as ever; `"both"`, by either. With `vr.aim = "gamepad"`, by X. Not in VR Controls. |
-| `vr.grab_world` | `true` | `HALO_VR_GRAB_WORLD` | With `vr.aim = "controller"`: the hands take hold of the world (above, "Picking up a weapon by hand", "Pressing a control by hand"): a weapon on the ground the game offers is taken by reaching down to it with the right hand and gripping; a control the game offers to activate is pressed by pushing either hand into it. `false`: X alone, which works either way. Not in VR Controls. |
+| `vr.vehicle_zoom` | `"2 4"` | `HALO_VR_VEHICLE_ZOOM` | With `vr.scope_view = "smartlink"`, in a vehicle's seat whose weapon you aim, seen from the seat: the magnifications the right stick's click steps through in the zoom's window, then none (up to 4, each more than 1; `""`: the click does nothing there, as before). A vehicle's weapon with zoom levels of its own (none in the game's maps) has those. Not in VR Setup. |
+| `vr.recoil` | `1.0` | `HALO_VR_RECOIL` | With `vr.aim = "controller"`: how far the weapon in your hand kicks as it fires, each its own way, from `0` (none) to `1` (above, "The weapons' feel"). Drawn alone: the aim, the shots and the scopes' views stay where you point. Not in VR Setup. |
+| `vr.weapon_haptics` | `1.0` | `HALO_VR_WEAPON_HAPTICS` | With `vr.aim = "controller"`: how strongly the controllers feel each weapon firing, each its own way, and the hits on you, in the hand on the side they came from, in place of the gamepad's rumble for them, from `0` (none) to `1` (above, "The weapons' feel"). In VR Setup > HANDS AND WEAPONS (HAPTICS). |
+| `vr.vehicle_flip` | `"lift"` | `HALO_VR_VEHICLE_FLIP` | How an overturned vehicle the game offers to flip is flipped (above, "Flipping a vehicle"): `"lift"`, by both hands gripping it low beside it and lifting together, fast (X reloads there); `"button"`, by X, as ever; `"both"`, by either. With `vr.aim = "gamepad"`, by X. Not in VR Setup. |
+| `vr.grab_world` | `true` | `HALO_VR_GRAB_WORLD` | With `vr.aim = "controller"`: the hands take hold of the world (above, "Picking up a weapon by hand", "Pressing a control by hand"): a weapon on the ground the game offers is taken by reaching down to it with the right hand and gripping; a control the game offers to activate is pressed by pushing either hand into it. `false`: X alone, which works either way. In VR Setup > HANDS AND WEAPONS (GRAB WORLD). |
 | `vr.manual_reload` | `true` | `HALO_VR_MANUAL_RELOAD` | With `vr.aim = "controller"`: reload by hand (above, "Reloading by hand"): the left hand takes another magazine from the left hip (the one in the weapon ejecting itself, or the right stick pushed down ejects it) and pushes it in, loaded at once (as a network game's client, after the game's reload time); the shotgun's shells one at a time; an empty weapon does not reload itself. X reloads as ever. |
 | `vr.grenade_throw` | `"gesture"` | `HALO_VR_GRENADE_THROW` | With `vr.aim = "controller"`: `"gesture"`, a grenade is thrown by throwing it with the left hand alone (above, "Throwing a grenade with the left hand"; on foot the left trigger throws nothing); `"both"`, with the left hand or the left trigger; `"button"`, with the left trigger alone. |
 | `vr.aim_assist` | `1.0` | `HALO_VR_AIM_ASSIST` | With `vr.aim = "controller"`: the aim assist (above, "Aiming with the controller"): near an enemy the game's magnetism would be drawn to, the aim is slow to leave it, and zoomed, is drawn gently toward it; how strongly, from `0` (none) to `2`. Zoomed, it reaches as far as the zoom's and is as wide as unzoomed (the flat game narrows it by the zoom's magnification, as its whole view is magnified; in the headset only a window is). The bullets' own autoaim is the game's whatever this is. With the left hand on a long gun's foregrip, half as strong again. The aim never moves while your hand is still but for that zoomed pull: away from a target it comes back to your hand's line only as your hand turns (not on its own as a reload, a melee or a kill loses the target), and a long frame (a hitch) does not reset it. |

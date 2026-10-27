@@ -2,9 +2,32 @@
 
 Features OpenFrame (the Steam Frame fork of OpenH1) adds to OpenH1's VR mode,
 where each came from, and how to turn it on. Each is set in `config.toml`
-(the `vr.*` keys below) or in VR Setup > VR Display > COMFORT, SPRINT... and
-HANDS, FISTS...
+(the `vr.*` keys below) or in VR Setup: MOVEMENT AND COMFORT..., HANDS AND
+WEAPONS... (and its FISTS AND GRABBING...), HUD... (WRIST HUD..., HUD
+LAYOUT...) and PLAYER....
 Every one is off, or as OpenH1 had it, until you choose it.
+
+The VR Setup menu (Settings > Controls tab > VR SETUP, also at the foot of the
+player profile menu) is a tree of pages of one purpose each:
+
+- VR SETUP: AIM, GAMEPAD VIEW, then DISPLAY..., HUD..., PLAYER..., MOVEMENT
+  AND COMFORT..., HANDS AND WEAPONS...
+- DISPLAY: refresh rate, resolution, foveation and its size, late latch,
+  menu distance and width.
+- HUD: HUD STYLE (visor, wrist, hidden), HUD SHAPE, size, distance, depth,
+  wrap, lag, then VISOR LOOK... (glow, glass, reacts, helmet rim, visor
+  shade, shield effects and energy), WRIST HUD... (size, three offsets) and
+  HUD LAYOUT... (inset, all, ammo, shields, tracker).
+- PLAYER: dominant hand (left-handed players: LEFT), swap sticks, position,
+  eye height, physical crouch, world scale, auto recentre, held lean, death
+  view.
+- MOVEMENT AND COMFORT: turning, snap angle, smooth speed, vignette and its
+  strength, sprint and its speed, vehicle view, third person and its
+  distance, parkour (slide, wall jump), bullet time and its speed.
+- HANDS AND WEAPONS: hands, two-handed aim, aim assist, scopes, holsters,
+  reload by hand, swing to melee, grenade throw, haptics, then FISTS AND
+  GRABBING... (fists, punch speed and damage, weapon pull and range, hand
+  swap, prop throw and strength, grab world).
 
 **Untested in the headset** marks a feature built and compiled but not yet
 played on a Steam Frame.
@@ -270,7 +293,7 @@ glass, glow and reaction to the world (`port/linux/vulkan/host_vulkan_vr.c`).
   across), `vr.wrist_hud_offset_along`, `vr.wrist_hud_offset_across`,
   `vr.wrist_hud_offset_out` (metres from its place, -0.2 to 0.2, default
   `0`: along the forearm toward the elbow, across toward the thumb, and up
-  off the wrist). VR Setup > VR Display > HUD AND VISOR... > HUD, DISPLAY...
+  off the wrist). VR Setup > HUD... (**HUD STYLE**) and WRIST HUD...
 - Where: on foot, with `vr.hud = "visor"` (the default; `"flat"` keeps the
   whole HUD on its flat screen). In a vehicle's seat, with the wrist
   untracked, and in the menus the corners go back to the visor. It works at
@@ -306,13 +329,13 @@ the side). Unlike the features above, `vr.auto_recentre` is on by default.
 - `vr.auto_recentre` (default `true`): the game recentres as play comes
   back after a load, a cinematic or the scripts holding the facing (half a
   second or more), and places each menu in front of where you look as it
-  opens. `false`: only both grips held (or a gamepad's Back), SteamVR's
+  opens (VR Setup > PLAYER... > AUTO RECENTRE). `false`: only both grips held (or a gamepad's Back), SteamVR's
   recentre and the headset going on recentre, and the menus are where the
   last recentre put them, as OpenH1 had it.
 - `vr.held_lean` (default `0.15` metres): while the scripts hold the
   player still (the cryo tube), the head moves the view at most this far
   across the floor from the player's eye. `10` lets it go as far as the
-  head does.
+  head does (VR Setup > PLAYER... > HELD LEAN).
 - The scripts' gaze tests (`unit_can_see_object`, `objects_can_see_flag`:
   the tutorial's lights) pass when the head looks at the thing, as well as
   when the player's facing (the controller, with `vr.aim = "controller"`)
@@ -327,8 +350,8 @@ the side). Unlike the features above, `vr.auto_recentre` is on by default.
 With a glasses spacer the Frame's comfortable view is narrower, and the
 visor HUD's corners (the ammunition and grenades at the top left, the motion
 tracker at the bottom left) were partly past its edge. These keys bring the
-corners in, move or resize each one (VR Setup > VR Display > HUD AND
-VISOR... > HUD, DISPLAY... > **HUD LAYOUT...**). Every one defaults to 0
+corners in, move or resize each one (VR Setup > HUD... > **HUD
+LAYOUT...**). Every one defaults to 0
 (sizes to 1): the corners where OpenH1 puts them.
 
 | Key (`HALO_*` variable) | VR Setup row | Range | What |
@@ -369,7 +392,7 @@ VISOR... > HUD, DISPLAY... > **HUD LAYOUT...**). Every one defaults to 0
 
 ## Left-handed
 
-Set VR Setup > HAND, HEIGHT, HUD... > DOMINANT HAND to LEFT
+Set VR Setup > PLAYER... > DOMINANT HAND to LEFT
 (`vr.dominant_hand = "left"`). OpenH1 swaps the two controllers as their
 input comes in (`port/linux/src/vr.c`, `hands_assign_views` and
 `hands_assign_input`): from there on everything that says "the weapon's

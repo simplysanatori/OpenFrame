@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
+<menus>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/vr_hands_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/header_vr_hands"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/options_menu"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/header_vr_hands" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/header_vr_hands">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/help" type="text" controller="1" left="68" top="366" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/help">
+		<data input="port settings help"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_hands" x="54" y="73"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_two_handed" x="54" y="101"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_aim_assist" x="54" y="129"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_scope_view" x="54" y="157"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_holsters" x="54" y="185"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_manual_reload" x="54" y="213"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_melee_gesture" x="54" y="241"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_grenade_throw" x="54" y="269"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_weapon_haptics" x="54" y="297"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_vr_fists_screen" x="54" y="325"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/button_bar" y="414"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/button_defaults" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/button_ok" x="380" y="1"/>
+		<child widget="common_button_cancel" x="510" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_hands" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/hands_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/hands_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/hands_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/hands_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ARMS|FLOATING HANDS|GAME ARMS" setting="vr.hands" values="arms|floating|game" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_two_handed" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/two_handed_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/two_handed_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/two_handed_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/two_handed_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="vr.two_handed" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_aim_assist" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/aim_assist_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/aim_assist_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/aim_assist_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/aim_assist_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|WEAK|ON|STRONG" setting="vr.aim_assist" values="0|0.5|1|1.5" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_scope_view" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/scope_view_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/scope_view_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/scope_view_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/scope_view_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|SMART-LINK|AT THE EYE" setting="vr.scope_view" values="off|smartlink|eye" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_holsters" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/holsters_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/holsters_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/holsters_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/holsters_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="vr.holsters" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_manual_reload" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/manual_reload_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/manual_reload_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/manual_reload_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/manual_reload_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="vr.manual_reload" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_melee_gesture" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/melee_gesture_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/melee_gesture_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/melee_gesture_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/melee_gesture_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="vr.melee_gesture" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_grenade_throw" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/grenade_throw_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/grenade_throw_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/grenade_throw_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/grenade_throw_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="HAND|BOTH|TRIGGER" setting="vr.grenade_throw" values="gesture|both|button" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_weapon_haptics" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/weapon_haptics_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/weapon_haptics_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/weapon_haptics_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/weapon_haptics_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|25%|50%|75%|100%" setting="vr.weapon_haptics" values="0|0.25|0.5|0.75|1" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/op_vr_fists_screen" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="a" run="port settings save" open="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/vr_fists_screen"/>
+		<on event="start" run="port settings save" open="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/vr_fists_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/vr_fists_screen_label"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/vr_fists_screen_label" type="text" controller="1" width="480" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port settings defaults"/>
+		<on event="start" run="port settings defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+		<on event="a" run="port settings save" back="true"/>
+		<on event="start" run="port settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</widget>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/labels">
+		<string text="HANDS:"/>
+		<string text="TWO-HANDED AIM:"/>
+		<string text="AIM ASSIST:"/>
+		<string text="SCOPES:"/>
+		<string text="HOLSTERS:"/>
+		<string text="RELOAD BY HAND:"/>
+		<string text="SWING TO MELEE:"/>
+		<string text="GRENADE THROW:"/>
+		<string text="HAPTICS:"/>
+		<string text="FISTS AND GRABBING..."/>
+	</strings>
+	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/help_strings">
+		<string text=""/>
+		<string text="Aiming with the controller, your hands: with arms\nfrom the shoulders, floating, or the game's arms."/>
+		<string text="The left grip holds a long gun by its foregrip:\nit aims along the line between your hands."/>
+		<string text="Near an enemy your aim is slow to leave it, and\nzoomed, it is drawn gently toward it."/>
+		<string text="Smart-link: the right stick's click zooms on your\nvisor. At the eye: raise the scope to your eye."/>
+		<string text="Reach over your right shoulder for a long gun, or\nto your right hip for a pistol, and grip to draw it."/>
+		<string text="Take a magazine from your left hip and push it\nin: loaded at once. X still reloads."/>
+		<string text="A hard swing of the right controller melees, as\nB does; with its grip held, a softer one will do."/>
+		<string text="Hand: hold the left grip, draw the hand back and\nlet go. Both: or the left trigger. Trigger: only it."/>
+		<string text="How strongly the controllers feel each weapon\nfiring, and the hits on you."/>
+		<string text="Punching and parrying, pulling a weapon to your\nhand, passing it across, holding and throwing things."/>
+	</strings>
+</menus>

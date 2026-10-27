@@ -54,137 +54,121 @@ SCREENS = {}
 
 # ---------- VR Setup (the VR build's, HALO_VR: port/linux/src/vr.c), its
 # item in the profile menu only while the game runs in VR (platform "vr").
-# Two screens: what the hands do, then where things are. Its settings are
-# read again as config.toml changes (vr.c, settings_read), but those marked
-# RESTART, which open the headset's session. A row with a screen in place
-# of a setting opens it (VR_LINK), after saving this screen's.
+# A tree of pages, one purpose each (VR SETUP at its root: the aim, then
+# DISPLAY, HUD, PLAYER, MOVEMENT AND COMFORT and HANDS AND WEAPONS), a row
+# with a screen in place of a setting opening one, after saving this
+# screen's. A page's last rows are its links. Its settings are read again as
+# config.toml changes (vr.c, settings_read), but those marked RESTART, which
+# open the headset's session.
 # (A value added to a setting is one more (shown, value) pair here, then
 # python3 tools/port_settings.py writes the screens' files.)
 
 RESTART = "(RESTART)"
 VR_HANDS = [("ARMS", "arms"), ("FLOATING HANDS", "floating"), ("GAME ARMS", "game")]
 VR_AIM = [("CONTROLLER", "controller"), ("HEAD", "head"), ("GAMEPAD", "gamepad")]
+VR_SETUP = f"{PE}/vr_setup/vr_setup_screen"
 VR_DISPLAY = f"{PE}/vr_display/vr_display_screen"
-VR_VISOR = f"{PE}/vr_visor/vr_visor_screen"
-# (OpenFrame: where the HUD's corners are, docs/openframe-features.md)
 VR_HUD = f"{PE}/vr_hud/vr_hud_screen"
+VR_VISOR = f"{PE}/vr_visor/vr_visor_screen"
+VR_WRIST = f"{PE}/vr_wrist/vr_wrist_screen"
 # (OpenFrame: the visor HUD's corners' placement, docs/openframe-features.md)
 VR_HUD_LAYOUT = f"{PE}/vr_hud_layout/vr_hud_layout_screen"
+VR_PLAYER = f"{PE}/vr_player/vr_player_screen"
 # (OpenFrame: comfort and movement, docs/openframe-features.md)
 VR_COMFORT = f"{PE}/vr_comfort/vr_comfort_screen"
+VR_HANDS_PAGE = f"{PE}/vr_hands/vr_hands_screen"
 # (OpenFrame: the hands' fists, pull, swap and throw, docs/openframe-features.md)
-VR_HANDS_EXTRA = f"{PE}/vr_hands_extra/vr_hands_extra_screen"
-VR_SCREENS = {
-    "vr_controls": {
-        "screen": "vr_controls_screen",
-        "header": ("header_vr_controls", f"{PE}/vr_controls/header_vr_controls"),
-        # (sixteen rows: closer than the others' 28px, the help line lower)
-        "spacing": 18,
-        "help_top": 366,
-        "rows": [
-            ("HANDS:", "vr.hands", VR_HANDS,
-             "Aiming with the controller, your hands: with arms\nfrom the shoulders, floating, or the game's arms.",
-             None),
-            ("AIM:", "vr.aim", VR_AIM,
-             "What aims: the right controller, which holds the\nweapon, your head, or a gamepad's right stick.", None),
-            ("GAMEPAD VIEW:", "vr.gamepad_view", [("CAMERA", "camera"), ("LEVEL", "level"), ("SNAP", "snap")],
-             "With a gamepad, the right stick turns and\npitches the view, only turns it, or in steps.", None),
-            ("TWO-HANDED AIM:", "vr.two_handed", ON_OFF,
-             "The left grip holds a long gun by its foregrip:\nit aims along the line between your hands.", None),
-            ("AIM ASSIST:", "vr.aim_assist", [("OFF", "0"), ("WEAK", "0.5"), ("ON", "1"), ("STRONG", "1.5")],
-             "Near an enemy your aim is slow to leave it, and\nzoomed, it is drawn gently toward it.", None),
-            ("SWING TO MELEE:", "vr.melee_gesture", ON_OFF,
-             "A hard swing of the right controller melees, as\nB does; with its grip held, a softer one will do.", None),
-            ("HOLSTERS:", "vr.holsters", ON_OFF,
-             "Reach over your right shoulder for a long gun, or\nto your right hip for a pistol, and grip to draw it.",
-             None),
-            ("PHYSICAL CROUCH:", "vr.physical_crouch", ON_OFF,
-             "Crouch in the room and you crouch in the game;\nstand up and you stand.", None),
-            ("SCOPES:", "vr.scope_view", [("OFF", "off"), ("SMART-LINK", "smartlink"), ("AT THE EYE", "eye")],
-             "Smart-link: the right stick's click zooms on your\nvisor. At the eye: raise the scope to your eye.", None),
-            ("RELOAD BY HAND:", "vr.manual_reload", ON_OFF,
-             "Take a magazine from your left hip and push it\nin: loaded at once. X still reloads.", None),
-            ("TURNING:", "vr.turn", [("SNAP", "snap"), ("SMOOTH", "smooth")],
-             "How the right stick turns you: in steps, or\ncontinuously.", None),
-            ("SNAP TURN ANGLE:", "vr.snap_turn_angle",
-             [(f"{angle} DEGREES", str(angle)) for angle in (15, 22.5, 30, 45, 60, 90)],
-             "How far each snap turn turns you.", None),
-            ("SMOOTH TURN SPEED:", "vr.smooth_turn_speed",
-             [(f"{speed} DEG/S", str(speed)) for speed in (60, 90, 120, 150, 180, 240, 300, 360)],
-             "How fast smooth turning turns you, the stick\npushed all the way: degrees a second.", None),
-            ("VEHICLE VIEW:", "vr.vehicle_view", [("FIRST PERSON", "first_person"), ("THIRD PERSON", "third_person")],
-             "In a vehicle's seat, the view from your head, or\nthe game's camera following the vehicle.", None),
-            ("DEATH VIEW:", "vr.death_view", [("FACE YOUR BODY", "face"), ("STILL", "still"), ("GAME'S CAMERA", "game")],
-             "As you die, the view stays where your head was\n(turned to your body in a blink), or the game's.",
-             None),
-            ("HAND, HEIGHT, HUD...", None, VR_DISPLAY,
-             "Left-handed (the weapon's hand), your height, the\nworld's scale, the HUD, the menus, the resolution.",
-             None),
-        ],
-    },
-    "vr_display": {
-        "screen": "vr_display_screen",
-        "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
-        # (fourteen rows: closer than the others' 28px, the help line lower)
-        "spacing": 20,
-        "help_top": 366,
-        "rows": [
-            ("DOMINANT HAND:", "vr.dominant_hand", [("RIGHT", "right"), ("LEFT", "left")],
-             "Left-handed? LEFT: the weapon in your left hand,\nall mirrored, the sticks swapped (SWAP STICKS).",
-             None),
-            ("SWAP STICKS:", "vr.swap_sticks", [("AS THE HAND", "auto"), ("NO", "no"), ("YES", "yes")],
-             "Move with the right stick and turn with the left:\nby default, with the left hand dominant.", None),
-            (f"POSITION {RESTART}:", "vr.height", [("SEATED", "seated"), ("STANDING", "standing")],
-             "Seated: your eyes where they are when you\nrecentre. From the next time the game starts.", None),
-            ("EYE HEIGHT:", "vr.player_height",
-             [(f"{height / 100:.2f} M", f"{height / 100:g}") for height in range(140, 205, 5)],
-             "Standing, the height of your eyes above the\nfloor.", None),
-            ("WORLD SCALE:", "vr.world_scale",
-             [(f"{scale:g}X", f"{scale:g}") for scale in (0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.5)],
-             "How large the world looks: more than 1 makes it\nlarger, and you smaller in it.", None),
-            ("HUD DISTANCE:", "vr.hud_distance",
-             [(f"{distance:.1f} M", f"{distance:g}") for distance in (1, 1.5, 2, 2.5, 3, 4, 5)],
-             "How far in front of your eyes the HUD is.", None),
-            ("HUD SIZE:", "vr.hud_size",
-             [(f"{size} DEGREES", str(size)) for size in (40, 50, 60, 70, 80, 90, 100)],
-             "How wide the HUD is, in degrees of your view.", None),
-            ("MENU DISTANCE:", "vr.menu_distance",
-             [(f"{distance:.1f} M", f"{distance:g}") for distance in (1.5, 2, 2.5, 3, 3.5, 4)],
-             "How far in front of you the menus are.", None),
-            ("MENU WIDTH:", "vr.menu_width",
-             [(f"{width:.1f} M", f"{width:g}") for width in (1.6, 2, 2.3, 2.6, 3, 3.5, 4)],
-             "How wide the menus are.", None),
-            (f"RESOLUTION {RESTART}:", "vr.resolution_scale",
-             [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.5, 0.6, 0.75, 0.9, 1, 1.1, 1.25, 1.5)],
-             "Of the size the headset recommends: less is\nfaster, more sharper. From the next start.", None),
-            # (OpenFrame: the Steam Frame has 72, 90 and 120 Hz only, no 80 or 144, and no use for "the
-            # headset's"; OpenH1's list was HEADSET'S, 72, 80, 90, 120, 144)
-            (f"REFRESH RATE {RESTART}:", "vr.refresh_rate",
-             [(f"{rate} HZ", str(rate)) for rate in (72, 90, 120)],
-             "The headset's rate (72, 90 or 120 Hz); the game\ndraws a frame each refresh. From the next start.",
-             None),
-            ("HUD AND VISOR...", None, VR_VISOR,
-             "The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy.",
-             None),
-            ("COMFORT, SPRINT...", None, VR_COMFORT,
-             "The comfort vignette, sprinting, bullet time,\nthe third person and parkour.", None),
-            ("HANDS, FISTS...", None, VR_HANDS_EXTRA,
-             "Punching and parrying, pulling a weapon to your\nhand, passing it across, holding and throwing things.",
-             None),
-        ],
-    },
+VR_FISTS = f"{PE}/vr_fists/vr_fists_screen"
+# the pages' titles (TITLES): a page's folder, then its title
+VR_TITLES = {
+    "vr_setup": "VR SETUP", "vr_display": "DISPLAY", "vr_hud": "HUD", "vr_visor": "VISOR LOOK",
+    "vr_wrist": "WRIST HUD", "vr_hud_layout": "HUD LAYOUT", "vr_player": "PLAYER",
+    "vr_comfort": "MOVEMENT AND COMFORT", "vr_hands": "HANDS AND WEAPONS", "vr_fists": "FISTS AND GRABBING",
 }
-# the visor's page of VR Display (titled as it is: its title's picture is
-# VR Display's), every value of it read again as it changes (vr_visor.c)
-VR_SCREENS["vr_visor"] = {
-    "screen": "vr_visor_screen",
-    "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
-    # (thirteen rows: closer than VR Display's 28px, the help line lower)
-    "spacing": 22,
+VR_SCREENS = {}
+# (OpenFrame) where the HUD's corners are placed, the wrist HUD's offsets from
+# the wrist, in meters. The wrist HUD ported from HaloCE-DecompRemix-VR by
+# moistman42069 (AGPL-3.0-or-later): docs/openframe-features.md
+WRIST_OFFSETS = [(f"{round(offset * 100):+d} CM" if offset else "0 CM", f"{offset:g}")
+                 for offset in (-0.1, -0.05, -0.02, 0, 0.02, 0.05, 0.1)]
+
+# VR SETUP: the aim, then the pages
+VR_SCREENS["vr_setup"] = {
+    "screen": "vr_setup_screen",
+    "header": ("header_vr_setup", f"{PE}/vr_setup/header_vr_setup"),
+    # (seven rows)
+    "spacing": 28,
     "help_top": 366,
     "rows": [
-        ("HUD:", "vr.hud", [("VISOR", "visor"), ("FLAT", "flat")],
+        ("AIM:", "vr.aim", VR_AIM,
+         "What aims: the right controller, which holds the\nweapon, your head, or a gamepad's right stick.", None),
+        ("GAMEPAD VIEW:", "vr.gamepad_view", [("CAMERA", "camera"), ("LEVEL", "level"), ("SNAP", "snap")],
+         "With a gamepad, the right stick turns and\npitches the view, only turns it, or in steps.", None),
+        ("DISPLAY...", None, VR_DISPLAY,
+         "The refresh rate, resolution and foveation, the late\nlatch, and where the menus are.", None),
+        ("HUD...", None, VR_HUD,
+         "The HUD: visor, wrist or hidden; its size, its\ndepth, the visor's look and where its corners are.", None),
+        ("PLAYER...", None, VR_PLAYER,
+         "Left-handed? Your hand, your height, seated or\nstanding, the world's scale, recentring.", None),
+        ("MOVEMENT AND COMFORT...", None, VR_COMFORT,
+         "Turning, the comfort vignette, sprinting, parkour,\nbullet time, the third person and the vehicles' view.", None),
+        ("HANDS AND WEAPONS...", None, VR_HANDS_PAGE,
+         "The hands, two-handed aim, holsters, reloading,\ngrenades, melee, fists and pulling a weapon to you.", None),
+    ],
+}
+# DISPLAY: what is drawn, and the menus
+VR_SCREENS["vr_display"] = {
+    "screen": "vr_display_screen",
+    "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
+    # (seven rows)
+    "spacing": 28,
+    "help_top": 366,
+    "rows": [
+        # (OpenFrame: the Steam Frame has 72, 90 and 120 Hz only, no 80 or 144, and no use for "the
+        # headset's"; OpenH1's list was HEADSET'S, 72, 80, 90, 120, 144)
+        (f"REFRESH RATE {RESTART}:", "vr.refresh_rate",
+         [(f"{rate} HZ", str(rate)) for rate in (72, 90, 120)],
+         "The headset's rate (72, 90 or 120 Hz); the game\ndraws a frame each refresh. From the next start.",
+         None),
+        (f"RESOLUTION {RESTART}:", "vr.resolution_scale",
+         [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.5, 0.6, 0.75, 0.9, 1, 1.1, 1.25, 1.5)],
+         "Of the size the headset recommends: less is\nfaster, more sharper. From the next start.", None),
+        (f"FOVEATION {RESTART}:", "vr.foveation", [("OFF", "off"), ("FIXED", "fixed"), ("EYE TRACKED", "eye")],
+         "Full detail where you look, less about it: faster.\nEye tracked follows your eyes. From the next start.",
+         None),
+        (f"FOVEA SIZE {RESTART}:", "vr.foveation_inset",
+         [(f"{round(inset * 100)}%", f"{inset:g}") for inset in (0.3, 0.4, 0.5, 0.6, 0.7, 0.8)],
+         "How much of each eye's image, across and up, is at\nfull detail: smaller is faster. From the next start.",
+         None),
+        ("LATE LATCH:", "vr.late_latch", ON_OFF,
+         "Draws each frame from where your head and the\nweapon's controller are just before it is shown.", None),
+        ("MENU DISTANCE:", "vr.menu_distance",
+         [(f"{distance:.1f} M", f"{distance:g}") for distance in (1.5, 2, 2.5, 3, 3.5, 4)],
+         "How far in front of you the menus are.", None),
+        ("MENU WIDTH:", "vr.menu_width",
+         [(f"{width:.1f} M", f"{width:g}") for width in (1.6, 2, 2.3, 2.6, 3, 3.5, 4)],
+         "How wide the menus are.", None),
+    ],
+}
+# HUD: how it is shown, then its pages
+VR_SCREENS["vr_hud"] = {
+    "screen": "vr_hud_screen",
+    "header": ("header_vr_hud", f"{PE}/vr_hud/header_vr_hud"),
+    # (ten rows)
+    "spacing": 28,
+    "help_top": 366,
+    "rows": [
+        ("HUD STYLE:", "vr.hud_mode", [("VISOR", "visor"), ("WRIST", "wrist"), ("HIDDEN", "hidden")],
+         "The shields, ammunition and tracker on the visor,\non your other wrist (turn it to your face), or hidden.",
+         None),
+        ("HUD SHAPE:", "vr.hud", [("VISOR", "visor"), ("FLAT", "flat")],
          "On your helmet's visor, curved about your eyes,\nor a flat screen before them.", None),
+        ("HUD SIZE:", "vr.hud_size",
+         [(f"{size} DEGREES", str(size)) for size in (40, 50, 60, 70, 80, 90, 100)],
+         "How wide the HUD is, in degrees of your view.", None),
+        ("HUD DISTANCE:", "vr.hud_distance",
+         [(f"{distance:.1f} M", f"{distance:g}") for distance in (1, 1.5, 2, 2.5, 3, 4, 5)],
+         "How far in front of your eyes the HUD is.", None),
         ("HUD DEPTH:", "vr.hud_depth",
          [("NONE", "0"), *((f"{depth:g}X", f"{depth:g}") for depth in (0.5, 0.75, 1, 1.25, 1.5, 2))],
          "How far apart in depth the HUD's parts are: the\ntracker nearest, the waypoints farthest.", None),
@@ -194,6 +178,22 @@ VR_SCREENS["vr_visor"] = {
         ("HUD LAG:", "vr.hud_lag",
          [("NONE", "0"), *((f"{round(lag * 1000)} MS", f"{lag:g}") for lag in (0.02, 0.03, 0.05, 0.08, 0.12))],
          "How far the HUD trails your head's turns.", None),
+        ("VISOR LOOK...", None, VR_VISOR,
+         "The visor's glass and glow, the helmet's rim, the\nshields' energy on the glass.", None),
+        ("WRIST HUD...", None, VR_WRIST,
+         "The HUD on your other wrist: its size, and where\nit sits on the arm.", None),
+        ("HUD LAYOUT...", None, VR_HUD_LAYOUT,
+         "Move, bring in or resize the visor HUD's corners:\nammo, shields, tracker (corners cut off?).", None),
+    ],
+}
+# the visor's look, every value of it read again as it changes (vr_visor.c)
+VR_SCREENS["vr_visor"] = {
+    "screen": "vr_visor_screen",
+    "header": ("header_vr_visor", f"{PE}/vr_visor/header_vr_visor"),
+    # (eight rows)
+    "spacing": 28,
+    "help_top": 366,
+    "rows": [
         ("HUD GLOW:", "vr.hud_glow",
          [("NONE", "0"), *((f"{round(glow * 100)}%", f"{glow:g}") for glow in (0.25, 0.5, 0.75, 1))],
          "The HUD's glow on the visor's glass.", None),
@@ -217,25 +217,17 @@ VR_SCREENS["vr_visor"] = {
         ("SHIELD ENERGY:", "vr.visor_energy",
          [(f"{round(energy * 100)}%", f"{energy:g}") for energy in (0.25, 0.5, 0.75, 1, 1.5, 2)],
          "How strong the shields' energy across the glass\nis, as they are hit and as they recharge.", None),
-        ("HUD, DISPLAY...", None, VR_HUD,
-         "Where the HUD's corners are: on the visor (and\ntheir layout), on your wrist, or hidden.", None),
     ],
 }
-# (OpenFrame) where the HUD's corners are, a page of the visor's (titled as
-# VR Display is), every value of it read again as it changes (vr_visor.c).
-# The wrist HUD ported from HaloCE-DecompRemix-VR by moistman42069
-# (AGPL-3.0-or-later): docs/openframe-features.md
-WRIST_OFFSETS = [(f"{round(offset * 100):+d} CM" if offset else "0 CM", f"{offset:g}")
-                 for offset in (-0.1, -0.05, -0.02, 0, 0.02, 0.05, 0.1)]
-VR_SCREENS["vr_hud"] = {
-    "screen": "vr_hud_screen",
-    "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
+# (OpenFrame) the wrist HUD (ported from HaloCE-DecompRemix-VR by moistman42069
+# (AGPL-3.0-or-later): docs/openframe-features.md), every value of it read again as it changes (vr_visor.c)
+VR_SCREENS["vr_wrist"] = {
+    "screen": "vr_wrist_screen",
+    "header": ("header_vr_wrist", f"{PE}/vr_wrist/header_vr_wrist"),
+    # (four rows)
     "spacing": 28,
     "help_top": 366,
     "rows": [
-        ("HUD MODE:", "vr.hud_mode", [("VISOR", "visor"), ("WRIST", "wrist"), ("HIDDEN", "hidden")],
-         "The shields, ammunition and tracker on the visor,\non your other wrist (turn it to your face), or hidden.",
-         None),
         ("WRIST HUD SIZE:", "vr.wrist_hud_scale",
          [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.5, 0.75, 1, 1.25, 1.5, 2)],
          "How large the wrist HUD is (100%: 11 cm across).", None),
@@ -245,15 +237,12 @@ VR_SCREENS["vr_hud"] = {
          "Moves the wrist HUD across your wrist (more:\ntoward the thumb).", None),
         ("OFF THE WRIST:", "vr.wrist_hud_offset_out", WRIST_OFFSETS,
          "Raises the wrist HUD off your wrist, or lowers it.", None),
-        ("HUD LAYOUT...", None, VR_HUD_LAYOUT,
-         "Move, bring in or resize the visor HUD's corners:\nammo, shields, tracker (corners cut off?).", None),
     ],
 }
-# (OpenFrame) the visor HUD's corners' placement, a page of HUD, DISPLAY's
-# (titled as VR Display is), every value of it read again as it changes
-# (vr_visor.c, panel_placement): each corner's own move and size, then the
-# inset, then all of them moved and sized together. Moves are fractions of
-# the HUD's width or height, -0.3 to 0.3.
+# (OpenFrame) the visor HUD's corners' placement, a page of HUD's, every value
+# of it read again as it changes (vr_visor.c, panel_placement): each corner's
+# own move and size, then the inset, then all of them moved and sized
+# together. Moves are fractions of the HUD's width or height, -0.3 to 0.3.
 PLACE_STEPS = (-0.3, -0.2, -0.15, -0.1, -0.08, -0.06, -0.04, -0.02, 0,
                0.02, 0.04, 0.06, 0.08, 0.1, 0.15, 0.2, 0.3)
 
@@ -269,8 +258,8 @@ PLACE_SCALES = [(f"{round(scale * 100)}%", f"{scale:g}")
                 for scale in (0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.3, 1.4, 1.5)]
 VR_SCREENS["vr_hud_layout"] = {
     "screen": "vr_hud_layout_screen",
-    "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
-    # (thirteen rows: closer, as the visor's page)
+    "header": ("header_vr_hud_layout", f"{PE}/vr_hud_layout/header_vr_hud_layout"),
+    # (thirteen rows: closer, the help line lower)
     "spacing": 22,
     "help_top": 366,
     "rows": [
@@ -304,16 +293,59 @@ VR_SCREENS["vr_hud_layout"] = {
          "The size of the motion tracker (bottom left).", None),
     ],
 }
-# (OpenFrame) comfort and movement, a page of VR Display's (titled as VR
-# Controls is), every value of it read again as it changes (vr.c,
-# settings_read). Ported from HaloCE-DecompRemix-VR by moistman42069
+# PLAYER: you, and where you are
+VR_SCREENS["vr_player"] = {
+    "screen": "vr_player_screen",
+    "header": ("header_vr_player", f"{PE}/vr_player/header_vr_player"),
+    # (nine rows)
+    "spacing": 28,
+    "help_top": 366,
+    "rows": [
+        ("DOMINANT HAND:", "vr.dominant_hand", [("RIGHT", "right"), ("LEFT", "left")],
+         "Left-handed? LEFT: the weapon in your left hand,\nall mirrored, the sticks swapped (SWAP STICKS).",
+         None),
+        ("SWAP STICKS:", "vr.swap_sticks", [("AS THE HAND", "auto"), ("NO", "no"), ("YES", "yes")],
+         "Move with the right stick and turn with the left:\nby default, with the left hand dominant.", None),
+        (f"POSITION {RESTART}:", "vr.height", [("SEATED", "seated"), ("STANDING", "standing")],
+         "Seated: your eyes where they are when you\nrecentre. From the next time the game starts.", None),
+        ("EYE HEIGHT:", "vr.player_height",
+         [(f"{height / 100:.2f} M", f"{height / 100:g}") for height in range(140, 205, 5)],
+         "Standing, the height of your eyes above the\nfloor.", None),
+        ("PHYSICAL CROUCH:", "vr.physical_crouch", ON_OFF,
+         "Crouch in the room and you crouch in the game;\nstand up and you stand.", None),
+        ("WORLD SCALE:", "vr.world_scale",
+         [(f"{scale:g}X", f"{scale:g}") for scale in (0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.5)],
+         "How large the world looks: more than 1 makes it\nlarger, and you smaller in it.", None),
+        ("AUTO RECENTRE:", "vr.auto_recentre", ON_OFF,
+         "Recentres by itself after a load or a cinematic, and\nas a menu opens. OFF: hold both grips to recentre.",
+         None),
+        ("HELD LEAN:", "vr.held_lean",
+         [("NONE", "0"), *((f"{round(lean * 100)} CM", f"{lean:g}") for lean in (0.05, 0.15, 0.3, 0.5)), ("ANY", "10")],
+         "While a scene holds you still (the cryo tube), how\nfar your head may move the view from the player's eye.",
+         None),
+        ("DEATH VIEW:", "vr.death_view", [("FACE YOUR BODY", "face"), ("STILL", "still"), ("GAME'S CAMERA", "game")],
+         "As you die, the view stays where your head was\n(turned to your body in a blink), or the game's.",
+         None),
+    ],
+}
+# (OpenFrame) movement and comfort, every value of it read again as it changes
+# (vr.c, settings_read). Ported from HaloCE-DecompRemix-VR by moistman42069
 # (AGPL-3.0-or-later): docs/openframe-features.md
 VR_SCREENS["vr_comfort"] = {
     "screen": "vr_comfort_screen",
-    "header": ("header_vr_controls", f"{PE}/vr_controls/header_vr_controls"),
-    "spacing": 24,
+    "header": ("header_vr_comfort", f"{PE}/vr_comfort/header_vr_comfort"),
+    # (fifteen rows: closer than the others' 28px, the help line lower)
+    "spacing": 19,
     "help_top": 366,
     "rows": [
+        ("TURNING:", "vr.turn", [("SNAP", "snap"), ("SMOOTH", "smooth")],
+         "How the right stick turns you: in steps, or\ncontinuously.", None),
+        ("SNAP TURN ANGLE:", "vr.snap_turn_angle",
+         [(f"{angle} DEGREES", str(angle)) for angle in (15, 22.5, 30, 45, 60, 90)],
+         "How far each snap turn turns you.", None),
+        ("SMOOTH TURN SPEED:", "vr.smooth_turn_speed",
+         [(f"{speed} DEG/S", str(speed)) for speed in (60, 90, 120, 150, 180, 240, 300, 360)],
+         "How fast smooth turning turns you, the stick\npushed all the way: degrees a second.", None),
         ("VIGNETTE:", "vr.vignette", [("VEHICLES", "vehicle"), ("ALWAYS", "always"), ("OFF", "off")],
          "The edges of your view dim as the view moves:\nin vehicles, or as the sticks move and turn you too.",
          None),
@@ -326,12 +358,8 @@ VR_SCREENS["vr_comfort"] = {
         ("SPRINT SPEED:", "vr.sprint_speed",
          [(f"{speed:g}X", f"{speed:g}") for speed in (1.25, 1.5, 1.75, 2)],
          "How much faster than the run a sprint is.", None),
-        ("BULLET TIME:", "vr.bullet_time", ON_OFF,
-         "Offline: hold the turning stick up to slow the\nworld (hold it again to end it).",
-         None),
-        ("BULLET TIME SPEED:", "vr.bullet_time_scale",
-         [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
-         "How fast the world runs in bullet time.", None),
+        ("VEHICLE VIEW:", "vr.vehicle_view", [("FIRST PERSON", "first_person"), ("THIRD PERSON", "third_person")],
+         "In a vehicle's seat, the view from your head, or\nthe game's camera following the vehicle.", None),
         ("THIRD PERSON:", "vr.third_person", ON_OFF,
          "On foot, the view from behind (not multiplayer);\nhold the turning stick down to switch.",
          None),
@@ -346,15 +374,56 @@ VR_SCREENS["vr_comfort"] = {
         ("WALL JUMP:", "vr.walljump_scale",
          [(f"{scale:g}X", f"{scale:g}") for scale in (0.5, 0.75, 1, 1.25, 1.5)],
          "How strong a jump off a wall is.", None),
+        ("BULLET TIME:", "vr.bullet_time", ON_OFF,
+         "Offline: hold the turning stick up to slow the\nworld (hold it again to end it).",
+         None),
+        ("BULLET TIME SPEED:", "vr.bullet_time_scale",
+         [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
+         "How fast the world runs in bullet time.", None),
     ],
 }
-# (OpenFrame) the hands, a page of VR Display's (titled as VR Controls is),
-# every value of it read again as it changes (vr.c, settings_read; vr_fists.c,
-# vr_grab.c). Ported from HaloCE-DecompRemix-VR by moistman42069
+# HANDS AND WEAPONS: the hands and the weapons in them
+VR_SCREENS["vr_hands"] = {
+    "screen": "vr_hands_screen",
+    "header": ("header_vr_hands", f"{PE}/vr_hands/header_vr_hands"),
+    # (ten rows)
+    "spacing": 28,
+    "help_top": 366,
+    "rows": [
+        ("HANDS:", "vr.hands", VR_HANDS,
+         "Aiming with the controller, your hands: with arms\nfrom the shoulders, floating, or the game's arms.",
+         None),
+        ("TWO-HANDED AIM:", "vr.two_handed", ON_OFF,
+         "The left grip holds a long gun by its foregrip:\nit aims along the line between your hands.", None),
+        ("AIM ASSIST:", "vr.aim_assist", [("OFF", "0"), ("WEAK", "0.5"), ("ON", "1"), ("STRONG", "1.5")],
+         "Near an enemy your aim is slow to leave it, and\nzoomed, it is drawn gently toward it.", None),
+        ("SCOPES:", "vr.scope_view", [("OFF", "off"), ("SMART-LINK", "smartlink"), ("AT THE EYE", "eye")],
+         "Smart-link: the right stick's click zooms on your\nvisor. At the eye: raise the scope to your eye.", None),
+        ("HOLSTERS:", "vr.holsters", ON_OFF,
+         "Reach over your right shoulder for a long gun, or\nto your right hip for a pistol, and grip to draw it.",
+         None),
+        ("RELOAD BY HAND:", "vr.manual_reload", ON_OFF,
+         "Take a magazine from your left hip and push it\nin: loaded at once. X still reloads.", None),
+        ("SWING TO MELEE:", "vr.melee_gesture", ON_OFF,
+         "A hard swing of the right controller melees, as\nB does; with its grip held, a softer one will do.", None),
+        ("GRENADE THROW:", "vr.grenade_throw", [("HAND", "gesture"), ("BOTH", "both"), ("TRIGGER", "button")],
+         "Hand: hold the left grip, draw the hand back and\nlet go. Both: or the left trigger. Trigger: only it.",
+         None),
+        ("HAPTICS:", "vr.weapon_haptics",
+         [("OFF", "0"), *((f"{round(haptics * 100)}%", f"{haptics:g}") for haptics in (0.25, 0.5, 0.75, 1))],
+         "How strongly the controllers feel each weapon\nfiring, and the hits on you.", None),
+        ("FISTS AND GRABBING...", None, VR_FISTS,
+         "Punching and parrying, pulling a weapon to your\nhand, passing it across, holding and throwing things.", None),
+    ],
+}
+# (OpenFrame) the hands' fists, pull, swap and throw, a page of HANDS AND
+# WEAPONS', every value of it read again as it changes (vr.c, settings_read;
+# vr_fists.c, vr_grab.c). Ported from HaloCE-DecompRemix-VR by moistman42069
 # (AGPL-3.0-or-later): docs/openframe-features.md
-VR_SCREENS["vr_hands_extra"] = {
-    "screen": "vr_hands_extra_screen",
-    "header": ("header_vr_controls", f"{PE}/vr_controls/header_vr_controls"),
+VR_SCREENS["vr_fists"] = {
+    "screen": "vr_fists_screen",
+    "header": ("header_vr_fists", f"{PE}/vr_fists/header_vr_fists"),
+    # (nine rows)
     "spacing": 28,
     "help_top": 366,
     "rows": [
@@ -378,6 +447,9 @@ VR_SCREENS["vr_hands_extra"] = {
         ("THROW STRENGTH:", "vr.prop_throw_strength",
          [(f"{strength:g}X", f"{strength:g}") for strength in (0.5, 1, 1.5, 2, 2.5, 3)],
          "How hard a thing let go of flies, times your\nhand's speed.", None),
+        ("GRAB WORLD:", "vr.grab_world", ON_OFF,
+         "Reach down to a weapon on the ground and grip to\ntake it; push a hand into a control to press it.",
+         None),
     ],
 }
 SCREENS.update(VR_SCREENS)
@@ -534,7 +606,6 @@ FIELDS_OF_VIEW = [("DEFAULT", "0")] + [(str(n), str(n)) for n in range(80, 151, 
 ANTI_ALIASING_HELP = "Smooths jagged edges. FXAA and SMAA cost little; {} sharper and {} more of the graphics card."
 STREAMER_LEVELS = [("OFF", "off"), ("SEVERE", "severe"), ("STRONG AND WORSE", "strong"), ("MILD AND WORSE", "mild")]
 SEED_UPLOADS = (64, 128, 256, 512, 1024, 2048, 4096, 8192, 10240)
-VR_CONTROLS = f"{PE}/vr_controls/vr_controls_screen"
 
 
 def _page_screen(folder: str, screen: str) -> str:
@@ -690,8 +761,8 @@ PAGES = {
              "played with.", None),
             # (VR Setup, the VR build's, while it plays in the headset)
             (SECTION, "VR"),
-            ("VR SETUP ›", None, VR_CONTROLS,
-             "Your hands, aiming, turning, your height, the HUD and the menus in VR.", "vr"),
+            ("VR SETUP ›", None, VR_SETUP,
+             "The aim, the display, the HUD, you, how you move and your hands in VR.", "vr"),
         ],
     },
     "network_setup": {
@@ -1214,8 +1285,8 @@ def _vr_item() -> list:
     return _widget(VR_ITEM, [("type", "text"), ("left", 51), ("top", 375), ("width", 232), ("height", 32),
                              ("bitmap", "bitmaps/list_item_bkd"), ("text", "VR SETUP"), ("font", "ui\\large_ui"),
                              ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 5)],
-                   [f'<on event="a" open="{PE}/vr_controls/vr_controls_screen"/>',
-                    f'<on event="start" open="{PE}/vr_controls/vr_controls_screen"/>',
+                   [f'<on event="a" open="{VR_SETUP}"/>',
+                    f'<on event="start" open="{VR_SETUP}"/>',
                     '<on event="left_mouse" run="mouse emit accept event"/>'])
 
 
@@ -1518,7 +1589,7 @@ def settings_files() -> dict:
     for folder, page in PAGES.items():
         files[f"{PE}/{folder}".replace("/", ".") + ".xml"] = _settings_page(folder, page)
     files[SETTINGS.replace("/", ".") + ".xml"] = _settings_shared()
-    files[f"{PE}/vr_controls".replace("/", ".") + ".xml"] += _vr_item()
+    files[f"{PE}/vr_setup".replace("/", ".") + ".xml"] += _vr_item()
     files[f"{PE}/controls_setup".replace("/", ".") + ".xml"] = _controls_screen()
     return {name: ['<?xml version="1.0" encoding="UTF-8"?>',
                    "<!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->",
@@ -2056,8 +2127,7 @@ BITMAP_FRAMES = {
 # the titles this port has that the PC version has not, set as its headers
 # are (port/assets/menus/port_svg): bitmap name, text
 TITLES = {
-    f"{PE}/vr_controls/header_vr_controls": "VR CONTROLS",
-    f"{PE}/vr_display/header_vr_display": "VR DISPLAY",
+    **{f"{PE}/{folder}/header_{folder}": title for folder, title in VR_TITLES.items()},
     "main_menu/mods/header_mods": "MODS",
     f"{MT}/join_game/header_server_browser": "SERVER BROWSER",
     f"{MT}/join_game/header_direct_link": "JOIN BY LINK",

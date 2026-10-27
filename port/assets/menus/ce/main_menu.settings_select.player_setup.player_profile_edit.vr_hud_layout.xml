@@ -4,10 +4,10 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/vr_hud_layout_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
 		<on event="b" back="true"/>
 		<on event="back" back="true"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_display"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/options_menu"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_display" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help" type="text" controller="1" left="68" top="366" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help_strings" font="ui\large_ui" color="#FFFFFFFF">
 	</widget>
