@@ -823,13 +823,27 @@ eyes' pass; 0 for the draws after it. Told by the rasterizer for each
 effect's group, and as it ends (rasterizer_xbox_transparent_geometry.c);
 render_sprite.c chooses thick for sprites large enough on the screen. */
 void halo_vr_effect_depth(int mode);
-/* the comfort vignette (vr.comfort_vignette): asked for each frame by
+/* the comfort vignette (vr.vignette, vr.vignette_strength): asked for each frame by
 the game (vr_vehicle.c: how fast the view turns with a vehicle, how hard
 the vehicle speeds up or slows), 0 to 1; and as it is drawn this frame,
 eased (0: none), with the eyes' fields of view (tangents: left, right, up,
 down) */
 void halo_vr_comfort_vignette(float amount);
 float halo_vr_vignette(float fov[2][4]);
+/* sprinting on foot (vr.sprint_mode, vr.c's comfort_update): how hard the
+player sprints now, 0 to 1 (the toggle's 0 or 1, the arms' run's effort; 0
+off foot, in the menus, or with the left stick pulled back or sideways), the
+speed a full sprint runs at (vr.sprint_speed, times the run's), and whether
+the toggle is on; the game says where it quickens the player
+(port/linux/game/vr_comfort.c: a game of this computer alone) */
+float halo_vr_sprint(void);
+float halo_vr_sprint_speed(void);
+int halo_vr_sprint_toggled(void);
+/* bullet time (vr.bullet_time): the world's speed asked for, 1 when off
+(vr.bullet_time_scale while toggled on, the right stick held up); and
+turned off, where the game will not slow the world (vr_comfort.c) */
+float halo_vr_bullet_time(void);
+void halo_vr_bullet_time_off(void);
 /* this frame's eyes' images multiplied by this colour as they are
 presented, all of each, before the helmet's rim; each call multiplies it
 further (vr_seat.c's blinks, vr_death.c's dimming: the game's screen flash

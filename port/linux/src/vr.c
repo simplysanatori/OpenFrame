@@ -185,6 +185,55 @@ asks for over VIGNETTE_IN_SECONDS as it grows and VIGNETTE_OUT_SECONDS as it
 falls (time constants), to nothing when the game asks for none */
 #define VIGNETTE_IN_SECONDS 0.12f
 #define VIGNETTE_OUT_SECONDS 0.4f
+/* vr.vignette: never, a vehicle's (what vr_vehicle.c and vr_seat.c ask
+for), or also the sticks' own motion on foot (comfort_update) */
+#define VIGNETTE_OFF 0
+#define VIGNETTE_VEHICLE 1
+#define VIGNETTE_ALWAYS 2
+/* ... with vr.vignette = "always" (comfort_update; after
+HaloCE-DecompRemix-VR's comfort vignette by moistman42069, AGPL-3.0-or-later):
+how much of it the left stick asks for on foot pushed all the way, and
+sprinting more; the right stick's smooth turn at full speed; a snap turn
+for a moment (falling to nothing over COMFORT_SNAP_SECONDS); the sticks'
+dead zone, and the push past it to the full ask */
+#define COMFORT_MOVE 0.5f
+#define COMFORT_SPRINT 0.2f
+#define COMFORT_TURN 0.8f
+#define COMFORT_SNAP 0.6f
+#define COMFORT_SNAP_SECONDS 0.25f
+#define COMFORT_DEADZONE 0.15f
+#define COMFORT_FULL 0.6f
+/* vr.sprint_mode = "toggle" and vr.bullet_time (comfort_update): the right
+stick pushed up past STICK_UP_PRESSED (STICK_UP_RELEASED lets it go) and
+less than STICK_UP_SIDEWAYS sideways (not a turn); let go within
+STICK_UP_HOLD_SECONDS a flick (sprint's toggle), held that long bullet
+time's. A toggled sprint ends with the left stick let go
+SPRINT_STOP_SECONDS (under SPRINT_STOP_PUSH), crouching, or off foot.
+Sprint's effort is none with the left stick pulled back past
+SPRINT_BACK or sideways past SPRINT_SIDEWAYS. */
+#define SPRINT_OFF 0
+#define SPRINT_TOGGLE 1
+#define SPRINT_ARM_SWING 2
+#define STICK_UP_PRESSED 0.75f
+#define STICK_UP_RELEASED 0.55f
+#define STICK_UP_SIDEWAYS 0.6f
+#define STICK_UP_HOLD_SECONDS 0.5f
+#define SPRINT_STOP_SECONDS 1.0f
+#define SPRINT_STOP_PUSH 0.2f
+#define SPRINT_BACK (-0.15f)
+#define SPRINT_SIDEWAYS 0.6f
+/* vr.sprint_mode = "arm_swing" (after HaloCE-DecompRemix-VR's arm run by
+moistman42069, AGPL-3.0-or-later): both hands pumping, as fast as the
+slower of them moves up and down (metres a second, each hand's vertical
+speed smoothed over ARM_SWING_SMOOTHING seconds) past ARM_SWING_FROM, is a
+run's effort, full at ARM_SWING_FULL; rising over ARM_SWING_RISE seconds
+and falling over ARM_SWING_FALL (time constants) so the strokes run on.
+The left stick still (under COMFORT_DEADZONE), the effort pushes it ahead. */
+#define ARM_SWING_FROM 0.6f
+#define ARM_SWING_FULL 1.5f
+#define ARM_SWING_SMOOTHING 0.08f
+#define ARM_SWING_RISE 0.12f
+#define ARM_SWING_FALL 0.4f
 #define GAMEPAD_RECENTRE_SECONDS 1.0f
 /* both hands on a long gun (vr.two_handed): the left hand takes the
 foregrip when its grip is pressed this near the line ahead of the right hand
@@ -600,6 +649,26 @@ static struct
 	float vignette_asked;
 	unsigned long vignette_asked_at;
 	float vignette;
+	/* comfort_update: the vignette the sticks ask for this frame
+	(vr.vignette = "always"), a snap turn's moment of it, and whether a
+	snap turn was made this frame; the right stick up (held, for how long,
+	and whether bullet time took this push), sprint (toggled on, the
+	seconds the left stick has been let go, the arms' effort and each
+	hand's last height and vertical speed, smoothed) and bullet time
+	(toggled on) */
+	float comfort_asked;
+	float comfort_snap;
+	int comfort_snapped;
+	int stick_up;
+	float stick_up_seconds;
+	int stick_up_taken;
+	int sprint_on;
+	float sprint_stopped;
+	float arm_swing;
+	int arm_heights_valid;
+	float arm_heights[2];
+	float arm_speeds[2];
+	int bullet_time_on;
 	/* debug.vr_test_target: the right controller pointed along this
 	(halo_vr_test_point: game axes from the recentred head), if set */
 	int test_point_valid;
@@ -912,6 +981,15 @@ static struct
 	int handlebars;
 	int wheel;
 	int comfort_vignette;
+	/* vr.vignette (VIGNETTE_OFF, _VEHICLE, _ALWAYS) and vr.vignette_strength;
+	vr.sprint_mode (SPRINT_OFF, _TOGGLE, _ARM_SWING) and vr.sprint_speed;
+	vr.bullet_time and vr.bullet_time_scale (comfort_update) */
+	int vignette_mode;
+	float vignette_strength;
+	int sprint_mode;
+	float sprint_speed;
+	int bullet_time;
+	float bullet_time_scale;
 	/* vr.late_latch */
 	int late_latch;
 	float test_turn;
@@ -1057,6 +1135,23 @@ static void settings_read(void)
 	settings.handlebars = strcmp(config_string("vr.ghost_steering"), "look") != 0;
 	settings.wheel = strcmp(config_string("vr.warthog_steering"), "look") != 0;
 	settings.comfort_vignette = config_boolean("vr.comfort_vignette");
+	settings.vignette_mode = !settings.comfort_vignette || !strcmp(config_string("vr.vignette"), "off") ? VIGNETTE_OFF :
+		!strcmp(config_string("vr.vignette"), "always") ? VIGNETTE_ALWAYS : VIGNETTE_VEHICLE;
+	settings.vignette_strength = (float)config_real("vr.vignette_strength");
+	if (!(settings.vignette_strength >= 0.25f && settings.vignette_strength <= 1.5f))
+		settings.vignette_strength = settings.vignette_strength > 1.5f ? 1.5f :
+			settings.vignette_strength >= 0.0f && settings.vignette_strength < 0.25f ? 0.25f : 1.0f;
+	settings.sprint_mode = !strcmp(config_string("vr.sprint_mode"), "toggle") ? SPRINT_TOGGLE :
+		!strcmp(config_string("vr.sprint_mode"), "arm_swing") ? SPRINT_ARM_SWING : SPRINT_OFF;
+	settings.sprint_speed = (float)config_real("vr.sprint_speed");
+	if (!(settings.sprint_speed >= 1.1f && settings.sprint_speed <= 2.0f))
+		settings.sprint_speed = settings.sprint_speed > 2.0f ? 2.0f :
+			settings.sprint_speed >= 1.0f && settings.sprint_speed < 1.1f ? 1.1f : 1.5f;
+	settings.bullet_time = config_boolean("vr.bullet_time");
+	settings.bullet_time_scale = (float)config_real("vr.bullet_time_scale");
+	if (!(settings.bullet_time_scale >= 0.2f && settings.bullet_time_scale <= 0.8f))
+		settings.bullet_time_scale = settings.bullet_time_scale > 0.8f ? 0.8f :
+			settings.bullet_time_scale > 0.0f && settings.bullet_time_scale < 0.2f ? 0.2f : 0.4f;
 	settings.late_latch = config_boolean("vr.late_latch");
 	settings.test_turn = (float)config_real("debug.vr_test_turn") * (float)M_PI / 180.0f;
 	settings.test_jitter = (float)config_real("debug.vr_test_jitter") * 0.001f;
@@ -3688,11 +3783,192 @@ int halo_vr_seat_enabled(int kind)
 		(kind == HALO_VR_SEAT_BARS ? settings.handlebars : kind == HALO_VR_SEAT_WHEEL ? settings.wheel : 1);
 }
 
-/* the comfort vignette, once a frame (VIGNETTE_* above) */
+/* how far a stick is pushed past COMFORT_DEADZONE, 0 to 1 at COMFORT_FULL:
+ported from HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later) */
+static float comfort_stick(float x, float y)
+{
+	float length = sqrtf(x * x + y * y);
+
+	if (!(length > COMFORT_DEADZONE))
+		return 0.0f;
+	length = (length - COMFORT_DEADZONE) / (COMFORT_FULL - COMFORT_DEADZONE);
+	return length > 1.0f ? 1.0f : length;
+}
+
+/* whether sprinting and bullet time may be asked for now: the game plays in
+the headset with the controllers aiming, on foot (halo_vr_crouch_able), no
+menus up and the session focused; the game itself says where it slows the
+world or quickens the player (port/linux/game/vr_comfort.c) */
+static int comfort_on_foot(void)
+{
+	return vr.initialized && vr.aimed && !settings.gamepad_aim && vr.crouch_able_frame && !vr.menus &&
+		vr.views.focused;
+}
+
+/* the arms' run (vr.sprint_mode = "arm_swing", ARM_SWING_* above): ported
+from HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later), its
+effort from the hands' vertical speeds in the play space */
+static void arm_swing_update(float seconds)
+{
+	const struct vr_host_pose *grip = vr.views.grip;
+	float effort = 0.0f, target, constant;
+	int hand;
+
+	if (settings.sprint_mode != SPRINT_ARM_SWING || !grip[0].valid || !grip[1].valid || seconds <= 0.0f)
+	{
+		vr.arm_heights_valid = 0;
+		vr.arm_swing = 0.0f;
+		return;
+	}
+	for (hand = 0; hand < 2; hand++)
+	{
+		float speed = vr.arm_heights_valid ? fabsf(grip[hand].position[1] - vr.arm_heights[hand]) / seconds : 0.0f;
+
+		vr.arm_speeds[hand] += (speed - vr.arm_speeds[hand]) * (1.0f - expf(-seconds / ARM_SWING_SMOOTHING));
+		vr.arm_heights[hand] = grip[hand].position[1];
+	}
+	vr.arm_heights_valid = 1;
+	/* (both arms pump: the slower is the run's; with both hands on a long
+	gun they move together, so either's) */
+	effort = vr.two_handed ? fmaxf(vr.arm_speeds[0], vr.arm_speeds[1]) : fminf(vr.arm_speeds[0], vr.arm_speeds[1]);
+	target = (effort - ARM_SWING_FROM) / (ARM_SWING_FULL - ARM_SWING_FROM);
+	target = target < 0.0f ? 0.0f : target > 1.0f ? 1.0f : target;
+	if (!comfort_on_foot())
+		target = 0.0f;
+	constant = target > vr.arm_swing ? ARM_SWING_RISE : ARM_SWING_FALL;
+	vr.arm_swing += (target - vr.arm_swing) * (1.0f - expf(-seconds / constant));
+	if (vr.arm_swing < 0.01f && target <= 0.0f)
+		vr.arm_swing = 0.0f;
+}
+
+/* once a frame, after the turn: sprint's toggle and bullet time's on the
+right stick pushed up (STICK_UP_* above: a flick toggles sprint, a hold
+bullet time; the right stick's up is no game control while the controllers
+aim, halo_vr_gamepad), the arms' run, and what the sticks ask of the
+comfort vignette (vr.vignette = "always", COMFORT_* above) */
+static void comfort_update(float seconds, float turn)
+{
+	int able = comfort_on_foot();
+	float up = vr.input.right_stick[1], sideways = fabsf(vr.input.right_stick[0]);
+	float move = comfort_stick(vr.input.left_stick[0], vr.input.left_stick[1]);
+	float asked = 0.0f;
+	int was_up = vr.stick_up;
+
+	arm_swing_update(seconds);
+	vr.stick_up = able && sideways < STICK_UP_SIDEWAYS && up > (vr.stick_up ? STICK_UP_RELEASED : STICK_UP_PRESSED);
+	if (vr.stick_up)
+	{
+		vr.stick_up_seconds = was_up ? vr.stick_up_seconds + seconds : 0.0f;
+		/* (held: bullet time's; without it a push is sprint's at once) */
+		if (!vr.stick_up_taken && settings.bullet_time && vr.stick_up_seconds >= STICK_UP_HOLD_SECONDS)
+		{
+			vr.stick_up_taken = 1;
+			vr.bullet_time_on = !vr.bullet_time_on;
+			hand_haptic(0, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+			hand_haptic(1, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+			platform_log("vr: bullet time %s", vr.bullet_time_on ? "on" : "off");
+		}
+		if (!vr.stick_up_taken && !settings.bullet_time && settings.sprint_mode == SPRINT_TOGGLE)
+		{
+			vr.stick_up_taken = 1;
+			vr.sprint_on = !vr.sprint_on;
+			vr.sprint_stopped = 0.0f;
+			hand_haptic(0, 0.3f, 0.04f);
+		}
+	}
+	else
+	{
+		/* (a flick, let go before bullet time took it: sprint's) */
+		if (was_up && !vr.stick_up_taken && settings.sprint_mode == SPRINT_TOGGLE && able)
+		{
+			vr.sprint_on = !vr.sprint_on;
+			vr.sprint_stopped = 0.0f;
+			hand_haptic(0, 0.3f, 0.04f);
+		}
+		vr.stick_up_seconds = 0.0f;
+		vr.stick_up_taken = 0;
+	}
+	if (!settings.bullet_time)
+		vr.bullet_time_on = 0;
+	/* a toggled sprint ends as the player stops, crouches or leaves the
+	ground's play (a vehicle, a cinematic, the menus, death) */
+	if (vr.sprint_on)
+	{
+		vr.sprint_stopped = move < SPRINT_STOP_PUSH ? vr.sprint_stopped + seconds : 0.0f;
+		if (settings.sprint_mode != SPRINT_TOGGLE || !able || vr.crouch_button || vr.crouching ||
+			vr.sprint_stopped >= SPRINT_STOP_SECONDS)
+		{
+			vr.sprint_on = 0;
+		}
+	}
+	/* the vignette (vr.vignette = "always"): on foot, the left stick's push
+	(or the arms' run) and sprinting; the right stick's smooth turn, or a
+	snap turn's moment, wherever the controllers aim (in a seat too) */
+	if (settings.vignette_mode == VIGNETTE_ALWAYS && vr.aimed && !vr.menus)
+	{
+		if (vr.crouch_able_frame)
+		{
+			float effort = halo_vr_sprint();
+
+			asked = fmaxf(move, vr.arm_swing) * COMFORT_MOVE + (effort > 0.0f ? effort * COMFORT_SPRINT : 0.0f);
+		}
+		asked = fmaxf(asked, turn * COMFORT_TURN);
+		if (vr.comfort_snapped)
+			vr.comfort_snap = COMFORT_SNAP;
+		asked = fmaxf(asked, vr.comfort_snap);
+	}
+	vr.comfort_snapped = 0;
+	if (seconds > 0.0f)
+		vr.comfort_snap = fmaxf(0.0f, vr.comfort_snap - seconds * COMFORT_SNAP / COMFORT_SNAP_SECONDS);
+	vr.comfort_asked = asked;
+}
+
+float halo_vr_sprint(void)
+{
+	float x = vr.input.left_stick[0], y = vr.input.left_stick[1];
+
+	if (settings.sprint_mode == SPRINT_OFF || !comfort_on_foot() || y < SPRINT_BACK || fabsf(x) > SPRINT_SIDEWAYS)
+		return 0.0f;
+	if (settings.sprint_mode == SPRINT_TOGGLE)
+		return vr.sprint_on ? 1.0f : 0.0f;
+	return vr.arm_swing;
+}
+
+float halo_vr_sprint_speed(void)
+{
+	return settings.sprint_speed;
+}
+
+int halo_vr_sprint_toggled(void)
+{
+	return vr.initialized && settings.sprint_mode == SPRINT_TOGGLE && vr.sprint_on;
+}
+
+float halo_vr_bullet_time(void)
+{
+	return vr.initialized && settings.bullet_time && vr.bullet_time_on ? settings.bullet_time_scale : 1.0f;
+}
+
+void halo_vr_bullet_time_off(void)
+{
+	vr.bullet_time_on = 0;
+}
+
+/* the comfort vignette, once a frame (VIGNETTE_* above): a vehicle's asks
+(vr.vignette = "vehicle", the default), the sticks' too ("always": comfort_
+update), stronger or lighter by vr.vignette_strength */
 static void vignette_update(float seconds)
 {
-	float asked = settings.comfort_vignette && vr.presents - vr.vignette_asked_at <= 1 ? vr.vignette_asked : 0.0f;
-	float constant = asked > vr.vignette ? VIGNETTE_IN_SECONDS : VIGNETTE_OUT_SECONDS;
+	float asked = settings.vignette_mode != VIGNETTE_OFF && vr.presents - vr.vignette_asked_at <= 1 ?
+		vr.vignette_asked : 0.0f;
+	float constant;
+
+	if (settings.vignette_mode == VIGNETTE_ALWAYS && vr.comfort_asked > asked)
+		asked = vr.comfort_asked;
+	asked *= settings.vignette_strength;
+	if (asked > 1.0f)
+		asked = 1.0f;
+	constant = asked > vr.vignette ? VIGNETTE_IN_SECONDS : VIGNETTE_OUT_SECONDS;
 
 	if (seconds > 0.0f)
 		vr.vignette += (asked - vr.vignette) * (1.0f - expf(-seconds / constant));
@@ -3852,6 +4128,8 @@ static void input_update(void)
 	/* (vr.aim = "gamepad": the gamepad's right stick turns, as on the flat
 	screen, and the view after it, halo_vr_aim; the controllers' does not) */
 	float x = settings.gamepad_aim ? 0.0f : vr.input.right_stick[0];
+	/* (how fast the sticks turn the view this frame, 0 to 1: comfort_update) */
+	float turn = 0.0f;
 
 	vr.last_ticks = now;
 	if (seconds > 0.1f)
@@ -3867,7 +4145,6 @@ static void input_update(void)
 	trigger_touch_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 	two_handed_update(seconds);
 	handlebars_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
-	vignette_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 	crouch_update();
 	/* (the poses' times: from one frame's display to the next's) */
 	throw_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
@@ -3896,16 +4173,23 @@ static void input_update(void)
 	/* (driving a vehicle steered toward the aim: the left stick's sideways
 	push turns smoothly too, STICK_DRIVE_FASTEST) */
 	if (seat_drives())
+	{
 		vr.body_yaw -= stick_steer_push(vr.input.left_stick[0]) * STICK_DRIVE_FASTEST * seconds;
+		turn = fabsf(stick_steer_push(vr.input.left_stick[0]));
+	}
 	if (settings.smooth_turn)
 	{
 		if (fabsf(x) > 0.2f)
+		{
 			vr.body_yaw -= (x - (x > 0.0f ? 0.2f : -0.2f)) / 0.8f * settings.smooth_speed * seconds;
+			turn = (fabsf(x) - 0.2f) / 0.8f;
+		}
 	}
 	else if (!vr.snap_latched && fabsf(x) > 0.7f)
 	{
 		vr.body_yaw -= x > 0.0f ? settings.snap_angle : -settings.snap_angle;
 		vr.snap_latched = 1;
+		vr.comfort_snapped = 1;
 	}
 	else if (vr.snap_latched && fabsf(x) < 0.3f)
 	{
@@ -3924,6 +4208,9 @@ static void input_update(void)
 	{
 		vr.recentre_time = 0.0f;
 	}
+	/* sprint, bullet time and the sticks' vignette, then the vignette */
+	comfort_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds, turn);
+	vignette_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 }
 
 /* debug.gpu_stats: each frame's time from one wait's end to the next's (as
@@ -5496,6 +5783,13 @@ void halo_vr_gamepad(void *gamepad)
 	if (!seat_stick_steers() && !seat_drives())
 		stick_merge(&pad->sThumbLX, vr.input.left_stick[0]);
 	stick_merge(&pad->sThumbLY, vr.input.left_stick[1]);
+	/* (vr.sprint_mode = "arm_swing": the arms' run pushes the left stick
+	ahead while it is let go, arm_swing_update) */
+	if (vr.arm_swing > 0.0f && comfort_stick(vr.input.left_stick[0], vr.input.left_stick[1]) <= 0.0f &&
+		comfort_on_foot())
+	{
+		stick_merge(&pad->sThumbLY, vr.arm_swing);
+	}
 	/* the right stick turns (input_update); while the aim does not follow
 	the head (menus, cinematics, a vehicle's turret without it), and always
 	with vr.aim = "gamepad", it looks as a gamepad's would */

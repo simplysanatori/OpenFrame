@@ -287,6 +287,10 @@ void machine_elevator_carried_forget(void);
 /* port: port/linux/game/network_objects.c's (a client deletes the host's
 objects on the host's word alone) */
 boolean network_objects_may_delete(long object_index);
+#ifdef HALO_VR
+/* port: the VR mode's sprint (vr.sprint_mode, port/linux/game/vr_comfort.c) */
+real vr_sprint_speed_scale(long biped_index);
+#endif
 
 /* port: an unarmed player's melee's length, in ticks (a weapon's is about
 this: its first person melee animation, sped up a quarter) */
@@ -4224,6 +4228,20 @@ static boolean biped_physics_prepare(
 				}
 				acceleration = player_information->run_acceleration * uncrouch +
 					player_information->sneak_acceleration * crouch;
+#ifdef HALO_VR
+				/* port: the VR mode's sprint, a game of this computer alone
+				(port/linux/game/vr_comfort.c): standing, running forward and
+				sideways (not backing) faster, accelerating faster with it */
+				if (crouch < 0.1f && biped->unit.animation.base_seat_index != _unit_base_seat_alert)
+				{
+					real sprint = vr_sprint_speed_scale(biped_index);
+
+					speeds->forward_speed[1] *= sprint;
+					speeds->sideways_speed[0] *= sprint;
+					speeds->sideways_speed[1] *= sprint;
+					acceleration *= sprint;
+				}
+#endif
 				speeds->stun_scale = stun_scale;
 				speeds->double_speed = game_players_are_double_speed();
 				speeds->double_speed_multiplier = player_information->double_speed_multiplier;

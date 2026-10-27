@@ -702,6 +702,8 @@ double config_real(const char *name);
 #ifdef HALO_VR
 void vr_seat_test_update(void);
 void vr_death_test_update(void);
+/* port: bullet time's scale of the game's clock (port/linux/game/vr_comfort.c) */
+real vr_comfort_frame(real seconds);
 #endif
 #include "server_director.h" /* port: port/linux/game/server_director.c */
 
@@ -3783,8 +3785,16 @@ void main_loop(
 					}
 					profile_scope_exit(main_network_end_frame_section)
 
+#ifdef HALO_VR
+					/* port: the VR mode's bullet time (vr.bullet_time, port/linux/game/
+					vr_comfort.c) runs the game's clock slower, the frames' not */
+					profile_scope(main_game_time_update_section,
+						game_time_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed*
+							vr_comfort_frame((real)main_globals.halt_time_scale*main_globals.seconds_elapsed));)
+#else
 					profile_scope(main_game_time_update_section,
 						game_time_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);)
+#endif
 
 					render_frame = main_globals.main_menu_scenario_loaded ||
 						(main_globals.halt_time_scale &&

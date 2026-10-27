@@ -601,7 +601,33 @@ static const struct config_setting config_settings[] =
 	{ "vr.comfort_vignette", _config_boolean, "true", "HALO_VR_COMFORT_VIGNETTE", _environment_value, _platform_desktop,
 		"The edges of your view dim a little while the view turns fast with a\n"
 		"vehicle you steer by its handlebars (vr.ghost_steering), or it speeds\n"
-		"up or slows hard." },
+		"up or slows hard. Superseded by vr.vignette: false turns it off\n"
+		"whatever vr.vignette says." },
+	{ "vr.vignette", _config_string, "\"vehicle\"", "HALO_VR_VIGNETTE", _environment_value, _platform_desktop,
+		"The comfort vignette, the edges of your view dimmed while the view\n"
+		"moves without you: \"vehicle\" in a vehicle (its turns, its speeding\n"
+		"up and slowing), \"always\" also as the left stick moves you on foot\n"
+		"and the right stick turns you (smoothly, or a moment at a snap turn),\n"
+		"\"off\" never." },
+	{ "vr.vignette_strength", _config_real, "1.0", "HALO_VR_VIGNETTE_STRENGTH", _environment_value, _platform_desktop,
+		"How strong the comfort vignette is, 0.25 to 1.5: more dims more of\n"
+		"the edges, and darker." },
+	{ "vr.sprint_mode", _config_string, "\"off\"", "HALO_VR_SPRINT_MODE", _environment_value, _platform_desktop,
+		"Sprinting on foot, in a game of this computer alone (the campaign):\n"
+		"\"toggle\" a flick of the right stick up turns it on and off (it\n"
+		"ends as you stop or crouch); \"arm_swing\" swing both arms as you\n"
+		"run, and the harder you swing the faster you go (with the left stick\n"
+		"still, the swing moves you forward); \"off\" never. The view's field\n"
+		"is unchanged." },
+	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
+		"Sprinting, how many times the running speed, 1.1 to 2." },
+	{ "vr.bullet_time", _config_boolean, "false", "HALO_VR_BULLET_TIME", _environment_value, _platform_desktop,
+		"Bullet time: holding the right stick up (half a second) slows the\n"
+		"world and turns it off again, in a game of this computer alone (the\n"
+		"campaign; never online, split screen or with bots). Your head and\n"
+		"hands stay at full speed; the sounds keep their pitch." },
+	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
+		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
 	{ "vr.death_view", _config_string, "\"crt\"", "HALO_VR_DEATH_VIEW", _environment_value, _platform_desktop,
 		"As you die: \"crt\" the helmet's view switches off as a CRT does and\n"
 		"cuts to a death cam, a feed from beside your body (the right stick\n"

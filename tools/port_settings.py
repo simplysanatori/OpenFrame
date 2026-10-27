@@ -66,6 +66,8 @@ VR_HANDS = [("ARMS", "arms"), ("FLOATING HANDS", "floating"), ("GAME ARMS", "gam
 VR_AIM = [("CONTROLLER", "controller"), ("HEAD", "head"), ("GAMEPAD", "gamepad")]
 VR_DISPLAY = f"{PE}/vr_display/vr_display_screen"
 VR_VISOR = f"{PE}/vr_visor/vr_visor_screen"
+# (OpenFrame: comfort and movement, docs/openframe-features.md)
+VR_COMFORT = f"{PE}/vr_comfort/vr_comfort_screen"
 VR_SCREENS = {
     "vr_controls": {
         "screen": "vr_controls_screen",
@@ -117,8 +119,8 @@ VR_SCREENS = {
     "vr_display": {
         "screen": "vr_display_screen",
         "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
-        # (twelve rows: closer than the others' 28px, the help line lower)
-        "spacing": 24,
+        # (thirteen rows: closer than the others' 28px, the help line lower)
+        "spacing": 22,
         "help_top": 366,
         "rows": [
             ("DOMINANT HAND:", "vr.dominant_hand", [("RIGHT", "right"), ("LEFT", "left")],
@@ -156,6 +158,8 @@ VR_SCREENS = {
             ("HUD AND VISOR...", None, VR_VISOR,
              "The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy.",
              None),
+            ("COMFORT, SPRINT...", None, VR_COMFORT,
+             "The comfort vignette, sprinting and bullet time.", None),
         ],
     },
 }
@@ -202,6 +206,36 @@ VR_SCREENS["vr_visor"] = {
         ("SHIELD ENERGY:", "vr.visor_energy",
          [(f"{round(energy * 100)}%", f"{energy:g}") for energy in (0.25, 0.5, 0.75, 1, 1.5, 2)],
          "How strong the shields' energy across the glass\nis, as they are hit and as they recharge.", None),
+    ],
+}
+# (OpenFrame) comfort and movement, a page of VR Display's (titled as VR
+# Controls is), every value of it read again as it changes (vr.c,
+# settings_read). Ported from HaloCE-DecompRemix-VR by moistman42069
+# (AGPL-3.0-or-later): docs/openframe-features.md
+VR_SCREENS["vr_comfort"] = {
+    "screen": "vr_comfort_screen",
+    "header": ("header_vr_controls", f"{PE}/vr_controls/header_vr_controls"),
+    "spacing": 24,
+    "help_top": 366,
+    "rows": [
+        ("VIGNETTE:", "vr.vignette", [("VEHICLES", "vehicle"), ("ALWAYS", "always"), ("OFF", "off")],
+         "The edges of your view dim as the view moves:\nin vehicles, or as the sticks move and turn you too.",
+         None),
+        ("VIGNETTE STRENGTH:", "vr.vignette_strength",
+         [(f"{round(strength * 100)}%", f"{strength:g}") for strength in (0.25, 0.5, 0.75, 1, 1.25, 1.5)],
+         "How much of the edges of your view the comfort\nvignette dims, and how dark.", None),
+        ("SPRINT:", "vr.sprint_mode", [("OFF", "off"), ("TOGGLE", "toggle"), ("ARM SWING", "arm_swing")],
+         "Offline: flick the right stick up to sprint, or\nswing your arms as you run.",
+         None),
+        ("SPRINT SPEED:", "vr.sprint_speed",
+         [(f"{speed:g}X", f"{speed:g}") for speed in (1.25, 1.5, 1.75, 2)],
+         "How much faster than the run a sprint is.", None),
+        ("BULLET TIME:", "vr.bullet_time", ON_OFF,
+         "Offline: hold the right stick up to slow the world\n(hold it again to end it).",
+         None),
+        ("BULLET TIME SPEED:", "vr.bullet_time_scale",
+         [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
+         "How fast the world runs in bullet time.", None),
     ],
 }
 SCREENS.update(VR_SCREENS)
