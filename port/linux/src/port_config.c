@@ -754,6 +754,59 @@ static const struct config_setting config_settings[] =
 		_platform_desktop,
 		"With vr.hud_mode = \"wrist\", raises the wrist HUD off the wrist, in\n"
 		"metres (-0.2 to 0.2; less lowers it)." },
+	{ "vr.hud_inset", _config_real, "0.0", "HALO_VR_HUD_INSET", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", the HUD's corners (the weapon's, the shields'\n"
+		"and the motion tracker's panels) brought in toward the middle of your\n"
+		"view, by this much of their angle from it (0 where the game puts them,\n"
+		"to 0.5 halfway in), after each one's own move (vr.hud_weapon_x, ...):\n"
+		"for a view narrower than the headset's (the Steam Frame with a glasses\n"
+		"spacer). The reticle, the messages and the waypoints stay where they are." },
+	{ "vr.hud_offset_x", _config_real, "0.0", "HALO_VR_HUD_OFFSET_X", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", moves the HUD's corners together right (less\n"
+		"than 0: left), after vr.hud_inset, by this much of the HUD's width\n"
+		"(-0.3 to 0.3). The reticle, the messages and the waypoints stay." },
+	{ "vr.hud_offset_y", _config_real, "0.0", "HALO_VR_HUD_OFFSET_Y", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", moves the HUD's corners together up (less than\n"
+		"0: down), after vr.hud_inset, by this much of the HUD's height (-0.3 to\n"
+		"0.3)." },
+	{ "vr.hud_scale", _config_real, "1.0", "HALO_VR_HUD_SCALE", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", the HUD's corners' size, each about its outer\n"
+		"corner (0.5 to 1.5; vr.hud_size sizes the whole HUD, the reticle too)." },
+	{ "vr.hud_weapon_x", _config_real, "0.0", "HALO_VR_HUD_WEAPON_X", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", moves the weapon's panel (the ammunition and\n"
+		"grenades, top left) right (less than 0: left), before vr.hud_inset, by\n"
+		"this much of the HUD's width (-0.3 to 0.3)." },
+	{ "vr.hud_weapon_y", _config_real, "0.0", "HALO_VR_HUD_WEAPON_Y", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", moves the weapon's panel (the ammunition and\n"
+		"grenades, top left) up (less than 0: down), before vr.hud_inset, by this\n"
+		"much of the HUD's height (-0.3 to 0.3)." },
+	{ "vr.hud_weapon_scale", _config_real, "1.0", "HALO_VR_HUD_WEAPON_SCALE", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", the size of the weapon's panel (the ammunition\n"
+		"and grenades, top left), about its outer corner (0.5 to 1.5), times\n"
+		"vr.hud_scale." },
+	{ "vr.hud_status_x", _config_real, "0.0", "HALO_VR_HUD_STATUS_X", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", moves the shields' panel (the shields and\n"
+		"health, top right) right (less than 0: left), before vr.hud_inset, by\n"
+		"this much of the HUD's width (-0.3 to 0.3)." },
+	{ "vr.hud_status_y", _config_real, "0.0", "HALO_VR_HUD_STATUS_Y", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", moves the shields' panel (the shields and\n"
+		"health, top right) up (less than 0: down), before vr.hud_inset, by this\n"
+		"much of the HUD's height (-0.3 to 0.3)." },
+	{ "vr.hud_status_scale", _config_real, "1.0", "HALO_VR_HUD_STATUS_SCALE", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", the size of the shields' panel (the shields and\n"
+		"health, top right), about its outer corner (0.5 to 1.5), times\n"
+		"vr.hud_scale." },
+	{ "vr.hud_tracker_x", _config_real, "0.0", "HALO_VR_HUD_TRACKER_X", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", moves the motion tracker's panel (bottom left)\n"
+		"right (less than 0: left), before vr.hud_inset, by this much of the\n"
+		"HUD's width (-0.3 to 0.3)." },
+	{ "vr.hud_tracker_y", _config_real, "0.0", "HALO_VR_HUD_TRACKER_Y", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", moves the motion tracker's panel (bottom left)\n"
+		"up (less than 0: down), before vr.hud_inset, by this much of the HUD's\n"
+		"height (-0.3 to 0.3)." },
+	{ "vr.hud_tracker_scale", _config_real, "1.0", "HALO_VR_HUD_TRACKER_SCALE", _environment_value, _platform_desktop,
+		"With vr.hud = \"visor\", the size of the motion tracker's panel (bottom\n"
+		"left), about its outer corner (0.5 to 1.5), times vr.hud_scale." },
 	{ "vr.hud_distance", _config_real, "2.0", "HALO_VR_HUD_DISTANCE", _environment_value, _platform_desktop,
 		"How far in front of your eyes the HUD is, in meters." },
 	{ "vr.hud_size", _config_real, "60.0", "HALO_VR_HUD_SIZE", _environment_value, _platform_desktop,

@@ -68,6 +68,8 @@ VR_DISPLAY = f"{PE}/vr_display/vr_display_screen"
 VR_VISOR = f"{PE}/vr_visor/vr_visor_screen"
 # (OpenFrame: where the HUD's corners are, docs/openframe-features.md)
 VR_HUD = f"{PE}/vr_hud/vr_hud_screen"
+# (OpenFrame: the visor HUD's corners' placement, docs/openframe-features.md)
+VR_HUD_LAYOUT = f"{PE}/vr_hud_layout/vr_hud_layout_screen"
 # (OpenFrame: comfort and movement, docs/openframe-features.md)
 VR_COMFORT = f"{PE}/vr_comfort/vr_comfort_screen"
 # (OpenFrame: the hands' fists, pull, swap and throw, docs/openframe-features.md)
@@ -216,7 +218,7 @@ VR_SCREENS["vr_visor"] = {
          [(f"{round(energy * 100)}%", f"{energy:g}") for energy in (0.25, 0.5, 0.75, 1, 1.5, 2)],
          "How strong the shields' energy across the glass\nis, as they are hit and as they recharge.", None),
         ("HUD, DISPLAY...", None, VR_HUD,
-         "Where the HUD's corners are: on the visor, on\nyour wrist, or hidden.", None),
+         "Where the HUD's corners are: on the visor (and\ntheir layout), on your wrist, or hidden.", None),
     ],
 }
 # (OpenFrame) where the HUD's corners are, a page of the visor's (titled as
@@ -243,6 +245,63 @@ VR_SCREENS["vr_hud"] = {
          "Moves the wrist HUD across your wrist (more:\ntoward the thumb).", None),
         ("OFF THE WRIST:", "vr.wrist_hud_offset_out", WRIST_OFFSETS,
          "Raises the wrist HUD off your wrist, or lowers it.", None),
+        ("HUD LAYOUT...", None, VR_HUD_LAYOUT,
+         "Move, bring in or resize the visor HUD's corners:\nammo, shields, tracker (corners cut off?).", None),
+    ],
+}
+# (OpenFrame) the visor HUD's corners' placement, a page of HUD, DISPLAY's
+# (titled as VR Display is), every value of it read again as it changes
+# (vr_visor.c, panel_placement): each corner's own move and size, then the
+# inset, then all of them moved and sized together. Moves are fractions of
+# the HUD's width or height, -0.3 to 0.3.
+PLACE_STEPS = (-0.3, -0.2, -0.15, -0.1, -0.08, -0.06, -0.04, -0.02, 0,
+               0.02, 0.04, 0.06, 0.08, 0.1, 0.15, 0.2, 0.3)
+
+
+def _place_offsets(less: str, more: str) -> list:
+    return [(f"{round(abs(offset) * 100)}% {more if offset > 0 else less}" if offset else "NONE",
+             f"{offset:g}") for offset in PLACE_STEPS]
+
+
+PLACE_ACROSS = _place_offsets("LEFT", "RIGHT")
+PLACE_UP = _place_offsets("DOWN", "UP")
+PLACE_SCALES = [(f"{round(scale * 100)}%", f"{scale:g}")
+                for scale in (0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.3, 1.4, 1.5)]
+VR_SCREENS["vr_hud_layout"] = {
+    "screen": "vr_hud_layout_screen",
+    "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
+    # (thirteen rows: closer, as the visor's page)
+    "spacing": 22,
+    "help_top": 366,
+    "rows": [
+        ("HUD INSET:", "vr.hud_inset",
+         [("NONE", "0"), *((f"{round(inset * 100)}%", f"{inset:g}")
+                           for inset in (0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5))],
+         "Brings ammo, shields and tracker in toward the\nmiddle (cut off? Frame with a spacer: 20%).", None),
+        ("ALL LEFT/RIGHT:", "vr.hud_offset_x", PLACE_ACROSS,
+         "Moves ammo, shields and tracker together left or\nright (of the HUD's width); the reticle stays.", None),
+        ("ALL UP/DOWN:", "vr.hud_offset_y", PLACE_UP,
+         "Moves ammo, shields and tracker together up or\ndown (of the HUD's height); the reticle stays.", None),
+        ("ALL SIZE:", "vr.hud_scale", PLACE_SCALES,
+         "The size of ammo, shields and tracker, each\ngrowing from its own corner.", None),
+        ("AMMO LEFT/RIGHT:", "vr.hud_weapon_x", PLACE_ACROSS,
+         "Ammo and grenades (top left) left/right: RIGHT\nbrings them in.", None),
+        ("AMMO UP/DOWN:", "vr.hud_weapon_y", PLACE_UP,
+         "Ammo and grenades (top left) up/down: DOWN\nbrings them in.", None),
+        ("AMMO SIZE:", "vr.hud_weapon_scale", PLACE_SCALES,
+         "The size of the ammo and grenades (top left).", None),
+        ("SHIELDS LEFT/RIGHT:", "vr.hud_status_x", PLACE_ACROSS,
+         "Shields and health (top right) left/right: LEFT\nbrings them in.", None),
+        ("SHIELDS UP/DOWN:", "vr.hud_status_y", PLACE_UP,
+         "Shields and health (top right) up/down: DOWN\nbrings them in.", None),
+        ("SHIELDS SIZE:", "vr.hud_status_scale", PLACE_SCALES,
+         "The size of the shields and health (top right).", None),
+        ("TRACKER LEFT/RIGHT:", "vr.hud_tracker_x", PLACE_ACROSS,
+         "Motion tracker (bottom left) left/right: RIGHT\nbrings it in.", None),
+        ("TRACKER UP/DOWN:", "vr.hud_tracker_y", PLACE_UP,
+         "Motion tracker (bottom left) up/down: UP brings\nit in.", None),
+        ("TRACKER SIZE:", "vr.hud_tracker_scale", PLACE_SCALES,
+         "The size of the motion tracker (bottom left).", None),
     ],
 }
 # (OpenFrame) comfort and movement, a page of VR Display's (titled as VR

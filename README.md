@@ -237,6 +237,7 @@ OpenFrame is playable left-handed, and a few comfort options help with other nee
 | Vignette always | COMFORT, SPRINT... > **VIGNETTE** = ALWAYS | Dims the edges whenever you move or turn; **VIGNETTE STRENGTH** adjusts it |
 | World scale | HAND, HEIGHT, HUD... > **WORLD SCALE** 0.75 to 1.5 times (`vr.world_scale`, default 1) | More than 1 makes the world look larger and you smaller in it |
 | HUD and menu size and distance | HAND, HEIGHT, HUD... > **HUD DISTANCE**, **HUD SIZE**, **MENU DISTANCE**, **MENU WIDTH** | Place and size the HUD and menus where you read them |
+| HUD layout: corners in, moved, resized (not yet tested in a headset) | HAND, HEIGHT, HUD... > HUD AND VISOR... > HUD, DISPLAY... > **HUD LAYOUT...**: **HUD INSET** (0 to 50%), **ALL LEFT/RIGHT**, **ALL UP/DOWN**, **ALL SIZE**, then **AMMO**, **SHIELDS** and **TRACKER** each **LEFT/RIGHT**, **UP/DOWN** (up to 30% of the HUD) and **SIZE** (50 to 150%) (`vr.hud_inset`, `vr.hud_offset_x`, `_y`, `vr.hud_scale`, `vr.hud_weapon_x`, `_y`, `_scale`, `vr.hud_status_*`, `vr.hud_tracker_*`) | Brings the visor HUD's corners in toward the middle of your view, or moves or resizes each one; the reticle, messages and waypoints stay. Applies as soon as the menu closes |
 
 ## Settings
 
@@ -290,6 +291,7 @@ Internet play is OpenH1's and is on by default. Invites and the server browser f
 - **The game asks for the disc image at start.** It did not find `maps/` in `~/.local/share/OpenFrame`. Run `install.sh --maps` with your maps folder.
 - **It plays flat in a window.** SteamVR was not running, or the headset was not connected, when the game started. Start SteamVR first. `HALO_VR=0` forces flat play.
 - **The menu is off to the side, or the view is not where the player is (outside the cryo tube).** Hold both grips for a moment: that recentres (the menu goes in front of you, the eye into the player). SteamVR's own recentre works too. The game also recentres by itself as play starts after a load or a cutscene, and each menu opens in front of where you look (`vr.auto_recentre`, on by default). In the cryo tube the view stays within 15 cm of the player's eye (`vr.held_lean`).
+- **HUD corners cut off** (the ammo top left or the motion tracker bottom left past the edge of your view, for example on a Frame with a glasses spacer). VR Setup > HAND, HEIGHT, HUD... > HUD AND VISOR... > HUD, DISPLAY... > HUD LAYOUT... > **HUD INSET** 15 to 25% (`vr.hud_inset = 0.2`), then **AMMO**, **SHIELDS** or **TRACKER** LEFT/RIGHT and UP/DOWN for one corner alone. [docs/steam-frame-defaults.md](docs/steam-frame-defaults.md) has a preset.
 - **Check what happened.** `~/.local/share/OpenFrame/sessions/latest/launch.log` shows the refresh rate asked for and whether SteamVR took the per-app settings; `stdout.log` is the game's output, with a crash's backtrace.
 
 ## Reporting a problem

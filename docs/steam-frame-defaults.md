@@ -26,6 +26,7 @@ measure, before it becomes a default.
 | `vr.late_latch` | `true` | `true` | Pacing: not touched by this review | n/a |
 | Eye anti-aliasing | none (the VR eyes have no FXAA/SMAA pass; MSAA cost 15 ms at 2x on the old renderer) | none | No budget at 90 Hz | Alpha-tested foliage and grates crawl; MSAA on the Vulkan eyes is unmeasured on the Frame |
 | `display.graphics` | `"enhanced"` (per-pixel lighting, sharper shadows, anisotropic filtering, enhanced dynamic lights) | `"enhanced"` | OpenH1's look; its cost on the Frame's GPU is unmeasured ("to be measured" in OpenH1's README) | If `HALO_GPU_STATS=1 HALO_VR_GPU_TIME=1` shows the GPU over budget, `"classic"` is the first thing to try |
+| `vr.hud_inset`, `vr.hud_offset_*`, `vr.hud_scale`, `vr.hud_<group>_*` | none (OpenFrame's keys) | `0`, sizes `1`: the corners where OpenH1 puts them | They fit the stock Frame's view; with a glasses spacer the view is narrower and the corners are cut off (see below) | Inset pulls the shields in too; above about 0.3 the corners crowd the reticle |
 | `vr.hud_lag` | `0.03` s | `0.03` | A slight trail reads as a helmet's HUD; the layer is composited by SteamVR either way | `0` locks the HUD to the head (view space) |
 | `vr.turn`, `vr.snap_turn_angle` | snap, 30 degrees | snap, 30 | Comfort first; VR Setup changes it | none |
 | `vr.world_scale` | `1.0` | `1.0` | 1:1 | none |
@@ -37,6 +38,33 @@ measure, before it becomes a default.
 | `vr.dominant_hand`, `vr.swap_sticks` | right, as the hand | right, as the hand | VR Setup > HAND, HEIGHT, HUD... > DOMINANT HAND; `docs/openframe-features.md` "Left-handed" | none |
 | `update.auto` | `true` | `false` (installer) | OpenH1's updater would replace this fork | none |
 | `TU_DEBUG` | unset | `sysmem` (wrapper; `OPENFRAME_SYSMEM=0` leaves it unset) | As the sibling Frame ports render | Not touched by this review |
+
+If the HUD's corners are cut off (second headset trial: with a glasses
+spacer the Frame's comfortable view is narrower, and the ammunition and
+grenades at the top left and the motion tracker at the bottom left sat
+partly past its edge; the shields at the top right were fine): VR Setup >
+HAND, HEIGHT, HUD... > HUD AND VISOR... > HUD, DISPLAY... > HUD LAYOUT..., or
+in `config.toml` under `[vr]` (moves are fractions of the HUD's width or
+height; y is up, so less than 0 is down):
+
+```toml
+hud_inset = 0.2          # 0.15 to 0.25: every corner brought a fifth of the way in
+hud_offset_y = 0.0       # -0.02 (a little down) if the top corners are cut off more than the bottom
+hud_weapon_x = 0.0       # 0.02 to 0.06: the ammo (top left) further right, inward
+hud_weapon_y = 0.0       # -0.02 to -0.06: the ammo further down, inward
+hud_tracker_x = 0.0      # 0.02 to 0.06: the tracker (bottom left) further right, inward
+hud_tracker_y = 0.0      # 0.02 to 0.06: the tracker further up, inward
+```
+
+Either way works: the inset alone, or each corner's own move alone (each
+corner's move comes first, then the inset, then `hud_offset_x`, `_y` for
+all). At `vr.hud_distance` 2 and `vr.hud_size` 60 the ammo sits about 22
+degrees left of the middle and 17 up (with `vr.hud_wrap` 1): an inset of
+0.2 brings it about 4.4 degrees right and 3.5 down; `hud_weapon_x = 0.05`
+is 3 degrees (5% of the HUD's 60). These are suggestions, not defaults: the
+shipped values stay at 0. **HUD SIZE** (`vr.hud_size`, VR Display) narrows
+the whole HUD, the reticle with it; **ALL SIZE** (`vr.hud_scale`) shrinks
+the corners alone.
 
 The Frame's controller profile: SteamVR 2.18.2 on the Frame accepts both
 `/interaction_profiles/valve/frame_controller_valve` and

@@ -188,6 +188,6 @@
 		<string text="The helmet's shadow on the glass at the edges of\nyour view, and the glass's faint gold."/>
 		<string text="The shields on the glass: their energy, the red\nwarning, the HUD's flicker as they break."/>
 		<string text="How strong the shields' energy across the glass\nis, as they are hit and as they recharge."/>
-		<string text="Where the HUD's corners are: on the visor, on\nyour wrist, or hidden."/>
+		<string text="Where the HUD's corners are: on the visor (and\ntheir layout), on your wrist, or hidden."/>
 	</strings>
 </menus>

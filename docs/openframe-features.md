@@ -322,6 +322,51 @@ the side). Unlike the features above, `vr.auto_recentre` is on by default.
   same with its head (`vr_head_look_actions`, `vr_script_can_see_point`);
   this is written for OpenH1's VR mode, not ported.
 
+## HUD placement (after the second headset trial; untested in the headset)
+
+With a glasses spacer the Frame's comfortable view is narrower, and the
+visor HUD's corners (the ammunition and grenades at the top left, the motion
+tracker at the bottom left) were partly past its edge. These keys bring the
+corners in, move or resize each one (VR Setup > VR Display > HUD AND
+VISOR... > HUD, DISPLAY... > **HUD LAYOUT...**). Every one defaults to 0
+(sizes to 1): the corners where OpenH1 puts them.
+
+| Key (`HALO_*` variable) | VR Setup row | Range | What |
+| --- | --- | --- | --- |
+| `vr.hud_inset` (`HALO_VR_HUD_INSET`) | HUD INSET | 0 to 0.5 | Every corner turned in toward the middle of your view by that fraction of its angle from it |
+| `vr.hud_offset_x`, `_y` (`HALO_VR_HUD_OFFSET_X`, `_Y`) | ALL LEFT/RIGHT, ALL UP/DOWN | -0.3 to 0.3 | The three corners moved together, right and up (less than 0: left, down), in fractions of the HUD's width and height |
+| `vr.hud_scale` (`HALO_VR_HUD_SCALE`) | ALL SIZE | 0.5 to 1.5 | The corners' size, each about its outer corner |
+| `vr.hud_weapon_x`, `_y`, `_scale` (`HALO_VR_HUD_WEAPON_X`, ...) | AMMO LEFT/RIGHT, UP/DOWN, SIZE | -0.3 to 0.3; 0.5 to 1.5 | The ammunition and grenades (top left) alone |
+| `vr.hud_status_x`, `_y`, `_scale` (`HALO_VR_HUD_STATUS_X`, ...) | SHIELDS LEFT/RIGHT, UP/DOWN, SIZE | the same | The shields and health (top right) alone |
+| `vr.hud_tracker_x`, `_y`, `_scale` (`HALO_VR_HUD_TRACKER_X`, ...) | TRACKER LEFT/RIGHT, UP/DOWN, SIZE | the same | The motion tracker (bottom left) alone |
+
+- Order: each corner's own move first, then the inset (which scales that
+  move too), then the move of all three; sizes multiply (`vr.hud_scale`
+  times the corner's own). The inset alone, or each corner's own move
+  alone, is enough; they add up if both are set.
+- Moves are angles: 0.1 of the width is 6 degrees at `vr.hud_size` 60, the
+  same at any `vr.hud_distance`. Sizes grow or shrink each corner about its
+  outer corner (where the game anchors its elements), so they stay put.
+- The reticle and the messages (the HUD's middle group, on the HUD's own
+  layer) and the waypoints and players' names stay where they are; the
+  messages cannot be moved alone (they share the reticle's image). So do
+  the visor's curve, glass and glow, each panel's depth (`vr.hud_depth_*`)
+  and wrap (`vr.hud_wrap`). With `vr.hud_mode = "wrist"` the corners on the
+  wrist are not moved (they are where they go back to the visor, as in a
+  vehicle's seat). With `vr.hud = "flat"` none of this applies.
+- Live: every value is read again as it changes (no restart), and the
+  corners are at their new place the moment the menu closes. While a menu
+  is open OpenH1 shows no corner panels (`vr_visor_panels` gives none with
+  the menus up), so they cannot be watched moving from the menu itself.
+- How: `port/linux/src/vr_visor.c`, `panel_placement`: each corner's quad
+  layer is turned about the middle of the head (across about the HUD's up,
+  then up about its own across), so it still faces the eyes, upright, its
+  image as ever, and scaled about its outer corner. At `vr.hud_depth` 0 the
+  corners are drawn on panels of their own (at the HUD's distance) while
+  they are moved, as the wrist HUD has them.
+- `docs/steam-frame-defaults.md` has suggested values for a Frame with a
+  spacer (`vr.hud_inset` 0.15 to 0.25, or the ammo's and tracker's own moves).
+
 ## Left-handed
 
 Set VR Setup > HAND, HEIGHT, HUD... > DOMINANT HAND to LEFT

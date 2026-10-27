@@ -155,6 +155,17 @@ static struct
 	int hud_mode;
 	float wrist_scale;
 	float wrist_offset[3];
+	/* (OpenFrame) the corners' placement on the visor (panel_placement):
+	each panel's own move across and up (fractions of the HUD's width and
+	height: vr.hud_weapon_x, _y, vr.hud_status_*, vr.hud_tracker_*) and
+	size (vr.hud_*_scale), then vr.hud_inset (0 to PLACE_INSET_MOST), then
+	the corners' move together (vr.hud_offset_x, _y) and size
+	(vr.hud_scale) */
+	float group_offset[VR_PANEL_COUNT][2];
+	float group_scale[VR_PANEL_COUNT];
+	float inset;
+	float offset[2];
+	float scale;
 } settings = { (unsigned long)-1 };
 
 /* (OpenFrame) vr.hud_mode: the HUD's corners (the weapon's, the shields'
@@ -172,18 +183,24 @@ enum
 1, across and down), and the setting of its distance from the HUD's (at
 vr.hud_depth 1, metres: before it less than 0). The regions are the anchors'
 corners of the game's 640x480 HUD, where hud_draw.c places their elements,
-with room to spare. The tracker's panel tilts back (vr.hud_tracker_tilt). */
+with room to spare. The tracker's panel tilts back (vr.hud_tracker_tilt).
+(OpenFrame) the settings of each corner's own move and size
+(panel_placement; none for the world's, which never moves) */
 static const struct
 {
 	int group;
 	float region[4];
 	const char *offset;
+	const char *place_x, *place_y, *place_scale;
 } panel_layout[VR_PANEL_COUNT] =
 {
-	{ HALO_VR_HUD_GROUP_WORLD, { 0.0f, 0.0f, 1.0f, 1.0f }, "vr.hud_depth_world" },
-	{ HALO_VR_HUD_GROUP_WEAPON, { 0.0f, 0.0f, 0.5f, 0.45f }, "vr.hud_depth_weapon" },
-	{ HALO_VR_HUD_GROUP_STATUS, { 0.5f, 0.0f, 1.0f, 0.45f }, "vr.hud_depth_status" },
-	{ HALO_VR_HUD_GROUP_TRACKER, { 0.0f, 0.5f, 0.45f, 1.0f }, "vr.hud_depth_tracker" },
+	{ HALO_VR_HUD_GROUP_WORLD, { 0.0f, 0.0f, 1.0f, 1.0f }, "vr.hud_depth_world", NULL, NULL, NULL },
+	{ HALO_VR_HUD_GROUP_WEAPON, { 0.0f, 0.0f, 0.5f, 0.45f }, "vr.hud_depth_weapon",
+		"vr.hud_weapon_x", "vr.hud_weapon_y", "vr.hud_weapon_scale" },
+	{ HALO_VR_HUD_GROUP_STATUS, { 0.5f, 0.0f, 1.0f, 0.45f }, "vr.hud_depth_status",
+		"vr.hud_status_x", "vr.hud_status_y", "vr.hud_status_scale" },
+	{ HALO_VR_HUD_GROUP_TRACKER, { 0.0f, 0.5f, 0.45f, 1.0f }, "vr.hud_depth_tracker",
+		"vr.hud_tracker_x", "vr.hud_tracker_y", "vr.hud_tracker_scale" },
 };
 /* the tracker's panel's, the one tilted */
 #define TRACKER_PANEL 3
@@ -198,6 +215,14 @@ across (radians for a radian squared); the most of vr.hud_wrap */
 #define WRAP_UP (5.0f * (float)M_PI / 180.0f)
 #define WRAP_BEND 0.25f
 #define WRAP_MOST 2.0f
+/* (OpenFrame) the corners' placement (vr.hud_inset, vr.hud_offset_*,
+vr.hud_<group>_*, docs/openframe-features.md "HUD placement"): the most of
+the inset, of each move (fractions of the HUD's width or height), and the
+least and most of each size */
+#define PLACE_INSET_MOST 0.5f
+#define PLACE_OFFSET_MOST 0.3f
+#define PLACE_SCALE_LEAST 0.5f
+#define PLACE_SCALE_MOST 1.5f
 
 /* (OpenFrame) the wrist HUD (vr.hud_mode = "wrist"): ported from
 HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later), its vr_frame.c's
@@ -318,6 +343,45 @@ static void settings_read(void)
 	settings.wrist_offset[0] = clamp((float)config_real("vr.wrist_hud_offset_along"), -0.2f, 0.2f);
 	settings.wrist_offset[1] = clamp((float)config_real("vr.wrist_hud_offset_across"), -0.2f, 0.2f);
 	settings.wrist_offset[2] = clamp((float)config_real("vr.wrist_hud_offset_out"), -0.2f, 0.2f);
+	/* (OpenFrame) the corners' placement: the world's panel never moves */
+	settings.inset = clamp((float)config_real("vr.hud_inset"), 0.0f, PLACE_INSET_MOST);
+	settings.offset[0] = clamp((float)config_real("vr.hud_offset_x"), -PLACE_OFFSET_MOST, PLACE_OFFSET_MOST);
+	settings.offset[1] = clamp((float)config_real("vr.hud_offset_y"), -PLACE_OFFSET_MOST, PLACE_OFFSET_MOST);
+	settings.scale = clamp((float)config_real("vr.hud_scale"), PLACE_SCALE_LEAST, PLACE_SCALE_MOST);
+	{
+		int index;
+
+		for (index = 0; index < VR_PANEL_COUNT; index++)
+		{
+			settings.group_offset[index][0] = settings.group_offset[index][1] = 0.0f;
+			settings.group_scale[index] = 1.0f;
+			if (!panel_layout[index].place_x)
+				continue;
+			settings.group_offset[index][0] = clamp((float)config_real(panel_layout[index].place_x),
+				-PLACE_OFFSET_MOST, PLACE_OFFSET_MOST);
+			settings.group_offset[index][1] = clamp((float)config_real(panel_layout[index].place_y),
+				-PLACE_OFFSET_MOST, PLACE_OFFSET_MOST);
+			settings.group_scale[index] = clamp((float)config_real(panel_layout[index].place_scale),
+				PLACE_SCALE_LEAST, PLACE_SCALE_MOST);
+		}
+	}
+}
+
+/* (OpenFrame) whether the corners are moved from where the game puts them
+(vr.hud_inset, vr.hud_offset_*) */
+static int placement_moved(void)
+{
+	int index;
+
+	if (settings.inset > 0.0f || settings.offset[0] != 0.0f || settings.offset[1] != 0.0f || settings.scale != 1.0f)
+		return 1;
+	for (index = 0; index < VR_PANEL_COUNT; index++)
+	{
+		if (settings.group_offset[index][0] != 0.0f || settings.group_offset[index][1] != 0.0f ||
+			settings.group_scale[index] != 1.0f)
+			return 1;
+	}
+	return 0;
 }
 
 int vr_visor_enabled(void)
@@ -764,8 +828,9 @@ int vr_visor_panels(struct vr_visor_panel panels[VR_PANEL_COUNT])
 
 	settings_read();
 	/* (OpenFrame: the corners apart from the rest in every vr.hud_mode
-	but "visor", at vr.hud_depth 0 too) */
-	if (!settings.visor || visor.menus || (settings.depth <= 0.0f && settings.hud_mode == HUD_MODE_VISOR))
+	but "visor", and moved (placement_moved), at vr.hud_depth 0 too) */
+	if (!settings.visor || visor.menus ||
+		(settings.depth <= 0.0f && settings.hud_mode == HUD_MODE_VISOR && !placement_moved()))
 		return 0;
 	for (index = 0; index < VR_PANEL_COUNT; index++)
 	{
@@ -822,6 +887,52 @@ static void quaternion_from_axes(const float x[3], const float y[3], const float
 		q[1] = (z[1] + y[2]) / s;
 		q[2] = 0.25f * s;
 	}
+}
+
+/* the rotation of an angle (radians) about an axis (unit) */
+static void quaternion_axis_angle(float x, float y, float z, float angle, float q[4])
+{
+	float s = sinf(angle * 0.5f);
+
+	q[0] = x * s;
+	q[1] = y * s;
+	q[2] = z * s;
+	q[3] = cosf(angle * 0.5f);
+}
+
+/* (OpenFrame) a corner's panel moved (panel_placement's settings): the
+rotation about the middle of the head (in the HUD's frame) that takes its
+middle from its angles across and up, first moved by its own offset
+(vr.hud_<group>_x, _y: fractions of the HUD's width and height), then
+brought in to (1 - vr.hud_inset) of them, then moved with the other corners
+(vr.hud_offset_x, _y), turning it across about the HUD's up, then up about
+its own across: it still faces the head, upright, its image (its part of
+the HUD, copied by its geometry: host_vulkan_vr.c) as ever; and its size
+(vr.hud_<group>_scale times vr.hud_scale, about its outer corner:
+vr_visor_layers). The world's
+panel and the wrist's are never moved. */
+static float panel_placement(int index, const struct vr_visor_panel *panel, float q[4])
+{
+	float width = 2.0f * visor.half_angles[0], height = 2.0f * visor.half_angles[1];
+	float across, up, to_across, to_up, turn[4], lift[4], back[4];
+
+	q[0] = q[1] = q[2] = 0.0f;
+	q[3] = 1.0f;
+	if (panel->plain || panel_layout[index].group == HALO_VR_HUD_GROUP_WORLD)
+		return 1.0f;
+	across = atan2f(panel->centre[0], -panel->centre[2]);
+	up = asinf(clamp(panel->centre[1], -1.0f, 1.0f));
+	to_across = (across + settings.group_offset[index][0] * width) * (1.0f - settings.inset) +
+		settings.offset[0] * width;
+	to_up = (up + settings.group_offset[index][1] * height) * (1.0f - settings.inset) + settings.offset[1] * height;
+	/* (directions: angles_direction(a, u) is the turn -a about y of the
+	turn u about x of ahead) */
+	quaternion_axis_angle(0.0f, 1.0f, 0.0f, across, back);
+	quaternion_axis_angle(1.0f, 0.0f, 0.0f, to_up - up, lift);
+	quaternion_axis_angle(0.0f, 1.0f, 0.0f, -to_across, turn);
+	quaternion_multiply(lift, back, q);
+	quaternion_multiply(turn, q, q);
+	return settings.group_scale[index] * settings.scale;
 }
 
 void vr_visor_layers(struct vr_host_layers *layers)
@@ -882,7 +993,7 @@ void vr_visor_layers(struct vr_host_layers *layers)
 		for (index = 0; index < VR_PANEL_COUNT; index++)
 		{
 			const struct vr_visor_panel *panel = &panels[index];
-			float offset[3], back[3], orientation[4];
+			float offset[3], back[3], orientation[4], placement[4], scale;
 
 			if (!any || !layers->panels[index].shown || !(panel->opacity > 0.0f))
 			{
@@ -908,17 +1019,33 @@ void vr_visor_layers(struct vr_host_layers *layers)
 				layers->panels[index].over_hud = 1;
 				continue;
 			}
-			for (axis = 0; axis < 3; axis++)
-				offset[axis] = panel->centre[axis] * panel->distance;
+			/* (OpenFrame) moved and sized as vr.hud_inset, vr.hud_offset_*,
+			vr.hud_scale and vr.hud_<group>_* say (panel_placement): turned
+			about the middle of the head */
+			scale = panel_placement(index, panel, placement);
+			/* (sized about its outer corner, where the game anchors its
+			elements, so that they grow or shrink where they are) */
+			{
+				const float *region = panel_layout[index].region;
+				float out_across = region[0] + region[2] < 1.0f ? -1.0f : 1.0f;
+				float out_up = region[1] + region[3] < 1.0f ? 1.0f : -1.0f;
+
+				for (axis = 0; axis < 3; axis++)
+					offset[axis] = panel->centre[axis] * panel->distance + (1.0f - scale) * panel->distance *
+						(panel->right[axis] * out_across * panel->half_size[0] +
+						panel->up[axis] * out_up * panel->half_size[1]);
+			}
+			quaternion_rotate(placement, offset, offset);
 			quaternion_rotate(layers->hud_pose.orientation, offset, offset);
 			for (axis = 0; axis < 3; axis++)
 				layers->panels[index].pose.position[axis] = base[axis] + offset[axis];
 			cross(panel->right, panel->up, back);
 			quaternion_from_axes(panel->right, panel->up, back, orientation);
+			quaternion_multiply(placement, orientation, orientation);
 			quaternion_multiply(layers->hud_pose.orientation, orientation, layers->panels[index].pose.orientation);
 			layers->panels[index].pose.valid = 1;
-			layers->panels[index].size[0] = 2.0f * panel->half_size[0] * panel->distance;
-			layers->panels[index].size[1] = 2.0f * panel->half_size[1] * panel->distance;
+			layers->panels[index].size[0] = 2.0f * panel->half_size[0] * panel->distance * scale;
+			layers->panels[index].size[1] = 2.0f * panel->half_size[1] * panel->distance * scale;
 			layers->panels[index].over_hud = panel->distance < d;
 		}
 	}
