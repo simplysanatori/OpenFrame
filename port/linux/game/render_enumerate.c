@@ -192,6 +192,44 @@ when it has no more room (it holds no more than a frame's) */
 are made: a map loaded again, or its game started again, needs none) */
 #define MAXIMUM_ENUMERATED_MAPS 64
 
+/* a light tag's definition, as far as light_drawn_as_earlier reads it
+(rasterizer_xbox_environment.c has the whole layout: each file that reads
+one defines it) */
+struct point_light_geometry_parameters
+{
+	real radius;
+	real radius_modifier_lower_bound;
+	real radius_modifier_upper_bound;
+	real falloff_angle;
+	real cutoff_angle;
+	real lens_flare_radius;
+	real runtime_cosine_falloff_angle;
+	real runtime_cosine_cutoff_angle;
+	real specular_radius_multiplier;
+	real runtime_sine_cutoff_angle;
+	long unused[2];
+};
+
+struct point_light_gel_parameters
+{
+	struct tag_reference map;
+	word pad0;
+	short texture_animation_function;
+	real texture_animation_rate;
+	struct tag_reference secondary_map;
+};
+
+struct point_light_definition
+{
+	unsigned long flags;
+	struct point_light_geometry_parameters geometry;
+	byte reserved34[0x30];
+	struct point_light_gel_parameters gel;
+};
+/* (the tag's layout: gel.map at 0x64, the secondary map at 0x7c) */
+typedef char point_light_gel_offset_check[__builtin_offsetof(struct point_light_definition, gel.secondary_map) == 0x7c &&
+	__builtin_offsetof(struct point_light_definition, geometry.runtime_cosine_falloff_angle) == 0x1c ? 1 : -1];
+
 /* (an object index no object has, but not 0: camouflage's source) */
 #define STAND_IN_OBJECT_INDEX 0x7ffe0000
 
@@ -224,6 +262,13 @@ static struct
 	/* the pass's lights (rasterizer_light_submit's) */
 	short light_count;
 	long light_indices[MAXIMUM_LIGHTS_PER_WINDOW];
+	/* the lights the structure was drawn through, of light_count
+	(light_drawn_as_earlier), in the last pass that drew them */
+	short lights_drawn;
+	/* a structure's scope enumeration's time, which the eyes' (in the same
+	frame) adds to its "structure prep" line: the structure's index, ms */
+	short scope_structure_bsp_index;
+	unsigned long scope_milliseconds;
 } enumerate = { TRUE, { NULL, NULL }, NONE };
 
 /* the maps enumerated (a map is its cache file's checksum and its
@@ -330,6 +375,8 @@ static void fog_set(short fog)
 void render_enumerate_new_map(void)
 {
 	enumerate.new_map = TRUE;
+	enumerate.scope_structure_bsp_index = NONE;
+	enumerate.scope_milliseconds = 0;
 }
 
 /* the world's part, or the mirror's */
@@ -410,6 +457,7 @@ boolean render_enumerate_begin(boolean mirrors, boolean scope)
 boolean render_enumerate_next(void)
 {
 	double waited, cpu;
+	unsigned long elapsed, scope;
 
 	do
 		enumerate.pass++;
@@ -435,11 +483,29 @@ boolean render_enumerate_next(void)
 	bitmaps instead of defaults when this enumeration filled the cache.
 	Never unlock between a draw's texture stages. */
 	texture_cache_idle();
+	elapsed = system_milliseconds() - enumerate.started;
 	platform_log("render: %s structure %d%s: its shaders and pipelines made (drawn in %d passes in %lu ms, %.0f ms "
 		"of the CPU's, %.0f ms waited for the GPU's)", enumerate.everything ? "the map's and its" : "its",
 		enumerate.structure_bsp_index, enumerate.scope ? " (scope)" : "", passes(),
-		system_milliseconds() - enumerate.started, cpu < 0.0 ? -1.0 : cpu * 1000.0,
+		elapsed, cpu < 0.0 ? -1.0 : cpu * 1000.0,
 		waited * 1000.0);
+	/* the whole preparation a structure's first frame waits for, once a
+	change: the scope's enumeration (drawn first, in the same frame) and the
+	eyes' (or the window's) */
+	if (enumerate.scope)
+	{
+		enumerate.scope_structure_bsp_index = enumerate.structure_bsp_index;
+		enumerate.scope_milliseconds = elapsed;
+	}
+	else
+	{
+		scope = enumerate.scope_structure_bsp_index == enumerate.structure_bsp_index ? enumerate.scope_milliseconds : 0;
+		platform_log("structure prep: %s %d: %lu ms (view %lu ms, scope %lu ms), the structure lit through %d of "
+			"%d lights", enumerate.everything ? "map and structure" : "structure", enumerate.structure_bsp_index,
+			elapsed + scope, elapsed, scope, enumerate.lights_drawn, enumerate.light_count);
+		enumerate.scope_structure_bsp_index = NONE;
+		enumerate.scope_milliseconds = 0;
+	}
 	return FALSE;
 }
 
@@ -490,6 +556,7 @@ static void lights_submit(void)
 	short index;
 
 	enumerate.light_count = 0;
+	enumerate.lights_drawn = 0;
 	tag_iterator_new(&iterator, LIGHT_DEFINITION_TAG);
 	while ((tag_index = tag_iterator_next(&iterator)) != NONE && rasterizer_lights.light_count < MAXIMUM_LIGHTS_PER_WINDOW)
 	{
@@ -528,6 +595,42 @@ static void lights_submit(void)
 	}
 }
 
+/* whether an earlier light of the pass draws the structure's surfaces as
+this one does: of a light, the environment's light passes
+(rasterizer_xbox_environment.c: _rasterizer_environment_diffuse_light_begin,
+_specular_light_begin and _specular_spot_light_begin, and their draws) read
+into the draws' shaders, pipelines and textures only its gels (the primary
+and the secondary bitmap), whether it is a spot (its cosine falloff) and
+whether its colour is bright; the rest (its position, radius, gel functions)
+are constants. So of the map's light tags (a10's: 48, 43 of them with no
+gel) a pass draws the surfaces through one light of each kind, not through
+every light: the same shaders and pipelines made, a fraction of the draws.
+Every tag is still submitted (lights_submit), so the models' lighting and
+the enhanced dynamic lights are as before. */
+static boolean light_drawn_as_earlier(short index)
+{
+	struct rasterizer_light_submit_parameters const *light =
+		&rasterizer_lights.lights[enumerate.light_indices[index]];
+	short earlier;
+
+	for (earlier = 0; earlier < index; earlier++)
+	{
+		struct rasterizer_light_submit_parameters const *other =
+			&rasterizer_lights.lights[enumerate.light_indices[earlier]];
+
+		if (other->definition->gel.map.index == light->definition->gel.map.index &&
+			other->definition->gel.secondary_map.index == light->definition->gel.secondary_map.index &&
+			(other->definition->geometry.runtime_cosine_falloff_angle == -1.0f) ==
+				(light->definition->geometry.runtime_cosine_falloff_angle == -1.0f) &&
+			other->color.red == light->color.red && other->color.green == light->color.green &&
+			other->color.blue == light->color.blue)
+		{
+			return TRUE;
+		}
+	}
+	return FALSE;
+}
+
 void render_enumerate_lights(boolean specular)
 {
 	short index;
@@ -540,6 +643,10 @@ void render_enumerate_lights(boolean specular)
 		rasterizer_environment_diffuse_lights_begin();
 	for (index = 0; index < enumerate.light_count; index++)
 	{
+		if (light_drawn_as_earlier(index))
+			continue;
+		if (!specular)
+			enumerate.lights_drawn++;
 		if (specular)
 			structure_render_specular_light(enumerate.light_indices[index], &render.camera.position, 10.0f, 0, NULL);
 		else
