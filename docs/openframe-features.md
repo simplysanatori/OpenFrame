@@ -178,9 +178,19 @@ changes) as each tick's movement is made ready, and in each sub-step of
   or a third of a second before), on the ground at a run or faster, and you
   slide on, crouched (the game's lower height), at the speed you ran and 15%
   more, losing speed to friction, faster down a slope, steered a little by
-  the stick (pulled back, it brakes). It ends as you stand, jump (the speed
-  carried into the jump), leave the ground, meet a wall, slow to half a run,
-  or after 1.1 seconds.
+  the stick (pulled back, it brakes). It ends as you let the crouch go, jump
+  (the speed carried into the jump; Jump again in the air beside a wall is
+  then a wall jump), leave the ground, meet a wall, slow to half a run, or
+  after 1.1 seconds. A toggled sprint is only paused by the crouch, so as
+  you stand it is back by itself and the next slide needs no new flick. The
+  crouch is read from the click or the head (not only the game's crouch,
+  which the game drops at a full stick push), so a slide holds for as long
+  as you hold the crouch. Arm swing: the swing just before the duck counts.
+- stdout.log: `vr: slide start (head crouch|crouch button, sprint on|by
+  arms) at N m/s, the run M`, `vr: no slide (why; speed, run)` when a crouch
+  began and did not slide, `vr: slide end (why) after N s, sprint ...`,
+  `vr: wall jump [from a run] at N m/s`, `vr: wall run start [(chained)]`
+  and `vr: wall run end (why)`.
 - Wall jump: in the air beside a wall, press Jump again to leap off it
   where your head looks (turned off the wall at least a third of the way),
   at least 5 m/s and as fast as you were going (up to half as fast again),

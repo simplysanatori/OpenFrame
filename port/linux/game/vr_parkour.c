@@ -8,19 +8,28 @@ local player's movement on foot, a tick at a time.
 - A slide: a crouch begun (the left stick's click, or the head lowered with
   vr.physical_crouch) while sprinting (vr.sprint_mode: vr_comfort.c's
   sprint, now or in the last third of a second; a crouch only pauses a
-  toggled sprint) on the ground at a run or faster slides on with the run's
+  toggled sprint: the sprint's effort goes on being asked for, bipeds.c
+  just does not scale a crouched biped's speeds, so the slide reads the
+  sprint through it and the sprint comes back by itself as the player
+  stands) on the ground at a run or faster slides on with the run's
   momentum (a little more, by vr.slide_momentum), crouched (the game's
   crouch: its lower height), giving it up to friction, taking a slope's
-  share of gravity, steered a little by the stick. It ends as the player
-  stands, jumps (the momentum carried into the jump), leaves the ground,
-  meets a wall, slows to half a run, or after its time (by
-  vr.slide_momentum: 1.1 seconds at 1).
+  share of gravity, steered a little by the stick. It ends as the crouch is
+  let go, the player jumps (the momentum carried into the jump), leaves the
+  ground, meets a wall, slows to half a run, or after its time (by
+  vr.slide_momentum: 1.1 seconds at 1). The crouch is read from the
+  controls (halo_vr_crouch: the click, the head) as well as the game's
+  crouch flag: player_control.c drops that flag at a stick pushed past 98%
+  (the run's full push), which ended a slide in two or three ticks (headset
+  trial 3) and would not begin one at a full push.
 - A wall jump: in the air beside a wall (probed about the body at the knee,
   the waist and the chest), Jump pressed again leaps off it where the head
   looks (turned off the wall at least 35% of the way), at least as fast as
   the body went, as high as a jump times vr.walljump_scale (more looking
   up); once a wall until the feet are on the ground again, the leap held
-  against the air control for 12 ticks.
+  against the air control for 12 ticks. A slide that ends in a jump leaves
+  the ground with the slide's momentum, and that jump is the first: the
+  wall jump is the next press, in the air.
 - A wall run: a jump at a wall with the stick pushed (past 60%) along it
   within a second runs along the wall, level for 60% of its 2 seconds and
   then easing into the fall; a wall jump ends it, and from it leaps where
@@ -182,7 +191,7 @@ static void parkour_settings_read(void)
 static void parkour_reset(void)
 {
 	if (parkour.sliding || parkour.running)
-		platform_log("vr parkour: reset");
+		platform_log("vr: parkour reset");
 	csmemset(&parkour, 0, sizeof(parkour));
 	parkour.unit_index = NONE;
 	parkour.tick = NONE;
@@ -295,8 +304,8 @@ static void slide_end(char const *why)
 {
 	if (parkour.sliding)
 	{
-		platform_log("vr parkour: slide ended (%s) after %.2f s", why,
-			(double)parkour.slide_ticks / TICKS_PER_SECOND);
+		platform_log("vr: slide end (%s) after %.2f s, sprint %s", why,
+			(double)parkour.slide_ticks / TICKS_PER_SECOND, halo_vr_sprint_toggled() ? "on" : "not toggled on");
 	}
 	parkour.sliding = FALSE;
 	parkour.slide_ticks = parkour.slide_airborne_ticks = parkour.slide_stall_ticks = 0;
@@ -306,7 +315,10 @@ static void slide_end(char const *why)
 level; run: the run's speed, metres a second) */
 static void slide_tick(long biped_index, struct biped_datum *biped, real_vector3d const *forward, real run)
 {
-	boolean crouch = TEST_FLAG(biped->unit.control_flags, _unit_control_crouch_modifier_bit);
+	/* (the crouch asked for, whether or not the game took it: it drops it at
+	a full stick, player_control.c) */
+	boolean crouch = TEST_FLAG(biped->unit.control_flags, _unit_control_crouch_modifier_bit) ||
+		halo_vr_crouch() != 0;
 	boolean crouch_begun = crouch && !parkour.crouch_was;
 	boolean airborne = TEST_FLAG(biped->biped.flags, _biped_airborne_bit);
 	real_vector3d horizontal = biped->object.translational_velocity;
@@ -324,9 +336,14 @@ static void slide_tick(long biped_index, struct biped_datum *biped, real_vector3
 	if (!parkour.sliding)
 	{
 		/* (a crouch begun while sprinting, on the ground, at a run or faster) */
-		if (!crouch_begun || parkour.sprint_recent <= 0 || airborne || !(actual >= SLIDE_RUN_SHARE * run) ||
+		if (!crouch_begun)
+			return;
+		if (parkour.sprint_recent <= 0 || airborne || !(actual >= SLIDE_RUN_SHARE * run) ||
 			normalize3d(&horizontal) <= 0.0f)
 		{
+			platform_log("vr: no slide (%s; %.1f m/s, the run %.1f)",
+				airborne ? "in the air" : parkour.sprint_recent <= 0 ? "not sprinting" : "too slow",
+				(double)actual, (double)run);
 			return;
 		}
 		speed = slide_entry_speed(actual, parkour_settings.momentum);
@@ -335,7 +352,9 @@ static void slide_tick(long biped_index, struct biped_datum *biped, real_vector3
 		parkour.sliding = TRUE;
 		parkour.slide_ticks = parkour.slide_airborne_ticks = parkour.slide_stall_ticks = 0;
 		halo_vr_pulse(0.35f, 0.08f);
-		platform_log("vr parkour: slide at %.1f m/s (the run %.1f)", speed, run);
+		platform_log("vr: slide start (%s, sprint %s) at %.1f m/s, the run %.1f",
+			(halo_vr_crouch() & HALO_VR_CROUCH_PHYSICAL) ? "head crouch" : "crouch button",
+			halo_vr_sprint_toggled() ? "on" : "by arms", (double)speed, (double)run);
 	}
 
 	if (!crouch)
@@ -646,7 +665,7 @@ static boolean wall_tick(long biped_index, struct biped_datum *biped, real_point
 			parkour.leap_speed = speed;
 			parkour.leap_ticks = WALL_LEAP_HOLD_TICKS;
 		}
-		platform_log("vr parkour: wall jump%s at %.1f m/s", parkour.running ? " from a run" : "",
+		platform_log("vr: wall jump%s at %.1f m/s", parkour.running ? " from a run" : "",
 			(double)(magnitude3d(velocity) / per_second));
 		parkour.jumped_wall = TRUE;
 		parkour.running = FALSE;
@@ -663,7 +682,7 @@ static boolean wall_tick(long biped_index, struct biped_datum *biped, real_point
 
 		if (normalize3d(&way) > 0.001f && dot_product3d(&way, &wall.plane.n) > 0.6f)
 		{
-			platform_log("vr parkour: wall run ended (steered away)");
+			platform_log("vr: wall run end (steered away)");
 			parkour.running = FALSE;
 			parkour.run_ticks = (long)(WALL_RUN_SECONDS * TICKS_PER_SECOND);
 			return FALSE;
@@ -692,7 +711,7 @@ static boolean wall_tick(long biped_index, struct biped_datum *biped, real_point
 			if (!parkour.running)
 			{
 				parkour.run_speed = speed;
-				platform_log("vr parkour: wall run%s", parkour.walljump_age <= 2 * TICKS_PER_SECOND ? " (chained)" : "");
+				platform_log("vr: wall run start%s", parkour.walljump_age <= 2 * TICKS_PER_SECOND ? " (chained)" : "");
 			}
 			speed = PIN(MAX(parkour.run_speed, WALL_RUN_SLOWEST * per_second) * WALL_RUN_SPEED,
 				WALL_RUN_SLOWEST * per_second, WALL_RUN_FASTEST * per_second);
@@ -717,7 +736,7 @@ static boolean wall_tick(long biped_index, struct biped_datum *biped, real_point
 		}
 	}
 	if (parkour.running)
-		platform_log("vr parkour: wall run ended");
+		platform_log("vr: wall run end (%s)", found ? "stopped" : "wall lost");
 	parkour.running = FALSE;
 	return FALSE;
 }
@@ -779,6 +798,8 @@ boolean vr_parkour_tick(
 	airborne = TEST_FLAG(biped->biped.flags, _biped_airborne_bit);
 	if (!airborne)
 	{
+		if (parkour.running)
+			platform_log("vr: wall run end (landed)");
 		parkour.run_ticks = 0;
 		parkour.jumped_wall = FALSE;
 		parkour.wall_valid = FALSE;
