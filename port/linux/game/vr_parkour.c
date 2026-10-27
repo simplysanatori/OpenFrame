@@ -7,8 +7,8 @@ local player's movement on foot, a tick at a time.
 
 - A slide: a crouch begun (the left stick's click, or the head lowered with
   vr.physical_crouch) while sprinting (vr.sprint_mode: vr_comfort.c's
-  sprint, now or in the last third of a second, as a crouch ends a toggled
-  sprint) on the ground at a run or faster slides on with the run's
+  sprint, now or in the last third of a second; a crouch only pauses a
+  toggled sprint) on the ground at a run or faster slides on with the run's
   momentum (a little more, by vr.slide_momentum), crouched (the game's
   crouch: its lower height), giving it up to friction, taking a slope's
   share of gravity, steered a little by the stick. It ends as the player
