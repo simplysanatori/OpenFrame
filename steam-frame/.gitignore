@@ -1,3 +1,7 @@
 # release output (steam-frame/release.sh writes here)
 release/*
 !release/.gitkeep
+
+# library artwork fetched per art/SOURCES.md (not committed: Halo art is not ours to redistribute)
+art/*.png
+art/*.ico
