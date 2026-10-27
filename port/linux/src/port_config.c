@@ -1942,6 +1942,16 @@ static const struct config_setting config_settings[] =
 		"in play: its first frame (and each structure's) drawn first, unseen,\n"
 		"through every shader its tags hold, in each way the game draws them;\n"
 		"false makes each the first time a draw needs it, which the draw waits for." },
+	/* (lane load-time: an Xbox map's texture cache sized by the memory) */
+	{ "display.large_texture_cache", _config_boolean, "true", "HALO_LARGE_TEXTURE_CACHE", _environment_value,
+		_platform_all,
+		"Give an Xbox map's textures as much cache as a Custom Edition map's (a\n"
+		"32nd of the computer's memory, 256 MB from 8 GB) rather than the Xbox's\n"
+		"22 MB, on the builds that keep the Xbox's (64-bit ARM Linux, the Steam\n"
+		"Frame, Android, iOS). A map's preparation (display.prepare_shaders) then\n"
+		"reads and uploads each texture once, not again in pass after pass as\n"
+		"a campaign level's do in 22 MB, and play reads fewer back; false keeps\n"
+		"the Xbox's size and memory use." },
 	{ "debug.load_trace", _config_boolean, "false", "HALO_LOAD_TRACE", _environment_value, _platform_all,
 		"Log map loading checkpoints with monotonic wall, thread and process CPU seconds." },
 	{ "debug.render_manifest", _config_string, "\"\"", "HALO_RENDER_MANIFEST", _environment_value, _platform_all,

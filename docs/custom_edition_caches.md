@@ -147,7 +147,10 @@ map the whole cache, macOS's among them. Android, iOS and 64-bit ARM Linux
 give an Xbox map the Xbox's 22 MB, and a Custom Edition map (or one with
 mods' bitmaps) a 32nd of the device's memory, from 64 MB to the whole: its
 pages are backed only as textures fill them, so an Xbox map uses no more
-memory than it did with the Xbox's cache.
+memory than it did with the Xbox's cache. `display.large_texture_cache` (on
+by default) gives an Xbox map the Custom Edition map's share on those builds
+too: a map's preparation draws through all of its textures, and in 22 MB a
+campaign level's were read and sent to the GPU again pass after pass.
 
 ## Loading and conversion
 

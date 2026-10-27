@@ -454,10 +454,23 @@ boolean render_enumerate_begin(boolean mirrors, boolean scope)
 	return TRUE;
 }
 
+/* the view being enumerated, for the log */
+static char const *enumerate_view_name(void)
+{
+	if (enumerate.scope)
+		return "scope";
+#ifdef HALO_VR
+	if (vr_render_eye_pass())
+		return "eyes";
+#endif
+	return "window";
+}
+
 boolean render_enumerate_next(void)
 {
-	double waited, cpu;
-	unsigned long elapsed, scope;
+	double waited, cpu, texture_wait, render_wait;
+	unsigned long elapsed, scope, texture_bytes, render_waits;
+	long texture_loads;
 
 	do
 		enumerate.pass++;
@@ -489,6 +502,17 @@ boolean render_enumerate_next(void)
 		enumerate.structure_bsp_index, enumerate.scope ? " (scope)" : "", passes(),
 		elapsed, cpu < 0.0 ? -1.0 : cpu * 1000.0,
 		waited * 1000.0);
+	/* where the time went: the game's thread's CPU, its waits for textures
+	read from the map, and its waits for the render thread to play what it
+	wrote (each time the texture cache made room, the ring full, and the
+	end: the pipelines and texture uploads, which the host's "map
+	preparation made" line above counts) */
+	texture_cache_preparation_statistics(&texture_loads, &texture_bytes, &texture_wait);
+	xgpu_backend_preparation_waits(&render_wait, &render_waits);
+	platform_log("map load: enumerate %s structure %d: %lu ms (CPU %.0f ms; %ld textures read, %lu MB, waited %.0f ms; "
+		"render thread waited for %.0f ms in %lu waits)", enumerate_view_name(), enumerate.structure_bsp_index, elapsed,
+		cpu < 0.0 ? -1.0 : cpu * 1000.0, texture_loads, texture_bytes >> 20, texture_wait * 1000.0,
+		render_wait * 1000.0, render_waits);
 	/* the whole preparation a structure's first frame waits for, once a
 	change: the scope's enumeration (drawn first, in the same frame) and the
 	eyes' (or the window's) */

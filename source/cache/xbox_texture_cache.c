@@ -346,6 +346,16 @@ taken since the memory of those past it went back to the system
 (texture_cache_size_for_map) */
 static long texture_cache_map_pages = HALO_PORT_TEXTURE_CACHE_XBOX_MAP_PAGE_COUNT;
 static long texture_cache_backed_pages = HALO_PORT_TEXTURE_CACHE_XBOX_MAP_PAGE_COUNT;
+/* port: what a map's preparation read and waited for
+(texture_cache_preparation_statistics) */
+static struct
+{
+	long loads;
+	unsigned long bytes;
+	double wait_seconds;
+} texture_cache_preparation;
+/* port: the platform layer's (port/linux/src/port_config.c) */
+int config_boolean(char const *name);
 
 /* ---------- public code */
 
@@ -406,13 +416,22 @@ static void texture_cache_discard_past_map_pages(
 set once its tags and its mods' bitmaps are loaded, and whenever the mods'
 bitmaps change (port/linux/game/mods.c), when the cache holds none of the
 textures it would let go of: what is not drawn is not backed, and an Xbox
-map takes no more than the Xbox's on the builds that keep it for those */
+map takes no more than the Xbox's on the builds that keep it for those,
+unless display.large_texture_cache gives it a Custom Edition map's size (a
+32nd of the computer's memory, the whole 256 MB from 8 GB): a map's
+preparation (render_enumerate.c) then reads each of an Xbox campaign level's
+textures once, not again pass after pass in the Xbox's 22 MB (a10's 518:
+about 570 MB read and sent to the GPU again in one enumeration, measured on
+a desktop, halo_port_capacity.h; the VR mode has two, the scope's and the
+eyes'), and play reads fewer back */
 void texture_cache_size_for_map(
 	void)
 {
 	extern long mods_bitmap_count(void); /* port/linux/game/mods.c */
+	boolean large = HALO_PORT_TEXTURE_CACHE_XBOX_MAP_PAGE_COUNT < HALO_PORT_TEXTURE_CACHE_PAGE_COUNT &&
+		config_boolean("display.large_texture_cache");
 	long page_count = texture_cache_map_page_count(
-		custom_edition_cache_tags_loaded(),
+		custom_edition_cache_tags_loaded() || large,
 		mods_bitmap_count() > 0,
 		texture_cache_memory_bytes());
 
@@ -502,11 +521,22 @@ static void texture_cache_preparation_checkpoint(void *const *bound)
 	}
 }
 
+/* port: what the preparation begun last read (render_enumerate.c's log) */
+void texture_cache_preparation_statistics(long *loads, unsigned long *bytes, double *wait_seconds)
+{
+	*loads = texture_cache_preparation.loads;
+	*bytes = texture_cache_preparation.bytes;
+	*wait_seconds = texture_cache_preparation.wait_seconds;
+}
+
 /* port: leave room for a draw's remaining stages before the next complete
 draw permits a checkpoint. The budget follows the cache's capacity for the
 map (texture_cache_size_for_map). */
 void texture_cache_preparation_begin(void)
 {
+	texture_cache_preparation.loads = 0;
+	texture_cache_preparation.bytes = 0;
+	texture_cache_preparation.wait_seconds = 0.0;
 	halo_gpu_preparation_checkpoint_set(
 		(unsigned long)texture_cache_map_pages * XBOX_TEXTURE_CACHE_PAGE_SIZE / 8,
 		texture_cache_preparation_checkpoint);
@@ -979,6 +1009,11 @@ static boolean texture_cache_start_loading_bitmap(
 
 		/* port: account for preparation's bounded resource batch. */
 		halo_gpu_preparation_loaded((unsigned long)size);
+		if (render_enumerating)
+		{
+			texture_cache_preparation.loads++;
+			texture_cache_preparation.bytes += (unsigned long)size;
+		}
 		base_address = xbox_texture_cache_globals.base_address +
 			(unsigned long)lruv_block_get_address(
 				xbox_texture_cache_globals.cache,
@@ -1203,6 +1238,8 @@ void *_texture_cache_bitmap_get_hardware_format(
 			struct xbox_texture_cache_texture *texture = datum_get(
 				xbox_texture_cache_globals.textures,
 				bitmap->cache_block_index);
+			/* port: the preparation's wait for it (render_enumerate.c's log) */
+			double waited_from = render_enumerating && block && !texture->loaded ? halo_wall_seconds() : -1.0;
 
 			lruv_block_touch(
 				xbox_texture_cache_globals.cache,
@@ -1237,6 +1274,10 @@ void *_texture_cache_bitmap_get_hardware_format(
 				}
 			}
 			while (!hardware_format && block);
+			if (waited_from >= 0.0)
+			{
+				texture_cache_preparation.wait_seconds += halo_wall_seconds() - waited_from;
+			}
 		}
 	}
 	else

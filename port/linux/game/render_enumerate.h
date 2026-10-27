@@ -58,5 +58,15 @@ void halo_gpu_prepare(int new_map);
 /* the CPU time the calling thread has spent, in seconds (0 where the system
 does not say) */
 double halo_thread_cpu_seconds(void);
+/* the monotonic clock, in seconds (port/linux/src/d3d8_device.c) */
+double halo_wall_seconds(void);
+/* what a map's preparation waited for, since texture_cache_preparation_begin
+(xbox_texture_cache.c): the textures read (their bytes) and the seconds the
+game waited for them to be read */
+void texture_cache_preparation_statistics(long *loads, unsigned long *bytes, double *wait_seconds);
+/* and the seconds the game waited for the render thread to play what it had
+written (each time the texture cache made room, and the end), since
+xgpu_backend_prepare (port/linux/src/xgpu_stream_encode.c) */
+void xgpu_backend_preparation_waits(double *seconds, unsigned long *count);
 
 #endif

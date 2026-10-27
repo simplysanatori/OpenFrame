@@ -3539,6 +3539,15 @@ double halo_thread_cpu_seconds(void)
 #endif
 }
 
+double halo_wall_seconds(void)
+{
+	struct timespec now;
+
+	if (clock_gettime(CLOCK_MONOTONIC, &now) != 0)
+		return 0.0;
+	return (double)now.tv_sec + (double)now.tv_nsec * 1e-9;
+}
+
 double halo_gpu_prepared(void)
 {
 	if (preparation.trace)

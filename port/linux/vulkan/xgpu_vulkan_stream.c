@@ -2604,6 +2604,22 @@ static uint32_t stream_prepared(void *context)
 	host_logf(HOST_LOG_INFO, "vulkan: map preparation made %llu pipelines (%llu total)",
 		(unsigned long long)(xgpu_vulkan_pipeline_count() - stream.prepare_pipelines),
 		(unsigned long long)xgpu_vulkan_pipeline_count());
+	/* (the render thread's share of a map's loading: the driver's pipeline
+	calls, on the compilers' threads, and the textures made and uploaded
+	again, on this one; stream_prepare's statistics) */
+	{
+		struct xgpu_vulkan_statistics now;
+		struct xgpu_vulkan_texture_statistics textures;
+
+		xgpu_vulkan_statistics_peek(&now);
+		xgpu_vulkan_textures_statistics_peek(&textures);
+		host_logf(HOST_LOG_INFO, "map load: render thread: %.0f ms of pipeline driver calls; textures %u made, %u "
+			"uploaded again, %llu MB; %.0f ms waited for the GPU", (now.pipeline_seconds -
+			stream.trace_statistics.pipeline_seconds) * 1000.0, textures.made - stream.trace_textures.made,
+			textures.remade - stream.trace_textures.remade,
+			(unsigned long long)((textures.bytes - stream.trace_textures.bytes) >> 20),
+			(now.wait_seconds - stream.trace_statistics.wait_seconds) * 1000.0);
+	}
 	stream.preparing = 0;
 	stream.prepared = 1;
 	/* (the pipelines just made kept, where they are new: Android seldom
