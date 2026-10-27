@@ -839,6 +839,11 @@ the toggle is on; the game says where it quickens the player
 float halo_vr_sprint(void);
 float halo_vr_sprint_speed(void);
 int halo_vr_sprint_toggled(void);
+/* bullet time (vr.bullet_time): the world's speed asked for, 1 when off
+(vr.bullet_time_scale while toggled on, the right stick held up); and
+turned off, where the game will not slow the world (vr_comfort.c) */
+float halo_vr_bullet_time(void);
+void halo_vr_bullet_time_off(void);
 /* this frame's eyes' images multiplied by this colour as they are
 presented, all of each, before the helmet's rim; each call multiplies it
 further (vr_seat.c's blinks, vr_death.c's dimming: the game's screen flash

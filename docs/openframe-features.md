@@ -17,6 +17,32 @@ AGPL-3.0-or-later, as OpenH1 is), re-implemented on OpenH1's VR layer
 share almost no code, so mostly the ideas and the tuning were carried over;
 the few functions whose lines came across say so at their top.
 
+### Bullet time (untested in the headset)
+
+Slows the world while your head and hands keep the display's rate. The
+game's clock runs slower (`source/main/main.c` scales the time it gives
+`game_time_update`), so every tick and `game.sim_rate` sub-step is the same
+step as ever, only fewer of them each second, and the frames between ticks
+are drawn as far into the next tick as the slowed clock has run. Nothing of
+it is saved: a checkpoint or a saved game knows nothing of it, and a revert
+turns it off. It eases in and out over about a sixth of a second.
+
+- Keys: `vr.bullet_time` (default `false`), `vr.bullet_time_scale` (the
+  world's speed, 0.2 to 0.8, default `0.4`).
+- Input: hold the turning stick (the right, or the left with
+  `vr.swap_sticks`) pushed up for half a second; again to end it. The stick's
+  up is no game control while the controllers aim (OpenH1 sends the right
+  stick to the game only in the menus, cinematics and with `vr.aim =
+  "gamepad"`; its down ejects a magazine with `vr.manual_reload`), so no
+  binding is taken from anything. On foot, with the controllers aiming.
+- Where: a game of this computer alone (the campaign). Never online, in split
+  screen or with bots (network games, which every machine must step alike);
+  the HUD says "Bullet time: offline only" there. It ends in a cinematic, at
+  death and where the game takes your control.
+- The HUD says "Bullet time" and "Bullet time off"; both controllers pulse.
+- Limitation: the sounds keep their pitch and speed (the mixer plays each
+  voice at its own rate), so a slowed world sounds as fast as ever.
+
 ### Sprint (untested in the headset)
 
 Runs faster than the game's run, on foot and standing (not crouched), forward
@@ -26,19 +52,16 @@ local player (`vr_sprint_speed_scale`).
 
 - Keys: `vr.sprint_mode` (`"off"`, the default; `"toggle"`;
   `"arm_swing"`), `vr.sprint_speed` (times the run, 1.1 to 2, default `1.5`).
-- `"toggle"`: flick the turning stick (the right, or the left with
-  `vr.swap_sticks`) up to sprint, and again to stop. It also ends as you let the left stick go for a
-  second, crouch, or leave your feet (a vehicle, a cinematic, the menus,
-  death). The HUD says "Sprint". The stick's up is no game control while
-  the controllers aim (OpenH1 sends the right stick to the game only in the
-  menus, cinematics and with `vr.aim = "gamepad"`; its down ejects a
-  magazine with `vr.manual_reload`), so no binding is taken from anything.
+- `"toggle"`: flick the turning stick up (as bullet time's input, but let go
+  within half a second; with bullet time off it toggles at once as you push)
+  to sprint, and again to stop. It also ends as you let the left stick go for
+  a second, crouch, or leave your feet (a vehicle, a cinematic, the menus,
+  death). The HUD says "Sprint".
 - `"arm_swing"`: swing both arms up and down as you run; the faster the
   slower arm moves (from 0.6 m/s, full at 1.5 m/s) the faster you go, up to
   `vr.sprint_speed`. With the left stick let go the swing walks you forward
   along your aim.
-- Where: a game of this computer alone (the campaign). Never online, in split
-  screen or with bots (network games, which every machine must step alike).
+- Where: a game of this computer alone, as bullet time.
 
 ### Comfort vignette for moving and turning (untested in the headset)
 

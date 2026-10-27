@@ -17,6 +17,8 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vignette_strength" x="54" y="97"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_sprint_mode" x="54" y="121"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_sprint_speed" x="54" y="145"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time" x="54" y="169"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time_scale" x="54" y="193"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_bar" y="414"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
@@ -60,6 +62,24 @@
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_speed_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="1.25X|1.5X|1.75X|2X" setting="vr.sprint_speed" values="1.25|1.5|1.75|2" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="vr.bullet_time" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_label"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_spinner" x="320" y="1"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="25%|40%|50%|65%|80%" setting="vr.bullet_time_scale" values="0.25|0.4|0.5|0.65|0.8" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+		<on event="created" run="port setting load"/>
+	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port settings defaults"/>
 		<on event="start" run="port settings defaults"/>
@@ -75,6 +95,8 @@
 		<string text="VIGNETTE STRENGTH:"/>
 		<string text="SPRINT:"/>
 		<string text="SPRINT SPEED:"/>
+		<string text="BULLET TIME:"/>
+		<string text="BULLET TIME SPEED:"/>
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/help_strings">
 		<string text=""/>
@@ -82,5 +104,7 @@
 		<string text="How much of the edges of your view the comfort\nvignette dims, and how dark."/>
 		<string text="Offline: flick the right stick up to sprint, or\nswing your arms as you run."/>
 		<string text="How much faster than the run a sprint is."/>
+		<string text="Offline: hold the right stick up to slow the world\n(hold it again to end it)."/>
+		<string text="How fast the world runs in bullet time."/>
 	</strings>
 </menus>

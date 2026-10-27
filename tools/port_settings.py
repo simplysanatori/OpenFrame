@@ -159,7 +159,7 @@ VR_SCREENS = {
              "The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy.",
              None),
             ("COMFORT, SPRINT...", None, VR_COMFORT,
-             "The comfort vignette and sprinting.", None),
+             "The comfort vignette, sprinting and bullet time.", None),
         ],
     },
 }
@@ -230,6 +230,12 @@ VR_SCREENS["vr_comfort"] = {
         ("SPRINT SPEED:", "vr.sprint_speed",
          [(f"{speed:g}X", f"{speed:g}") for speed in (1.25, 1.5, 1.75, 2)],
          "How much faster than the run a sprint is.", None),
+        ("BULLET TIME:", "vr.bullet_time", ON_OFF,
+         "Offline: hold the right stick up to slow the world\n(hold it again to end it).",
+         None),
+        ("BULLET TIME SPEED:", "vr.bullet_time_scale",
+         [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
+         "How fast the world runs in bullet time.", None),
     ],
 }
 SCREENS.update(VR_SCREENS)

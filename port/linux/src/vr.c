@@ -203,10 +203,12 @@ dead zone, and the push past it to the full ask */
 #define COMFORT_SNAP_SECONDS 0.25f
 #define COMFORT_DEADZONE 0.15f
 #define COMFORT_FULL 0.6f
-/* vr.sprint_mode = "toggle" (comfort_update): the right stick pushed up
-past STICK_UP_PRESSED (STICK_UP_RELEASED lets it go) and less than
-STICK_UP_SIDEWAYS sideways (not a turn) toggles sprint. A toggled sprint
-ends with the left stick let go SPRINT_STOP_SECONDS (under SPRINT_STOP_PUSH), crouching, or off foot.
+/* vr.sprint_mode = "toggle" and vr.bullet_time (comfort_update): the right
+stick pushed up past STICK_UP_PRESSED (STICK_UP_RELEASED lets it go) and
+less than STICK_UP_SIDEWAYS sideways (not a turn); let go within
+STICK_UP_HOLD_SECONDS a flick (sprint's toggle), held that long bullet
+time's. A toggled sprint ends with the left stick let go
+SPRINT_STOP_SECONDS (under SPRINT_STOP_PUSH), crouching, or off foot.
 Sprint's effort is none with the left stick pulled back past
 SPRINT_BACK or sideways past SPRINT_SIDEWAYS. */
 #define SPRINT_OFF 0
@@ -215,6 +217,7 @@ SPRINT_BACK or sideways past SPRINT_SIDEWAYS. */
 #define STICK_UP_PRESSED 0.75f
 #define STICK_UP_RELEASED 0.55f
 #define STICK_UP_SIDEWAYS 0.6f
+#define STICK_UP_HOLD_SECONDS 0.5f
 #define SPRINT_STOP_SECONDS 1.0f
 #define SPRINT_STOP_PUSH 0.2f
 #define SPRINT_BACK (-0.15f)
@@ -648,14 +651,16 @@ static struct
 	float vignette;
 	/* comfort_update: the vignette the sticks ask for this frame
 	(vr.vignette = "always"), a snap turn's moment of it, and whether a
-	snap turn was made this frame; the right stick up (held, and whether
-	this push has been taken), sprint (toggled on, the seconds the left
-	stick has been let go, the arms' effort and each hand's last height and
-	vertical speed, smoothed) */
+	snap turn was made this frame; the right stick up (held, for how long,
+	and whether bullet time took this push), sprint (toggled on, the
+	seconds the left stick has been let go, the arms' effort and each
+	hand's last height and vertical speed, smoothed) and bullet time
+	(toggled on) */
 	float comfort_asked;
 	float comfort_snap;
 	int comfort_snapped;
 	int stick_up;
+	float stick_up_seconds;
 	int stick_up_taken;
 	int sprint_on;
 	float sprint_stopped;
@@ -663,6 +668,7 @@ static struct
 	int arm_heights_valid;
 	float arm_heights[2];
 	float arm_speeds[2];
+	int bullet_time_on;
 	/* debug.vr_test_target: the right controller pointed along this
 	(halo_vr_test_point: game axes from the recentred head), if set */
 	int test_point_valid;
@@ -976,12 +982,14 @@ static struct
 	int wheel;
 	int comfort_vignette;
 	/* vr.vignette (VIGNETTE_OFF, _VEHICLE, _ALWAYS) and vr.vignette_strength;
-	vr.sprint_mode (SPRINT_OFF, _TOGGLE, _ARM_SWING) and vr.sprint_speed
-	(comfort_update) */
+	vr.sprint_mode (SPRINT_OFF, _TOGGLE, _ARM_SWING) and vr.sprint_speed;
+	vr.bullet_time and vr.bullet_time_scale (comfort_update) */
 	int vignette_mode;
 	float vignette_strength;
 	int sprint_mode;
 	float sprint_speed;
+	int bullet_time;
+	float bullet_time_scale;
 	/* vr.late_latch */
 	int late_latch;
 	float test_turn;
@@ -1139,6 +1147,11 @@ static void settings_read(void)
 	if (!(settings.sprint_speed >= 1.1f && settings.sprint_speed <= 2.0f))
 		settings.sprint_speed = settings.sprint_speed > 2.0f ? 2.0f :
 			settings.sprint_speed >= 1.0f && settings.sprint_speed < 1.1f ? 1.1f : 1.5f;
+	settings.bullet_time = config_boolean("vr.bullet_time");
+	settings.bullet_time_scale = (float)config_real("vr.bullet_time_scale");
+	if (!(settings.bullet_time_scale >= 0.2f && settings.bullet_time_scale <= 0.8f))
+		settings.bullet_time_scale = settings.bullet_time_scale > 0.8f ? 0.8f :
+			settings.bullet_time_scale > 0.0f && settings.bullet_time_scale < 0.2f ? 0.2f : 0.4f;
 	settings.late_latch = config_boolean("vr.late_latch");
 	settings.test_turn = (float)config_real("debug.vr_test_turn") * (float)M_PI / 180.0f;
 	settings.test_jitter = (float)config_real("debug.vr_test_jitter") * 0.001f;
@@ -3782,10 +3795,10 @@ static float comfort_stick(float x, float y)
 	return length > 1.0f ? 1.0f : length;
 }
 
-/* whether sprinting may be asked for now: the game plays in the headset
-with the controllers aiming, on foot (halo_vr_crouch_able), no menus up and
-the session focused; the game itself says where it quickens the player
-(port/linux/game/vr_comfort.c) */
+/* whether sprinting and bullet time may be asked for now: the game plays in
+the headset with the controllers aiming, on foot (halo_vr_crouch_able), no
+menus up and the session focused; the game itself says where it slows the
+world or quickens the player (port/linux/game/vr_comfort.c) */
 static int comfort_on_foot(void)
 {
 	return vr.initialized && vr.aimed && !settings.gamepad_aim && vr.crouch_able_frame && !vr.menus &&
@@ -3828,9 +3841,10 @@ static void arm_swing_update(float seconds)
 		vr.arm_swing = 0.0f;
 }
 
-/* once a frame, after the turn: sprint's toggle on the right stick pushed
-up (STICK_UP_* above; the right stick's up is no game control while the
-controllers aim, halo_vr_gamepad), the arms' run, and what the sticks ask of the
+/* once a frame, after the turn: sprint's toggle and bullet time's on the
+right stick pushed up (STICK_UP_* above: a flick toggles sprint, a hold
+bullet time; the right stick's up is no game control while the controllers
+aim, halo_vr_gamepad), the arms' run, and what the sticks ask of the
 comfort vignette (vr.vignette = "always", COMFORT_* above) */
 static void comfort_update(float seconds, float turn)
 {
@@ -3838,12 +3852,23 @@ static void comfort_update(float seconds, float turn)
 	float up = vr.input.right_stick[1], sideways = fabsf(vr.input.right_stick[0]);
 	float move = comfort_stick(vr.input.left_stick[0], vr.input.left_stick[1]);
 	float asked = 0.0f;
+	int was_up = vr.stick_up;
 
 	arm_swing_update(seconds);
 	vr.stick_up = able && sideways < STICK_UP_SIDEWAYS && up > (vr.stick_up ? STICK_UP_RELEASED : STICK_UP_PRESSED);
 	if (vr.stick_up)
 	{
-		if (!vr.stick_up_taken && settings.sprint_mode == SPRINT_TOGGLE)
+		vr.stick_up_seconds = was_up ? vr.stick_up_seconds + seconds : 0.0f;
+		/* (held: bullet time's; without it a push is sprint's at once) */
+		if (!vr.stick_up_taken && settings.bullet_time && vr.stick_up_seconds >= STICK_UP_HOLD_SECONDS)
+		{
+			vr.stick_up_taken = 1;
+			vr.bullet_time_on = !vr.bullet_time_on;
+			hand_haptic(0, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+			hand_haptic(1, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+			platform_log("vr: bullet time %s", vr.bullet_time_on ? "on" : "off");
+		}
+		if (!vr.stick_up_taken && !settings.bullet_time && settings.sprint_mode == SPRINT_TOGGLE)
 		{
 			vr.stick_up_taken = 1;
 			vr.sprint_on = !vr.sprint_on;
@@ -3853,8 +3878,18 @@ static void comfort_update(float seconds, float turn)
 	}
 	else
 	{
+		/* (a flick, let go before bullet time took it: sprint's) */
+		if (was_up && !vr.stick_up_taken && settings.sprint_mode == SPRINT_TOGGLE && able)
+		{
+			vr.sprint_on = !vr.sprint_on;
+			vr.sprint_stopped = 0.0f;
+			hand_haptic(0, 0.3f, 0.04f);
+		}
+		vr.stick_up_seconds = 0.0f;
 		vr.stick_up_taken = 0;
 	}
+	if (!settings.bullet_time)
+		vr.bullet_time_on = 0;
 	/* a toggled sprint ends as the player stops, crouches or leaves the
 	ground's play (a vehicle, a cinematic, the menus, death) */
 	if (vr.sprint_on)
@@ -3907,6 +3942,16 @@ float halo_vr_sprint_speed(void)
 int halo_vr_sprint_toggled(void)
 {
 	return vr.initialized && settings.sprint_mode == SPRINT_TOGGLE && vr.sprint_on;
+}
+
+float halo_vr_bullet_time(void)
+{
+	return vr.initialized && settings.bullet_time && vr.bullet_time_on ? settings.bullet_time_scale : 1.0f;
+}
+
+void halo_vr_bullet_time_off(void)
+{
+	vr.bullet_time_on = 0;
 }
 
 /* the comfort vignette, once a frame (VIGNETTE_* above): a vehicle's asks
@@ -4163,7 +4208,7 @@ static void input_update(void)
 	{
 		vr.recentre_time = 0.0f;
 	}
-	/* sprint and the sticks' vignette, then the vignette */
+	/* sprint, bullet time and the sticks' vignette, then the vignette */
 	comfort_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds, turn);
 	vignette_update(vr.views.display_elapsed > 0.0f ? vr.views.display_elapsed : seconds);
 }
