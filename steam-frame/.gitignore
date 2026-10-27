@@ -1,0 +1,3 @@
+# release output (steam-frame/release.sh writes here)
+release/*
+!release/.gitkeep
