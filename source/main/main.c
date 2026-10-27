@@ -702,6 +702,8 @@ double config_real(const char *name);
 #ifdef HALO_VR
 void vr_seat_test_update(void);
 void vr_death_test_update(void);
+/* port: the VR mode's sprint's HUD label (port/linux/game/vr_comfort.c) */
+void vr_comfort_frame(void);
 #endif
 #include "server_director.h" /* port: port/linux/game/server_director.c */
 
@@ -3783,6 +3785,9 @@ void main_loop(
 					}
 					profile_scope_exit(main_network_end_frame_section)
 
+#ifdef HALO_VR
+					vr_comfort_frame();
+#endif
 					profile_scope(main_game_time_update_section,
 						game_time_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);)
 

@@ -830,6 +830,15 @@ eased (0: none), with the eyes' fields of view (tangents: left, right, up,
 down) */
 void halo_vr_comfort_vignette(float amount);
 float halo_vr_vignette(float fov[2][4]);
+/* sprinting on foot (vr.sprint_mode, vr.c's comfort_update): how hard the
+player sprints now, 0 to 1 (the toggle's 0 or 1, the arms' run's effort; 0
+off foot, in the menus, or with the left stick pulled back or sideways), the
+speed a full sprint runs at (vr.sprint_speed, times the run's), and whether
+the toggle is on; the game says where it quickens the player
+(port/linux/game/vr_comfort.c: a game of this computer alone) */
+float halo_vr_sprint(void);
+float halo_vr_sprint_speed(void);
+int halo_vr_sprint_toggled(void);
 /* this frame's eyes' images multiplied by this colour as they are
 presented, all of each, before the helmet's rim; each call multiplies it
 further (vr_seat.c's blinks, vr_death.c's dimming: the game's screen flash

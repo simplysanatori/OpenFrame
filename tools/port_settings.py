@@ -158,8 +158,8 @@ VR_SCREENS = {
             ("HUD AND VISOR...", None, VR_VISOR,
              "The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy.",
              None),
-            ("COMFORT...", None, VR_COMFORT,
-             "The comfort vignette, in vehicles or always.", None),
+            ("COMFORT, SPRINT...", None, VR_COMFORT,
+             "The comfort vignette and sprinting.", None),
         ],
     },
 }
@@ -224,6 +224,12 @@ VR_SCREENS["vr_comfort"] = {
         ("VIGNETTE STRENGTH:", "vr.vignette_strength",
          [(f"{round(strength * 100)}%", f"{strength:g}") for strength in (0.25, 0.5, 0.75, 1, 1.25, 1.5)],
          "How much of the edges of your view the comfort\nvignette dims, and how dark.", None),
+        ("SPRINT:", "vr.sprint_mode", [("OFF", "off"), ("TOGGLE", "toggle"), ("ARM SWING", "arm_swing")],
+         "Offline: flick the right stick up to sprint, or\nswing your arms as you run.",
+         None),
+        ("SPRINT SPEED:", "vr.sprint_speed",
+         [(f"{speed:g}X", f"{speed:g}") for speed in (1.25, 1.5, 1.75, 2)],
+         "How much faster than the run a sprint is.", None),
     ],
 }
 SCREENS.update(VR_SCREENS)

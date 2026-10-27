@@ -612,6 +612,15 @@ static const struct config_setting config_settings[] =
 	{ "vr.vignette_strength", _config_real, "1.0", "HALO_VR_VIGNETTE_STRENGTH", _environment_value, _platform_desktop,
 		"How strong the comfort vignette is, 0.25 to 1.5: more dims more of\n"
 		"the edges, and darker." },
+	{ "vr.sprint_mode", _config_string, "\"off\"", "HALO_VR_SPRINT_MODE", _environment_value, _platform_desktop,
+		"Sprinting on foot, in a game of this computer alone (the campaign):\n"
+		"\"toggle\" a flick of the right stick up turns it on and off (it\n"
+		"ends as you stop or crouch); \"arm_swing\" swing both arms as you\n"
+		"run, and the harder you swing the faster you go (with the left stick\n"
+		"still, the swing moves you forward); \"off\" never. The view's field\n"
+		"is unchanged." },
+	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
+		"Sprinting, how many times the running speed, 1.1 to 2." },
 	{ "vr.death_view", _config_string, "\"crt\"", "HALO_VR_DEATH_VIEW", _environment_value, _platform_desktop,
 		"As you die: \"crt\" the helmet's view switches off as a CRT does and\n"
 		"cuts to a death cam, a feed from beside your body (the right stick\n"
