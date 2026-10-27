@@ -649,6 +649,17 @@ static const struct config_setting config_settings[] =
 		"starts and how long it may last (1: 15% faster, at most 1.1 seconds)." },
 	{ "vr.walljump_scale", _config_real, "1.5", "HALO_VR_WALLJUMP_SCALE", _environment_value, _platform_desktop,
 		"Parkour, a wall jump's strength, 0.5 to 1.5, times the jump's." },
+	{ "vr.fists", _config_boolean, "false", "HALO_VR_FISTS", _environment_value, _platform_desktop,
+		"Fists, in a game of this computer alone (the campaign; never online,\n"
+		"split screen or with bots): the hand without the weapon (and the\n"
+		"weapon's hand when it holds none) punches the enemies it hits as it\n"
+		"swings past vr.fist_speed, a hard punch staggering them; a hand swiped\n"
+		"across an enemy's blow just before it lands parries it." },
+	{ "vr.fist_speed", _config_real, "2.0", "HALO_VR_FIST_SPEED", _environment_value, _platform_desktop,
+		"Fists, how fast a hand must swing to punch, in metres a second, 1 to 4." },
+	{ "vr.fist_damage", _config_real, "0.33", "HALO_VR_FIST_DAMAGE", _environment_value, _platform_desktop,
+		"Fists, a punch's damage, 0.1 to 1, of the weapon's melee blow (less on\n"
+		"the harder difficulties)." },
 	{ "vr.death_view", _config_string, "\"crt\"", "HALO_VR_DEATH_VIEW", _environment_value, _platform_desktop,
 		"As you die: \"crt\" the helmet's view switches off as a CRT does and\n"
 		"cuts to a death cam, a feed from beside your body (the right stick\n"

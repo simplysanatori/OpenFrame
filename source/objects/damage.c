@@ -151,6 +151,10 @@ void network_damage_aftermath(long object_index, struct damage_data const *damag
 	real shield_damage, real body_damage, real body_damage_multiplier, short body_part, short node_index,
 	short region_index, short material_index, long victim_player_index);
 boolean network_damage_static_target(long object_index);
+#ifdef HALO_VR
+/* port: the VR mode's fists' parry (vr.fists, port/linux/game/vr_fists.c) */
+boolean vr_fists_parry(long victim_index, long attacker_index);
+#endif
 
 /* set while a distributed client carries out a kill it does not decide (an
 act of god: the host's word, network_distributed.c, or the world's) */
@@ -1471,6 +1475,16 @@ void object_cause_damage(
 
 	damage_effect = damage_effect_definition_get(damage->definition_index);
 	damage_definition = &damage_effect->damage;
+#ifdef HALO_VR
+	/* port: an enemy's melee blow on the first local player parried by a
+	hand swiped across it (vr.fists, a game of this computer alone;
+	port/linux/game/vr_fists.c): none of it dealt */
+	if (damage_definition->category == _damage_category_melee &&
+		vr_fists_parry(object_index, damage->owner_object_index))
+	{
+		return;
+	}
+#endif
 	damage_was_modified = FALSE;
 	parent_takes_body_damage = TRUE;
 

@@ -2,7 +2,8 @@
 
 Features OpenFrame (the Steam Frame fork of OpenH1) adds to OpenH1's VR mode,
 where each came from, and how to turn it on. Each is set in `config.toml`
-(the `vr.*` keys below) or in VR Setup > VR Display > COMFORT, SPRINT...
+(the `vr.*` keys below) or in VR Setup > VR Display > COMFORT, SPRINT... and
+HANDS, FISTS...
 Every one is off, or as OpenH1 had it, until you choose it.
 
 **Untested in the headset** marks a feature built and compiled but not yet
@@ -16,6 +17,50 @@ AGPL-3.0-or-later, as OpenH1 is), re-implemented on OpenH1's VR layer
 (`port/linux/src/vr.c`, `port/linux/game/vr_comfort.c`): the two VR layers
 share almost no code, so mostly the ideas and the tuning were carried over;
 the few functions whose lines came across say so at their top.
+
+### Fists: punch and parry (untested in the headset)
+
+`port/linux/game/vr_fists.c`, once a tick (`source/game/game.c`, a marked
+port change), the hands from `port/linux/src/vr.c`.
+
+- Punch: swing the hand without the weapon (or the weapon's hand while you
+  hold no weapon) past `vr.fist_speed` into an enemy. The fist's path over
+  the tick, carried on a little, must pass within reach of the enemy's body
+  (its pelvis to its head, as the game's aim assist has it, plus 16 cm), in
+  sight. The hand's own speed counts (the room's: walking, turning or a
+  turn of the body is no punch). One blow a swing: the game's melee damage
+  of the weapon in hand (an empty hand's, the game's unarmed blow), half to
+  one and a half times as strong as the swing is fast, times
+  `vr.fist_damage`, and less on the harder difficulties (moistman42069's
+  0.8, 1, 1.3, 1.6 by difficulty); the enemy is shoved along the punch by
+  its mobility. With `vr.fists` and no weapon in hand, the weapon hand's
+  swing is a fist's, not `vr.melee_gesture`'s B.
+- Hard punch: a blow of 1.2 or more (a swing near twice `vr.fist_speed`)
+  staggers the enemy for a second: lifted off its feet a moment (the game's
+  airborne stumble), slowed (the game's own stun), and unable to begin a
+  melee attack (`source/units/units.c`, a marked port change). Never a
+  Hunter, nor an Elite whose shields hold.
+- Parry: swipe a hand across an enemy's blow (at least 1.8 m/s, half of it
+  across the line from your eyes to the enemy), the hand 10 to 60 cm before
+  your eyes toward it, in the ticks before the blow lands (eight on Easy to
+  four on Legendary). None of the blow is dealt
+  (`source/objects/damage.c`, a marked port change), the enemy is staggered
+  a second, the HUD says "Parry". The weapon's hand parries too; the other
+  not while on the foregrip.
+- Keys: `vr.fists` (default `false`), `vr.fist_speed` (metres a second, 1
+  to 4, default `2.0`, moistman42069's MELEE SPEED), `vr.fist_damage` (of
+  the weapon's melee blow, 0.1 to 1, default `0.33`: moistman42069's ENEMY
+  HEALTH of 3).
+- Input: gestures only (a swing, a swipe); nothing bound. A hand's punch
+  and a parry pulse it.
+- Where: the first player, on foot, alive, the controllers aiming, in a game
+  of this computer alone (never online, split screen or with bots); enemies
+  only (no allies).
+- Not carried over: moistman42069's lunges, combos, counters and their
+  warnings, takedowns, blocks, combat moves, hit highlights, knockdowns
+  (ragdolls on Jolt) and body contact on the bones: the body here is the
+  aim assist's pill, and a strong hit's stagger the game's own stun and
+  stumble.
 
 ### Third person on foot (untested in the headset)
 

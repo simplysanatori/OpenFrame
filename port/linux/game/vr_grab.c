@@ -483,6 +483,19 @@ static void vr_grab_test(long player_index, boolean aiming)
 	}
 }
 
+/* (OpenFrame) vr_fists.c's hands' tick: what the hand without the weapon's
+grip would take (nothing yet), and a tick of the hands */
+void vr_grab_hands_claims(int claim[2])
+{
+	claim[0] = claim[1] = 0;
+}
+
+void vr_grab_hands_tick(struct halo_vr_hands const *hands, long unit_index)
+{
+	(void)hands;
+	(void)unit_index;
+}
+
 /* players.c, as the game offers a player something to do with the action
 button (player_set_action_result), and would offer it (set_action): the
 weapons offered to the first local player kept, and among them the one its

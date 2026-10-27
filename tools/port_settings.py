@@ -68,6 +68,8 @@ VR_DISPLAY = f"{PE}/vr_display/vr_display_screen"
 VR_VISOR = f"{PE}/vr_visor/vr_visor_screen"
 # (OpenFrame: comfort and movement, docs/openframe-features.md)
 VR_COMFORT = f"{PE}/vr_comfort/vr_comfort_screen"
+# (OpenFrame: the hands' fists, docs/openframe-features.md)
+VR_HANDS_EXTRA = f"{PE}/vr_hands_extra/vr_hands_extra_screen"
 VR_SCREENS = {
     "vr_controls": {
         "screen": "vr_controls_screen",
@@ -119,8 +121,8 @@ VR_SCREENS = {
     "vr_display": {
         "screen": "vr_display_screen",
         "header": ("header_vr_display", f"{PE}/vr_display/header_vr_display"),
-        # (thirteen rows: closer than the others' 28px, the help line lower)
-        "spacing": 22,
+        # (fourteen rows: closer than the others' 28px, the help line lower)
+        "spacing": 20,
         "help_top": 366,
         "rows": [
             ("DOMINANT HAND:", "vr.dominant_hand", [("RIGHT", "right"), ("LEFT", "left")],
@@ -160,6 +162,9 @@ VR_SCREENS = {
              None),
             ("COMFORT, SPRINT...", None, VR_COMFORT,
              "The comfort vignette, sprinting, bullet time,\nthe third person and parkour.", None),
+            ("HANDS, FISTS...", None, VR_HANDS_EXTRA,
+             "Punching your enemies and parrying their blows\nwith your hands.",
+             None),
         ],
     },
 }
@@ -250,6 +255,26 @@ VR_SCREENS["vr_comfort"] = {
         ("WALL JUMP:", "vr.walljump_scale",
          [(f"{scale:g}X", f"{scale:g}") for scale in (0.5, 0.75, 1, 1.25, 1.5)],
          "How strong a jump off a wall is.", None),
+    ],
+}
+# (OpenFrame) the hands, a page of VR Display's (titled as VR Controls is),
+# every value of it read again as it changes (vr.c, settings_read; vr_fists.c,
+# vr_grab.c). Ported from HaloCE-DecompRemix-VR by moistman42069
+# (AGPL-3.0-or-later): docs/openframe-features.md
+VR_SCREENS["vr_hands_extra"] = {
+    "screen": "vr_hands_extra_screen",
+    "header": ("header_vr_controls", f"{PE}/vr_controls/header_vr_controls"),
+    "spacing": 28,
+    "help_top": 366,
+    "rows": [
+        ("FISTS:", "vr.fists", ON_OFF,
+         "Offline: punch with your free hand, or with an\nempty one; swipe across a blow to parry it.", None),
+        ("PUNCH SPEED:", "vr.fist_speed",
+         [(f"{speed:g} M/S", f"{speed:g}") for speed in (1.5, 2, 2.5, 3, 3.5, 4)],
+         "How fast a hand must swing to punch.", None),
+        ("PUNCH DAMAGE:", "vr.fist_damage",
+         [(f"{round(damage * 100)}%", f"{damage:g}") for damage in (0.15, 0.25, 0.33, 0.5, 0.75, 1)],
+         "A punch's damage, of the weapon's melee blow.", None),
     ],
 }
 SCREENS.update(VR_SCREENS)
