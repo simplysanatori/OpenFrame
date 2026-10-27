@@ -427,8 +427,8 @@ static const struct config_setting config_settings[] =
 		"The hand that holds the weapon: \"right\", or \"left\" (the weapon and the\n"
 		"hands drawn mirrored; the left trigger fires, the right hand holds the\n"
 		"foregrip and throws, the holsters on your left, the magazines at your\n"
-		"right hip). Not with vr.aim = \"gamepad\". VR Setup > HAND, HEIGHT,\n"
-		"HUD... > DOMINANT HAND; vr.hand_swap's gesture sets it too." },
+		"right hip). Not with vr.aim = \"gamepad\". VR Setup > PLAYER... >\n"
+		"DOMINANT HAND; vr.hand_swap's gesture sets it too." },
 	{ "vr.swap_sticks", _config_string, "\"auto\"", "HALO_VR_SWAP_STICKS", _environment_value, _platform_desktop,
 		"\"yes\": the right stick moves and the left turns (and zooms, its click;\n"
 		"pushed down, ejects the magazine), \"no\": as they are; \"auto\": swapped\n"
