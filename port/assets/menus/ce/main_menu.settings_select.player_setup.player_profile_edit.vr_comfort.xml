@@ -157,11 +157,11 @@
 		<string text=""/>
 		<string text="The edges of your view dim as the view moves:\nin vehicles, or as the sticks move and turn you too."/>
 		<string text="How much of the edges of your view the comfort\nvignette dims, and how dark."/>
-		<string text="Offline: flick the right stick up to sprint, or\nswing your arms as you run."/>
+		<string text="Offline: flick the turning stick up to sprint, or\nswing your arms as you run."/>
 		<string text="How much faster than the run a sprint is."/>
-		<string text="Offline: hold the right stick up to slow the world\n(hold it again to end it)."/>
+		<string text="Offline: hold the turning stick up to slow the\nworld (hold it again to end it)."/>
 		<string text="How fast the world runs in bullet time."/>
-		<string text="On foot, the view from behind you (not in\nmultiplayer); hold the right stick down to switch."/>
+		<string text="On foot, the view from behind (not multiplayer);\nhold the turning stick down to switch."/>
 		<string text="How far behind your head the third person's view\nis (walls bring it nearer)."/>
 		<string text="Offline: crouch as you sprint to slide, jump off\nwalls and run along them."/>
 		<string text="How fast a slide starts and how long it lasts."/>

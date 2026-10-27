@@ -577,8 +577,9 @@ nothing). On foot, the eye pass is drawn from behind and above the head:
 the head's own place and turn as ever (it leans and looks about from
 there), moved back along the body's heading (vr.c's: the head's, followed
 past a turn and slowly) by vr.third_person_distance, up THIRD_PERSON_UP and
-right THIRD_PERSON_RIGHT, brought in by what is between (pulled in at
-once, let out at THIRD_PERSON_EASE_OUT). Only the view moves: the hands,
+THIRD_PERSON_RIGHT to the weapon hand's side (the right; the left,
+left-handed), brought in by what is between (pulled in at once, let out at
+THIRD_PERSON_EASE_OUT). Only the view moves: the hands,
 the aim (the controller's, from the hand where the body is), the reticle
 and the listener stay the body's, and the body is drawn as the game
 animates it, its weapon in its hands (render_objects.c), the first-person
@@ -586,8 +587,8 @@ weapon and hands not (first_person_weapons.c). Never in a multiplayer
 game (seeing round corners), a vehicle's seat, a cinematic, zoomed, dead or
 climbing a vehicle; the turning stick held down switches it (vr.c). */
 
-/* metres: above the head, to its right, nearest the head, kept off a wall;
-the speed it is let out at (metres a second) */
+/* metres: above the head, to its side (the weapon hand's), nearest the
+head, kept off a wall; the speed it is let out at (metres a second) */
 #define THIRD_PERSON_UP 0.3f
 #define THIRD_PERSON_RIGHT 0.25f
 #define THIRD_PERSON_NEAREST 0.3f
@@ -663,6 +664,8 @@ static void third_person_eye(long unit_index, real_point3d *eye)
 	real units = view->world_units_per_metre;
 	real yaw = vr_render.base_yaw + body_heading();
 	real c = (real)cos(yaw), s = (real)sin(yaw);
+	/* (over the weapon hand's shoulder: the left, left-handed) */
+	real side = halo_vr_left_handed() ? -THIRD_PERSON_RIGHT : THIRD_PERSON_RIGHT;
 	real reach, length;
 	real_vector3d vector;
 	struct collision_result collision;
@@ -675,8 +678,8 @@ static void third_person_eye(long unit_index, real_point3d *eye)
 			third_person.setting = third_person.setting > 4.0f ? 4.0f : third_person.setting > 0.0f ? 1.0f : 1.7f;
 	}
 	/* (back along the heading, right of it, up) */
-	vector.i = (-c * third_person.setting + s * THIRD_PERSON_RIGHT) * units;
-	vector.j = (-s * third_person.setting - c * THIRD_PERSON_RIGHT) * units;
+	vector.i = (-c * third_person.setting + s * side) * units;
+	vector.j = (-s * third_person.setting - c * side) * units;
 	vector.k = THIRD_PERSON_UP * units;
 	length = (real)sqrt(third_person.setting * third_person.setting + THIRD_PERSON_RIGHT * THIRD_PERSON_RIGHT +
 		THIRD_PERSON_UP * THIRD_PERSON_UP);

@@ -715,7 +715,8 @@ static struct
 	axes); the grip (closed, and taken by what the game claimed), the claims
 	told and when (hands_clock), the player unarmed and the game this
 	computer's alone, as told; the weapon passed to the other hand
-	(vr.hand_swap), and the grips held off after it */
+	(vr.hand_swap: each pass turns hands_swapped over, which the game's
+	tick says on the HUD), and the grips held off after it */
 	unsigned int hands_sample;
 	double hands_clock;
 	float hands_place[HANDS_SAMPLES][2][3];
@@ -1182,13 +1183,9 @@ static void settings_read(void)
 	settings.left_handed = !settings.gamepad_aim && !strcmp(config_string("vr.dominant_hand"), "left");
 	settings.swap_sticks = !settings.gamepad_aim && (!strcmp(config_string("vr.swap_sticks"), "yes") ||
 		(settings.left_handed && strcmp(config_string("vr.swap_sticks"), "no") != 0));
-	/* (OpenFrame: the weapon passed to the other hand, vr.hand_swap; the
-	sticks stay as the dominant hand set them) */
+	/* (OpenFrame: the weapon passed to the other hand, vr.hand_swap, is
+	vr.dominant_hand written: hands_swap_save) */
 	settings.hand_swap = config_boolean("vr.hand_swap");
-	if (!settings.hand_swap || settings.gamepad_aim)
-		vr.hands_swapped = 0;
-	if (vr.hands_swapped)
-		settings.left_handed = !settings.left_handed;
 	settings.gamepad_snap = !strcmp(config_string("vr.gamepad_view"), "snap");
 	settings.gamepad_pitch = !settings.gamepad_snap && strcmp(config_string("vr.gamepad_view"), "level") != 0;
 	settings.melee_gesture = config_boolean("vr.melee_gesture");
@@ -1606,6 +1603,22 @@ static void hands_assign_input(void)
 		if ((input->buttons & clicks) == VR_BUTTON_LEFT_STICK || (input->buttons & clicks) == VR_BUTTON_RIGHT_STICK)
 			input->buttons ^= clicks;
 	}
+}
+
+/* (OpenFrame) the weapon passed to the other hand (vr.hand_swap) makes
+that hand the dominant one: vr.dominant_hand is written as VR Setup's
+DOMINANT HAND writes it (for now and in config.toml), so that the menu, the
+setting and the hands never disagree, and choosing the hand in the menu
+afterwards is simply that. The sticks stay as they are: vr.swap_sticks
+"auto" (as the hand) is first written as what it now does ("yes" or "no"),
+so that the hand changing does not move them. Its caller has already
+turned settings.left_handed over (this frame's hands) */
+static void hands_swap_save(void)
+{
+	if (!strcmp(config_string("vr.swap_sticks"), "auto"))
+		config_write("vr.swap_sticks", settings.swap_sticks ? "yes" : "no");
+	if (!config_write("vr.dominant_hand", settings.left_handed ? "left" : "right"))
+		platform_log("vr: hands: vr.dominant_hand could not be saved in config.toml (for now only)");
 }
 
 /* the controller of a hand as this file names them (0 the left, 1 the
@@ -4390,6 +4403,7 @@ static void hands_update(float seconds)
 			{
 				vr.hands_swapped = !vr.hands_swapped;
 				settings.left_handed = !settings.left_handed;
+				hands_swap_save();
 				vr.hands_swap_latch = 1;
 				vr.hands_grip_down[0] = vr.hands_grip_down[1] = 0;
 				vr.hands_taken[0] = vr.hands_taken[1] = 0;
@@ -6261,7 +6275,8 @@ int halo_vr_button_name(int button, char *name, unsigned long size)
 	"gesture", halo_vr_gamepad) */
 	if (button == 6 && settings.throw_gesture_only && settings.controller_aim && vr.crouch_able_frame)
 	{
-		snprintf(name, size, "%s", "Left Hand Throw");
+		/* (the hand without the weapon: the right, left-handed) */
+		snprintf(name, size, "%s", settings.left_handed ? "Right Hand Throw" : "Left Hand Throw");
 		return 1;
 	}
 	if (!named || now - named_at >= PROMPT_NAMES_MS)

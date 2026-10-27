@@ -427,7 +427,8 @@ static const struct config_setting config_settings[] =
 		"The hand that holds the weapon: \"right\", or \"left\" (the weapon and the\n"
 		"hands drawn mirrored; the left trigger fires, the right hand holds the\n"
 		"foregrip and throws, the holsters on your left, the magazines at your\n"
-		"right hip). Not with vr.aim = \"gamepad\"." },
+		"right hip). Not with vr.aim = \"gamepad\". VR Setup > HAND, HEIGHT,\n"
+		"HUD... > DOMINANT HAND; vr.hand_swap's gesture sets it too." },
 	{ "vr.swap_sticks", _config_string, "\"auto\"", "HALO_VR_SWAP_STICKS", _environment_value, _platform_desktop,
 		"\"yes\": the right stick moves and the left turns (and zooms, its click;\n"
 		"pushed down, ejects the magazine), \"no\": as they are; \"auto\": swapped\n"
@@ -606,35 +607,38 @@ static const struct config_setting config_settings[] =
 	{ "vr.vignette", _config_string, "\"vehicle\"", "HALO_VR_VIGNETTE", _environment_value, _platform_desktop,
 		"The comfort vignette, the edges of your view dimmed while the view\n"
 		"moves without you: \"vehicle\" in a vehicle (its turns, its speeding\n"
-		"up and slowing), \"always\" also as the left stick moves you on foot\n"
-		"and the right stick turns you (smoothly, or a moment at a snap turn),\n"
-		"\"off\" never." },
+		"up and slowing), \"always\" also as the moving stick moves you on foot\n"
+		"and the turning stick turns you (smoothly, or a moment at a snap\n"
+		"turn), \"off\" never (the left stick moves and the right turns,\n"
+		"swapped with vr.swap_sticks)." },
 	{ "vr.vignette_strength", _config_real, "1.0", "HALO_VR_VIGNETTE_STRENGTH", _environment_value, _platform_desktop,
 		"How strong the comfort vignette is, 0.25 to 1.5: more dims more of\n"
 		"the edges, and darker." },
 	{ "vr.sprint_mode", _config_string, "\"off\"", "HALO_VR_SPRINT_MODE", _environment_value, _platform_desktop,
 		"Sprinting on foot, in a game of this computer alone (the campaign):\n"
-		"\"toggle\" a flick of the right stick up turns it on and off (it\n"
-		"ends as you stop or crouch); \"arm_swing\" swing both arms as you\n"
-		"run, and the harder you swing the faster you go (with the left stick\n"
-		"still, the swing moves you forward); \"off\" never. The view's field\n"
-		"is unchanged." },
+		"\"toggle\" a flick of the turning stick up (the right, or the left\n"
+		"with vr.swap_sticks) turns it on and off (it ends as you stop or\n"
+		"crouch); \"arm_swing\" swing both arms as you run, and the harder you\n"
+		"swing the faster you go (with the moving stick still, the swing moves\n"
+		"you forward); \"off\" never. The view's field is unchanged." },
 	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
 		"Sprinting, how many times the running speed, 1.1 to 2." },
 	{ "vr.bullet_time", _config_boolean, "false", "HALO_VR_BULLET_TIME", _environment_value, _platform_desktop,
-		"Bullet time: holding the right stick up (half a second) slows the\n"
-		"world and turns it off again, in a game of this computer alone (the\n"
-		"campaign; never online, split screen or with bots). Your head and\n"
-		"hands stay at full speed; the sounds keep their pitch." },
+		"Bullet time: holding the turning stick up (half a second; the right,\n"
+		"or the left with vr.swap_sticks) slows the world and turns it off\n"
+		"again, in a game of this computer alone (the campaign; never online,\n"
+		"split screen or with bots). Your head and hands stay at full speed;\n"
+		"the sounds keep their pitch." },
 	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
 		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
 	{ "vr.third_person", _config_boolean, "false", "HALO_VR_THIRD_PERSON", _environment_value, _platform_desktop,
 		"On foot, the view from behind and above your body (the campaign and\n"
 		"other games without a multiplayer engine): your body drawn as others\n"
 		"see it, the weapon aimed by the controller as ever, the HUD as ever.\n"
-		"Holding the right stick down (three quarters of a second) switches\n"
-		"between it and the first person. A vehicle's seat, a scope, death and\n"
-		"the cinematics keep their own views." },
+		"Holding the turning stick down (three quarters of a second; the right,\n"
+		"or the left with vr.swap_sticks) switches between it and the first\n"
+		"person; the view is over the weapon hand's shoulder. A vehicle's\n"
+		"seat, a scope, death and the cinematics keep their own views." },
 	{ "vr.third_person_distance", _config_real, "1.7", "HALO_VR_THIRD_PERSON_DISTANCE", _environment_value, _platform_desktop,
 		"How far behind your head the third person's view is, in metres, 1 to\n"
 		"4 (walls bring it nearer)." },
@@ -670,8 +674,10 @@ static const struct config_setting config_settings[] =
 		"1 to 5." },
 	{ "vr.hand_swap", _config_boolean, "false", "HALO_VR_HAND_SWAP", _environment_value, _platform_desktop,
 		"Hand swap, in a game of this computer alone: palms together, the other\n"
-		"hand's grip takes the weapon (the weapon's grip open). The sticks stay\n"
-		"as they were." },
+		"hand's grip takes the weapon (the weapon's grip open), and that hand\n"
+		"is vr.dominant_hand from then on (written here, as VR Setup writes it).\n"
+		"The sticks stay as they were (vr.swap_sticks \"auto\" is first written\n"
+		"as what it then does)." },
 	{ "vr.prop_throw", _config_boolean, "false", "HALO_VR_PROP_THROW", _environment_value, _platform_desktop,
 		"Prop throw, in a game of this computer alone: the hand without the\n"
 		"weapon holds a loose weapon or piece of equipment it grips at, and\n"

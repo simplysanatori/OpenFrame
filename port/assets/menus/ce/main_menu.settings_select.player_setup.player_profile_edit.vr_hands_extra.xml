@@ -127,7 +127,7 @@
 		<string text="A punch's damage, of the weapon's melee blow."/>
 		<string text="Offline: point your free hand at a weapon, grip,\nand flick the hand back: it flies to you."/>
 		<string text="How far away a weapon can be pulled."/>
-		<string text="Offline: palms together, the free hand's grip\ntakes the weapon into that hand."/>
+		<string text="Offline: palms together, the free hand's grip\ntakes the weapon (and sets DOMINANT HAND)."/>
 		<string text="Offline: your free hand grips a loose weapon or\nitem to hold it, and lets go to throw it."/>
 		<string text="How hard a thing let go of flies, times your\nhand's speed."/>
 	</strings>
