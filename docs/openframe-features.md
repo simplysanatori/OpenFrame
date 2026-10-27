@@ -291,6 +291,37 @@ glass, glow and reaction to the world (`port/linux/vulkan/host_vulkan_vr.c`).
   head, world, follow). A lag for the HUD following the head needs nothing
   new: OpenH1 has `vr.hud_lag`.
 
+## Recentring and Pillar of Autumn's tutorial (after the first headset trial)
+
+These fix what the first trial found (the player's eye outside the cryo
+tube, the tutorial not going on as the head looked about, the menu off to
+the side). Unlike the features above, `vr.auto_recentre` is on by default.
+
+- SteamVR's own recentre (its dashboard's, or the system button's) moves
+  the play space; the game now recentres with it (the runtime's
+  `XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING`). Before, the game
+  kept its recentred origin from before, so the eye was as far from the
+  player's as the head had been from where it was then, and the menus were
+  as far round.
+- `vr.auto_recentre` (default `true`): the game recentres as play comes
+  back after a load, a cinematic or the scripts holding the facing (half a
+  second or more), and places each menu in front of where you look as it
+  opens. `false`: only both grips held (or a gamepad's Back), SteamVR's
+  recentre and the headset going on recentre, and the menus are where the
+  last recentre put them, as OpenH1 had it.
+- `vr.held_lean` (default `0.15` metres): while the scripts hold the
+  player still (the cryo tube), the head moves the view at most this far
+  across the floor from the player's eye. `10` lets it go as far as the
+  head does.
+- The scripts' gaze tests (`unit_can_see_object`, `objects_can_see_flag`:
+  the tutorial's lights) pass when the head looks at the thing, as well as
+  when the player's facing (the controller, with `vr.aim = "controller"`)
+  does; and the look tests (`player_action_test_look_relative_*`: look up,
+  down, left, right) count the head's turn and the VR aim's, about 5
+  degrees each time, as well as the stick's. HaloCE-DecompRemix-VR does the
+  same with its head (`vr_head_look_actions`, `vr_script_can_see_point`);
+  this is written for OpenH1's VR mode, not ported.
+
 ## Left-handed
 
 Set VR Setup > HAND, HEIGHT, HUD... > DOMINANT HAND to LEFT

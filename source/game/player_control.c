@@ -894,6 +894,25 @@ static void handle_one_player_input(
 			{
 				halo_vr_aim_release();
 			}
+			/* (OpenFrame) the scripts' look tests (Pillar of Autumn's
+			tutorial) count the head's turn and the VR aim's, not the stick's
+			alone (port/linux/game/vr_render.c) */
+			if (local_player_index == 0)
+			{
+				extern unsigned long vr_render_look_actions(long unit_index, boolean facing_valid, real facing_yaw,
+					real facing_pitch);
+				unsigned long look = vr_render_look_actions(player->unit_index, vr_aim == 1,
+					player->desired_angles.yaw, player->desired_angles.pitch);
+
+				if (look & 1)
+					player_control_globals->action_flags |= FLAG(_player_control_look_relative_up_bit);
+				if (look & 2)
+					player_control_globals->action_flags |= FLAG(_player_control_look_relative_down_bit);
+				if (look & 4)
+					player_control_globals->action_flags |= FLAG(_player_control_look_relative_left_bit);
+				if (look & 8)
+					player_control_globals->action_flags |= FLAG(_player_control_look_relative_right_bit);
+			}
 		}
 #endif
 

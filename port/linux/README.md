@@ -4362,6 +4362,8 @@ headset's session is opened with, apply from the next start.
 | `vr.smooth_turn_speed` | `150.0` | `HALO_VR_SMOOTH_TURN_SPEED` | Degrees each second of smooth turning. |
 | `vr.height` | `"seated"` | `HALO_VR_HEIGHT` | `"seated"`: the head where it is at the recentring is the player's eye. `"standing"`: the head `vr.player_height` above the floor is. |
 | `vr.player_height` | `1.65` | `HALO_VR_PLAYER_HEIGHT` | Standing, the height of your eyes, in metres. |
+| `vr.auto_recentre` | `true` | `HALO_VR_AUTO_RECENTRE` | (OpenFrame) Recentre as play starts after a load or a cinematic, and open each menu in front of where you look. `false`: only both grips (or a gamepad's Back) and SteamVR's own recentre do. |
+| `vr.held_lean` | `0.15` | `HALO_VR_HELD_LEAN` | (OpenFrame) While the scripts hold the player still (Pillar of Autumn's cryo tube), how far across the floor the head may move the view from the player's eye, in metres. |
 | `vr.world_scale` | `1.0` | `HALO_VR_WORLD_SCALE` | More than `1` makes the world look larger. |
 | `vr.hud` | `"visor"` | `HALO_VR_HUD` | `"visor"`: the HUD on the helmet's visor (below, "The HUD on the visor"). `"flat"`: a flat screen in front of the eyes. |
 | `vr.hud_distance`, `vr.hud_size` | `2.0`, `60.0` | `HALO_VR_HUD_DISTANCE`, `HALO_VR_HUD_SIZE` | The HUD's distance in front of the eyes (metres) and width (degrees of the view). On the visor, the radius of its curve and the angle that it spans. |

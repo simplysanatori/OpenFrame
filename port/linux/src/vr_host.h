@@ -125,6 +125,9 @@ struct vr_host_views
 	where the eyes look; OpenXR's view space), valid while they are
 	tracked */
 	struct vr_host_pose gaze;
+	/* (OpenFrame) the runtime recentred the play space (SteamVR's own
+	recentre) as of this frame: the game recentres too (vr.c) */
+	int space_changed;
 };
 
 /* The late latch (vr.late_latch): the poses a frame's eyes are drawn from,

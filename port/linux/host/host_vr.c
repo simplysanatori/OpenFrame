@@ -128,6 +128,14 @@ static struct
 	XrFrameState frame;
 	XrTime last_display_time;
 	XrSpace play_space;
+	/* (OpenFrame) the play space's type, and the runtime's recentring of
+	it (XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING: SteamVR's own
+	recentre, its dashboard's or the system button's): pending until the
+	frame displayed at its change time, which the guest is told of
+	(vr_host_views' space_changed) */
+	XrReferenceSpaceType play_type;
+	int space_change_pending;
+	XrTime space_change_time;
 	XrSpace view_space;
 	XrSwapchain swapchains[VR_SWAPCHAIN_COUNT];
 	int swapchain_width[VR_SWAPCHAIN_COUNT];
@@ -1002,6 +1010,7 @@ static int initialize(struct vr_host_info *info)
 		if (!check(xrCreateReferenceSpace(vr.session, &space, &vr.play_space), "xrCreateReferenceSpace (play)"))
 			return 0;
 	}
+	vr.play_type = space.referenceSpaceType;
 	if (!actions_create())
 		return 0;
 	info->eye_gaze = vr.want_eye_gaze && vr.has_eye_gaze;
@@ -1211,6 +1220,21 @@ static void events_poll(void)
 				host_exit(0);
 			}
 		}
+		else if (event.type == XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING)
+		{
+			/* (OpenFrame) the runtime moves the play space (its recentre):
+			the game recentres on it too, once it has (host_vr_frame_wait) */
+			const XrEventDataReferenceSpaceChangePending *pending =
+				(const XrEventDataReferenceSpaceChangePending *)&event;
+
+			if (pending->referenceSpaceType == vr.play_type)
+			{
+				vr.space_change_pending = 1;
+				vr.space_change_time = pending->changeTime;
+				host_logf(HOST_LOG_INFO, "vr: the runtime recentres the %s space",
+					vr.play_type == XR_REFERENCE_SPACE_TYPE_STAGE ? "stage" : "local");
+			}
+		}
 		else if (event.type == XR_TYPE_EVENT_DATA_INTERACTION_PROFILE_CHANGED)
 		{
 			int hand;
@@ -1286,6 +1310,10 @@ int host_vr_frame_wait(struct vr_host_views *views)
 	}
 	views->should_render = vr.frame.shouldRender ? 1 : 0;
 	views->focused = vr.state == XR_SESSION_STATE_FOCUSED;
+	/* (OpenFrame: the runtime's recentre in effect from this frame) */
+	views->space_changed = vr.space_change_pending && vr.frame.predictedDisplayTime >= vr.space_change_time;
+	if (views->space_changed)
+		vr.space_change_pending = 0;
 	views->display_period = (float)(vr.frame.predictedDisplayPeriod * 1e-9);
 	views->display_elapsed = vr.last_display_time ?
 		(float)((vr.frame.predictedDisplayTime - vr.last_display_time) * 1e-9) : 0.0f;

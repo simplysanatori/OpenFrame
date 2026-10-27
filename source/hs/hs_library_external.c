@@ -278,6 +278,16 @@ boolean hs_unit_can_see_object(
 			unit_index,
 			&target_point,
 			DEGREES_TO_RADIANS(degrees));
+#ifdef HALO_VR
+		/* port (OpenFrame): the VR player's head looking at it passes too
+		(port/linux/game/vr_render.c) */
+		if (!result)
+		{
+			extern boolean vr_render_head_sees(long unit_index, real_point3d const *point, real field_of_view);
+
+			result = vr_render_head_sees(unit_index, &target_point, DEGREES_TO_RADIANS(degrees));
+		}
+#endif
 	}
 
 	return result;
@@ -356,6 +366,20 @@ boolean hs_unit_can_see_flag(
 				cutscene_flag_index,
 				struct scenario_cutscene_flag)->position,
 			DEGREES_TO_RADIANS(degrees));
+#ifdef HALO_VR
+		/* port (OpenFrame): the VR player's head looking at it passes too */
+		if (!result)
+		{
+			extern boolean vr_render_head_sees(long unit_index, real_point3d const *point, real field_of_view);
+
+			result = vr_render_head_sees(unit_index,
+				&TAG_BLOCK_GET_ELEMENT(
+					&global_scenario_get()->cutscene_flags,
+					cutscene_flag_index,
+					struct scenario_cutscene_flag)->position,
+				DEGREES_TO_RADIANS(degrees));
+		}
+#endif
 	}
 
 	return result;

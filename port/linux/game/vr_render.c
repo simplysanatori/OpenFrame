@@ -940,7 +940,24 @@ boolean vr_render_camera(struct render_camera *camera, struct render_camera *ras
 	vr_render.listener_valid = TRUE;
 	view_rotate(base_yaw, pitch, view->head_forward, &camera->forward);
 	view_rotate(base_yaw, pitch, view->head_up, &camera->up);
-	view_rotate(base_yaw, pitch, view->head_position, &offset);
+	{
+		/* (OpenFrame, vr.held_lean) while the scripts hold the player still
+		(Pillar of Autumn's cryo tube), the head moves the eye only so far
+		across the floor from the player's: a head away from where it was
+		recentred would see the player from outside */
+		float head[3];
+		real lean = (real)config_real("vr.held_lean");
+		real across;
+
+		memcpy(head, view->head_position, sizeof(head));
+		across = (real)sqrt(head[0] * head[0] + head[1] * head[1]);
+		if (lean >= 0.0f && across > lean && !player_input_enabled() && !cinematic_in_progress())
+		{
+			head[0] *= lean / across;
+			head[1] *= lean / across;
+		}
+		view_rotate(base_yaw, pitch, head, &offset);
+	}
 	camera->position.x += offset.i * view->world_units_per_metre;
 	camera->position.y += offset.j * view->world_units_per_metre;
 	camera->position.z += offset.k * view->world_units_per_metre;
@@ -1831,6 +1848,102 @@ boolean vr_render_head_forward(real_vector3d *forward)
 		return FALSE;
 	view_rotate(vr_render.base_yaw, view_pitch(), vr_render.view.head_forward, forward);
 	return normalize3d(forward) > 0.0f;
+}
+
+/* (OpenFrame) the scripts' tests of a unit's gaze (hs_library_external.c:
+unit_can_see_object, objects_can_see_flag; Pillar of Autumn's tutorial
+lights): whether the head of the VR mode's player (unit_index's, aiming in
+the last tick or two) looks within field_of_view (radians) of point, from
+the eye as the last frame drew it. The unit's own facing follows the
+controller (vr.aim), so a head looking at the light alone did not pass */
+boolean vr_render_head_sees(long unit_index, real_point3d const *point, real field_of_view)
+{
+	real_vector3d forward, direction;
+	long now = game_time_get();
+
+	if (unit_index == NONE || !vr_render.aim_base_valid || vr_render.aim_base_unit_index != unit_index ||
+		now - vr_render.aim_base_tick > 2 || now < vr_render.aim_base_tick || !vr_render_head_forward(&forward))
+		return FALSE;
+	vector_from_points3d(&vr_render.head_position, point, &direction);
+	if (normalize3d(&direction) <= 0.0f)
+		return FALSE;
+	return dot_product3d(&direction, &forward) > cosine(field_of_view);
+}
+
+/* (OpenFrame) the scripts' look tests (player_action_test_look_relative_*:
+Pillar of Autumn's tutorial asks to look up, down, left and right), which
+the game counts from the stick's turn alone (player_control_action_test_
+note), so that the head's (and the controller's aim's) do too: the ways the
+head (forward from the eye as the last frame drew it) and the player's
+facing (facing_yaw, facing_pitch: the VR aim's this tick, if facing_valid)
+turned since they were taken last, LOOK_STEP or more (radians); 1 up, 2
+down, 4 left, 8 right. The marks are taken again on the player's unit
+changing or the head's not being known. */
+#define LOOK_STEP 0.08f
+static struct
+{
+	long unit_index;
+	boolean head_valid, facing_valid;
+	real head[2], facing[2];
+} look_test = { NONE };
+
+static unsigned long look_turned(boolean *valid, real mark[2], real yaw, real pitch)
+{
+	unsigned long actions = 0;
+	real turn;
+
+	if (!*valid)
+	{
+		*valid = TRUE;
+		mark[0] = yaw;
+		mark[1] = pitch;
+		return 0;
+	}
+	turn = yaw - mark[0];
+	while (turn > (real)M_PI)
+		turn -= 2.0f * (real)M_PI;
+	while (turn < -(real)M_PI)
+		turn += 2.0f * (real)M_PI;
+	if (turn >= LOOK_STEP || turn <= -LOOK_STEP)
+	{
+		actions |= turn > 0.0f ? 4 : 8;
+		mark[0] = yaw;
+	}
+	turn = pitch - mark[1];
+	if (turn >= LOOK_STEP || turn <= -LOOK_STEP)
+	{
+		actions |= turn > 0.0f ? 1 : 2;
+		mark[1] = pitch;
+	}
+	return actions;
+}
+
+unsigned long vr_render_look_actions(long unit_index, boolean facing_valid, real facing_yaw, real facing_pitch)
+{
+	real_vector3d forward;
+	unsigned long actions = 0;
+	long now = game_time_get();
+
+	if (unit_index != look_test.unit_index)
+	{
+		look_test.unit_index = unit_index;
+		look_test.head_valid = look_test.facing_valid = FALSE;
+	}
+	if (unit_index == NONE)
+		return 0;
+	if (vr_render.aim_base_valid && vr_render.aim_base_unit_index == unit_index &&
+		now - vr_render.aim_base_tick <= 2 && now >= vr_render.aim_base_tick && vr_render_head_forward(&forward))
+	{
+		actions |= look_turned(&look_test.head_valid, look_test.head, (real)atan2(forward.j, forward.i),
+			(real)asin(forward.k < -1.0f ? -1.0f : forward.k > 1.0f ? 1.0f : forward.k));
+	}
+	else
+		look_test.head_valid = FALSE;
+	if (facing_valid)
+		actions |= look_turned(&look_test.facing_valid, look_test.facing, facing_yaw, facing_pitch);
+	else
+		look_test.facing_valid = FALSE;
+	return actions;
 }
 
 /* (OpenFrame) vr_fists.c, vr_grab.c: a hand's place (game axes from the

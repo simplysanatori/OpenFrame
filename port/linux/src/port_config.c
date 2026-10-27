@@ -714,6 +714,15 @@ static const struct config_setting config_settings[] =
 		"vr.player_height above the floor is." },
 	{ "vr.player_height", _config_real, "1.65", "HALO_VR_PLAYER_HEIGHT", _environment_value, _platform_desktop,
 		"Standing, the height of your eyes in meters." },
+	{ "vr.auto_recentre", _config_boolean, "true", "HALO_VR_AUTO_RECENTRE", _environment_value, _platform_desktop,
+		"Recentre by itself: as play starts after a load or a cinematic (the\n"
+		"player's eye where your head is, ahead where you look), and each menu\n"
+		"opening in front of where you look. false: only when you hold both\n"
+		"grips (or a gamepad's Back), and as SteamVR recentres." },
+	{ "vr.held_lean", _config_real, "0.15", "HALO_VR_HELD_LEAN", _environment_value, _platform_desktop,
+		"While the scripts hold the player still (Pillar of Autumn's cryo\n"
+		"tube), how far across the floor your head may move the view from the\n"
+		"player's eye, in meters (10: as far as it moves)." },
 	{ "vr.world_scale", _config_real, "1.0", "HALO_VR_WORLD_SCALE", _environment_value, _platform_desktop,
 		"How large the world looks: more than 1 makes it larger (and your\n"
 		"movements and eyes smaller in it)." },

@@ -139,6 +139,9 @@ tuning, by moistman42069, AGPL-3.0-or-later.) */
 #define MELEE_HIT_SECONDS 0.06f
 /* holding both grips this long recentres, or a gamepad's Back (View) */
 #define RECENTRE_SECONDS 0.75f
+/* (OpenFrame, vr.auto_recentre) how many frames the aim is let go before
+play coming back recentres: half a second at 90 Hz */
+#define AUTO_RECENTRE_FRAMES 45
 /* a vehicle's seat ridden first-person (port/linux/game/vr_vehicle.c, which
 places it each frame and turns the view with the vehicle: the stick turns
 the view nothing there, but steers a seat steered by its controls while the
@@ -646,6 +649,18 @@ static struct
 	int was_focused;
 	float origin_position[3];
 	float origin_yaw;
+	/* (OpenFrame, vr.auto_recentre) the aim let go (halo_vr_aim_release:
+	a load, a cinematic, the scripts holding the facing) since the frame
+	presented then (vr.presents): play coming back after long enough
+	recentres; and where the menus are (in front of the head as they opened,
+	or as recentred), if it is known, and whether to place them so as the
+	head is next located */
+	int aim_released;
+	unsigned long aim_released_at;
+	int menu_anchor_valid;
+	int menu_anchor_pending;
+	float menu_position[3];
+	float menu_yaw;
 	/* the turn, and whether the aim follows the head */
 	float body_yaw;
 	int aiming;
@@ -1002,6 +1017,8 @@ static struct
 	float hud_size;
 	float menu_distance;
 	float menu_width;
+	/* (OpenFrame) vr.auto_recentre */
+	int auto_recentre;
 	int controller_aim;
 	int gamepad_aim;
 	/* vr.dominant_hand = "left" (not with vr.aim = "gamepad", where the
@@ -1178,6 +1195,7 @@ static void settings_read(void)
 		settings.hud_size = 60.0f;
 	settings.menu_distance = (float)config_real("vr.menu_distance");
 	settings.menu_width = (float)config_real("vr.menu_width");
+	settings.auto_recentre = config_boolean("vr.auto_recentre");
 	settings.gamepad_aim = !strcmp(config_string("vr.aim"), "gamepad");
 	settings.controller_aim = !settings.gamepad_aim && strcmp(config_string("vr.aim"), "head") != 0;
 	settings.left_handed = !settings.gamepad_aim && !strcmp(config_string("vr.dominant_hand"), "left");
@@ -1494,6 +1512,20 @@ unsigned int halo_vr_image(int swapchain)
 	return 1;
 }
 
+/* (OpenFrame) the menus placed in front of the head as it is now (they
+are drawn vr.menu_distance ahead of it: frame_end) */
+static void menu_anchor(void)
+{
+	const struct vr_host_pose *head = &vr.views.head;
+
+	if (!head->valid)
+		return;
+	vr.menu_yaw = quaternion_yaw(head->orientation);
+	memcpy(vr.menu_position, head->position, sizeof(vr.menu_position));
+	vr.menu_anchor_valid = 1;
+	vr.menu_anchor_pending = 0;
+}
+
 static void recentre(void)
 {
 	const struct vr_host_pose *head = &vr.views.head;
@@ -1502,6 +1534,13 @@ static void recentre(void)
 	if (!head->valid)
 		return;
 	yaw = quaternion_yaw(head->orientation);
+	/* (OpenFrame, vr.auto_recentre: the first play recentres again, as the
+	headset is on by then) */
+	if (!vr.origin_valid && !vr.aim_released)
+	{
+		vr.aim_released = 1;
+		vr.aim_released_at = vr.presents;
+	}
 	/* the aim keeps pointing where it did; the gamepad's is where the head
 	looks now (halo_vr_aim) */
 	if (settings.gamepad_aim)
@@ -1515,6 +1554,8 @@ static void recentre(void)
 	vr.origin_position[1] = settings.standing ? settings.player_height : head->position[1];
 	vr.origin_position[2] = head->position[2];
 	vr.origin_valid = 1;
+	/* (OpenFrame: the menus too, before the head) */
+	menu_anchor();
 	platform_log("vr: recentred (%s)", settings.standing ? "standing" : "seated");
 }
 
@@ -5381,8 +5422,15 @@ static int frame_begin(void)
 		test_head_apply();
 		test_fov_apply();
 		jitter_apply();
-		if (!vr.origin_valid || (vr.views.focused && !vr.was_focused))
+		/* (OpenFrame: and as the runtime recentres its play space, SteamVR's
+		own recentre, which moves the head in it: the origin kept from before
+		would put the eye and the menus off to the side) */
+		if (!vr.origin_valid || (vr.views.focused && !vr.was_focused) || vr.views.space_changed)
 			recentre();
+		/* (OpenFrame, vr.auto_recentre: the menus as they open, in front of
+		the head) */
+		else if (vr.menu_anchor_pending && vr.views.head.valid && vr.views.focused)
+			menu_anchor();
 	}
 	if (vr.views.head.valid)
 		vr.was_focused = vr.views.focused;
@@ -5516,14 +5564,18 @@ void halo_vr_present(int eyes_drawn, int hud_drawn, int scope_drawn)
 		}
 		else
 		{
-			/* the menus, in front of where the head was at the recentring */
-			float s = sinf(vr.origin_yaw * 0.5f), c = cosf(vr.origin_yaw * 0.5f);
+			/* the menus, in front of where the head was at the recentring
+			(OpenFrame, vr.auto_recentre: or as they opened) */
+			int opened = settings.auto_recentre && vr.menu_anchor_valid;
+			float yaw = opened ? vr.menu_yaw : vr.origin_yaw;
+			const float *place = opened ? vr.menu_position : vr.origin_position;
+			float s = sinf(yaw * 0.5f), c = cosf(yaw * 0.5f);
 
 			pending->hud_pose.orientation[1] = s;
 			pending->hud_pose.orientation[3] = c;
-			pending->hud_pose.position[0] = vr.origin_position[0] - sinf(vr.origin_yaw) * settings.menu_distance;
-			pending->hud_pose.position[1] = settings.standing ? settings.player_height : vr.origin_position[1];
-			pending->hud_pose.position[2] = vr.origin_position[2] - cosf(vr.origin_yaw) * settings.menu_distance;
+			pending->hud_pose.position[0] = place[0] - sinf(yaw) * settings.menu_distance;
+			pending->hud_pose.position[1] = settings.standing ? settings.player_height : place[1];
+			pending->hud_pose.position[2] = place[2] - cosf(yaw) * settings.menu_distance;
 			pending->hud_size[0] = settings.menu_width;
 			pending->hud_size[1] = settings.menu_width * (float)HUD_HEIGHT / (float)HUD_WIDTH;
 		}
@@ -5983,6 +6035,19 @@ int halo_vr_aim(float current_yaw, int long_gun, float *yaw, float *pitch)
 		vr.aim_line_valid = 0;
 		return 0;
 	}
+	/* (OpenFrame, vr.auto_recentre) play back after a load, a cinematic or
+	the scripts holding the facing (Pillar of Autumn's cryo tube) for
+	AUTO_RECENTRE_FRAMES or more: the player's eye where the head is now,
+	ahead where it looks, so a head moved or turned since the last recentre
+	(or SteamVR's) does not put the eye outside the player (the view keeps
+	the player's facing: aim_synced) */
+	if (vr.aim_released && settings.auto_recentre && vr.presents - vr.aim_released_at >= AUTO_RECENTRE_FRAMES)
+	{
+		platform_log("vr: play resumes: recentring (vr.auto_recentre)");
+		recentre();
+		vr.aim_synced = 0;
+	}
+	vr.aim_released = 0;
 	if (settings.gamepad_aim)
 	{
 		/* the gamepad aims, as on the flat screen: the facing stays the
@@ -6065,6 +6130,12 @@ int halo_vr_aim(float current_yaw, int long_gun, float *yaw, float *pitch)
 
 void halo_vr_aim_release(void)
 {
+	/* (OpenFrame, vr.auto_recentre: since when) */
+	if (!vr.aim_released)
+	{
+		vr.aim_released = 1;
+		vr.aim_released_at = vr.presents;
+	}
 	vr.aim_synced = 0;
 	vr.aiming = 0;
 	vr.aim_line_valid = 0;
@@ -6082,6 +6153,10 @@ int halo_vr_aim_line(float position[3], float forward[3], float *body_yaw)
 
 void halo_vr_menus(int active)
 {
+	/* (OpenFrame, vr.auto_recentre) a menu opening is placed in front of
+	the head as next located */
+	if (active && !vr.menus)
+		vr.menu_anchor_pending = 1;
 	vr.menus = active;
 	vr_visor_menus(active);
 }

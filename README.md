@@ -289,6 +289,7 @@ Internet play is OpenH1's and is on by default. Invites and the server browser f
 - **`install.sh` says Steam's debugging port is not reachable.** Start Steam and run it again, or set `OPENFRAME_SKIP_STEAM=1`.
 - **The game asks for the disc image at start.** It did not find `maps/` in `~/.local/share/OpenFrame`. Run `install.sh --maps` with your maps folder.
 - **It plays flat in a window.** SteamVR was not running, or the headset was not connected, when the game started. Start SteamVR first. `HALO_VR=0` forces flat play.
+- **The menu is off to the side, or the view is not where the player is (outside the cryo tube).** Hold both grips for a moment: that recentres (the menu goes in front of you, the eye into the player). SteamVR's own recentre works too. The game also recentres by itself as play starts after a load or a cutscene, and each menu opens in front of where you look (`vr.auto_recentre`, on by default). In the cryo tube the view stays within 15 cm of the player's eye (`vr.held_lean`).
 - **Check what happened.** `~/.local/share/OpenFrame/sessions/latest/launch.log` shows the refresh rate asked for and whether SteamVR took the per-app settings; `stdout.log` is the game's output, with a crash's backtrace.
 
 ## Reporting a problem
