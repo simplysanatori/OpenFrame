@@ -192,6 +192,44 @@ when it has no more room (it holds no more than a frame's) */
 are made: a map loaded again, or its game started again, needs none) */
 #define MAXIMUM_ENUMERATED_MAPS 64
 
+/* a light tag's definition, as far as light_drawn_as_earlier reads it
+(rasterizer_xbox_environment.c has the whole layout: each file that reads
+one defines it) */
+struct point_light_geometry_parameters
+{
+	real radius;
+	real radius_modifier_lower_bound;
+	real radius_modifier_upper_bound;
+	real falloff_angle;
+	real cutoff_angle;
+	real lens_flare_radius;
+	real runtime_cosine_falloff_angle;
+	real runtime_cosine_cutoff_angle;
+	real specular_radius_multiplier;
+	real runtime_sine_cutoff_angle;
+	long unused[2];
+};
+
+struct point_light_gel_parameters
+{
+	struct tag_reference map;
+	word pad0;
+	short texture_animation_function;
+	real texture_animation_rate;
+	struct tag_reference secondary_map;
+};
+
+struct point_light_definition
+{
+	unsigned long flags;
+	struct point_light_geometry_parameters geometry;
+	byte reserved34[0x30];
+	struct point_light_gel_parameters gel;
+};
+/* (the tag's layout: gel.map at 0x64, the secondary map at 0x7c) */
+typedef char point_light_gel_offset_check[__builtin_offsetof(struct point_light_definition, gel.secondary_map) == 0x7c &&
+	__builtin_offsetof(struct point_light_definition, geometry.runtime_cosine_falloff_angle) == 0x1c ? 1 : -1];
+
 /* (an object index no object has, but not 0: camouflage's source) */
 #define STAND_IN_OBJECT_INDEX 0x7ffe0000
 
