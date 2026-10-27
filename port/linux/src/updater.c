@@ -1031,6 +1031,14 @@ void updater_start(void)
 	char *slash;
 	int updated;
 
+#ifdef OPENFRAME
+	/* (OpenFrame, the Steam Frame fork: updated by its own installer; OpenH1's
+	releases would replace it with OpenH1, so nothing asks api.github.com. The
+	state stays idle, so updater_poll asks nothing; update.auto is still
+	read, and ignored) */
+	platform_log("update: not looked for: updates are handled by the OpenFrame installer");
+	return;
+#endif
 	if (!update_executable_path(updater_executable, sizeof(updater_executable)))
 		return;
 #ifdef HALO_WINDOWS
@@ -1166,6 +1174,9 @@ void updater_update_now(void)
 	SDL_IOStream *ready;
 	int length;
 
+#ifdef OPENFRAME
+	return;
+#endif
 	updater_path(path, sizeof(path), "update-ready");
 	ready = SDL_IOFromFile(path, "wb");
 	length = snprintf(line, sizeof(line), "build %ld\n", updater_latest_build);

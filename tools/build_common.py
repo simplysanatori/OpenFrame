@@ -162,8 +162,12 @@ def updater_defines(release: bool) -> str:
     if not number.isdigit():
         number = "0"
     flavor = "release" if release else "debug"
+    # OpenFrame (the Steam Frame fork) is updated by its own installer, never
+    # by OpenH1's self-updater, and labels its build as such; OPENFRAME=0 in
+    # the environment builds what OpenH1 does
+    openframe = " -DOPENFRAME=1" if os.environ.get("OPENFRAME", "1") != "0" else ""
     return (f'-DHALO_BUILD_NUMBER={number} -DHALO_BUILD_FLAVOR=\\"{flavor}\\" '
-            f'-DHALO_BUILD_REPOSITORY=\\"{build_repository()}\\"')
+            f'-DHALO_BUILD_REPOSITORY=\\"{build_repository()}\\"' + openframe)
 
 
 def configuration_defines(sln: Any) -> List[str]:
