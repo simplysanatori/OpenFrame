@@ -144,7 +144,7 @@ Nearly all of these are **offline only**: in a game of this computer alone (the 
 
 - What it does: runs faster than the game's run (1.5 times by default), on foot, standing, forward and sideways but not backing.
 - Turn it on: MOVEMENT AND COMFORT... > **SPRINT** = TOGGLE or ARM SWING (`vr.sprint_mode`, default `"off"`), **SPRINT SPEED** (`vr.sprint_speed`, 1.25 to 2 times, default 1.5).
-- In play, TOGGLE: push the right (turning) stick up and let go within half a second ("flick it up") to start sprinting; flick again to stop. A sprint also ends if you let the left stick go for a second, crouch, or leave your feet (a vehicle, a cinematic, the menus, death). The HUD says "Sprint". With bullet time on too, a flick is sprint and a half-second hold is bullet time.
+- In play, TOGGLE: push the right (turning) stick up and let go ("flick it up") to start sprinting; flick again to stop. The HUD says "Sprint" and "Sprint off" each time, and the right controller pulses. A sprint stays on as you stop, look around or crouch (crouching pauses it; standing up you sprint again), and ends by itself only in a vehicle or at death. With bullet time on too, a push let go within 0.8 s is a flick and one held 0.8 s is bullet time; while bullet time is on, a flick ends bullet time instead of toggling sprint.
 - In play, ARM SWING: swing both arms up and down as you run; the faster the slower arm moves (from 0.6 m/s, full at 1.5 m/s) the faster you go, up to the sprint speed. With the left stick let go, the swing walks you forward along your aim.
 - Caveats: offline only.
 
@@ -152,7 +152,7 @@ Nearly all of these are **offline only**: in a game of this computer alone (the 
 
 - What it does: slows the world to 40% (default) while your head and hands keep the display's rate. It eases in and out over about a sixth of a second.
 - Turn it on: MOVEMENT AND COMFORT... > **BULLET TIME** = ON (`vr.bullet_time`, default off), **BULLET TIME SPEED** (`vr.bullet_time_scale`, 25 to 80%, default 40%).
-- In play: hold the right (turning) stick pushed up for half a second; hold it again to end it. Both controllers pulse, and the HUD says "Bullet time" and "Bullet time off". It also ends in a cinematic, at death and where the game takes your control.
+- In play: hold the right (turning) stick pushed up for 0.8 s; flick it up (or hold it again) to end it. Both controllers pulse, and the HUD says "Bullet time" and "Bullet time off". It also ends in a cinematic, at death and where the game takes your control. **Your own body slows with the world**: you run at 40% speed and jumps float, so bullet time feels like slow, floaty movement; that is bullet time, not the sprint.
 - Caveats: **offline only** (network games must step alike; the HUD says "Bullet time: offline only"). **The sounds keep their normal pitch and speed**, so a slowed world sounds as fast as ever. Nothing of it is saved in a checkpoint, and a revert turns it off.
 
 ### Third person on foot (not yet tested in a headset)

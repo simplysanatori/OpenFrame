@@ -212,7 +212,7 @@
 		<string text="Offline: crouch as you sprint to slide, jump off\nwalls and run along them."/>
 		<string text="How fast a slide starts and how long it lasts."/>
 		<string text="How strong a jump off a wall is."/>
-		<string text="Offline: hold the turning stick up to slow the\nworld (hold it again to end it)."/>
+		<string text="Offline: hold the turning stick up to slow the\nworld; flick it up to end it."/>
 		<string text="How fast the world runs in bullet time."/>
 	</strings>
 </menus>

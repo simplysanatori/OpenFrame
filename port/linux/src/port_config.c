@@ -617,18 +617,20 @@ static const struct config_setting config_settings[] =
 	{ "vr.sprint_mode", _config_string, "\"off\"", "HALO_VR_SPRINT_MODE", _environment_value, _platform_desktop,
 		"Sprinting on foot, in a game of this computer alone (the campaign):\n"
 		"\"toggle\" a flick of the turning stick up (the right, or the left\n"
-		"with vr.swap_sticks) turns it on and off (it ends as you stop or\n"
-		"crouch); \"arm_swing\" swing both arms as you run, and the harder you\n"
-		"swing the faster you go (with the moving stick still, the swing moves\n"
-		"you forward); \"off\" never. The view's field is unchanged." },
+		"with vr.swap_sticks) turns it on, the next off (it stays on as you\n"
+		"stop or crouch; it ends in a vehicle or at death); \"arm_swing\"\n"
+		"swing both arms as you run, and the harder you swing the faster you\n"
+		"go (with the moving stick still, the swing moves you forward); \"off\"\n"
+		"never. The view's field is unchanged." },
 	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
 		"Sprinting, how many times the running speed, 1.1 to 2." },
 	{ "vr.bullet_time", _config_boolean, "false", "HALO_VR_BULLET_TIME", _environment_value, _platform_desktop,
-		"Bullet time: holding the turning stick up (half a second; the right,\n"
-		"or the left with vr.swap_sticks) slows the world and turns it off\n"
-		"again, in a game of this computer alone (the campaign; never online,\n"
-		"split screen or with bots). Your head and hands stay at full speed;\n"
-		"the sounds keep their pitch." },
+		"Bullet time: holding the turning stick up (most of a second; the\n"
+		"right, or the left with vr.swap_sticks) slows the world, your body's\n"
+		"run and jumps with it; a flick up (or another hold) ends it. In a game\n"
+		"of this computer alone (the campaign; never online, split screen or\n"
+		"with bots). Your head and hands stay at full speed; the sounds keep\n"
+		"their pitch." },
 	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
 		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
 	{ "vr.third_person", _config_boolean, "false", "HALO_VR_THIRD_PERSON", _environment_value, _platform_desktop,

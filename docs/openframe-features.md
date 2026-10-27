@@ -175,12 +175,12 @@ changes) as each tick's movement is made ready, and in each sub-step of
 
 - Slide: crouch (the left stick's click, or your head lowered with
   `vr.physical_crouch`) while sprinting (`vr.sprint_mode`; the sprint now,
-  or a third of a second before, as a crouch ends a toggled sprint), on the
-  ground at a run or faster, and you slide on, crouched (the game's lower
-  height), at the speed you ran and 15% more, losing speed to friction,
-  faster down a slope, steered a little by the stick (pulled back, it
-  brakes). It ends as you stand, jump (the speed carried into the jump),
-  leave the ground, meet a wall, slow to half a run, or after 1.1 seconds.
+  or a third of a second before), on the ground at a run or faster, and you
+  slide on, crouched (the game's lower height), at the speed you ran and 15%
+  more, losing speed to friction, faster down a slope, steered a little by
+  the stick (pulled back, it brakes). It ends as you stand, jump (the speed
+  carried into the jump), leave the ground, meet a wall, slow to half a run,
+  or after 1.1 seconds.
 - Wall jump: in the air beside a wall, press Jump again to leap off it
   where your head looks (turned off the wall at least a third of the way),
   at least 5 m/s and as fast as you were going (up to half as fast again),
@@ -220,11 +220,14 @@ turns it off. It eases in and out over about a sixth of a second.
 - Keys: `vr.bullet_time` (default `false`), `vr.bullet_time_scale` (the
   world's speed, 0.2 to 0.8, default `0.4`).
 - Input: hold the turning stick (the right, or the left with
-  `vr.swap_sticks`) pushed up for half a second; again to end it. The stick's
-  up is no game control while the controllers aim (OpenH1 sends the right
-  stick to the game only in the menus, cinematics and with `vr.aim =
-  "gamepad"`; its down ejects a magazine with `vr.manual_reload`), so no
-  binding is taken from anything. On foot, with the controllers aiming.
+  `vr.swap_sticks`) pushed up for 0.8 s; a flick up (or another hold) ends
+  it. The player's own body is of the world and slows with it (the run at
+  40%, jumps floating): in headset trial 3 a push held a little long (the
+  hold was half a second then) took bullet time, which was felt as a slow,
+  floaty sprint that no flick turned off. The stick's up is no game control
+  while the controllers aim (OpenH1 sends the right stick to the game only
+  in the menus, cinematics and with `vr.aim = "gamepad"`; its down ejects a
+  magazine with `vr.manual_reload`), so no binding is taken from anything. On foot, with the controllers aiming.
 - Where: a game of this computer alone (the campaign). Never online, in split
   screen or with bots (network games, which every machine must step alike);
   the HUD says "Bullet time: offline only" there. It ends in a cinematic, at
@@ -243,10 +246,18 @@ local player (`vr_sprint_speed_scale`).
 - Keys: `vr.sprint_mode` (`"off"`, the default; `"toggle"`;
   `"arm_swing"`), `vr.sprint_speed` (times the run, 1.1 to 2, default `1.5`).
 - `"toggle"`: flick the turning stick up (as bullet time's input, but let go
-  within half a second; with bullet time off it toggles at once as you push)
-  to sprint, and again to stop. It also ends as you let the left stick go for
-  a second, crouch, or leave your feet (a vehicle, a cinematic, the menus,
-  death). The HUD says "Sprint".
+  within 0.8 s; with bullet time off it toggles at once as you push) to
+  sprint, and again to stop. While bullet time is on, a flick ends bullet time
+  instead. The sprint stays on as you stop or crouch (a crouch pauses it:
+  `bipeds.c` sprints standing), and ends by itself only off foot (a vehicle,
+  death; half a second of it, the menus aside). The HUD says "Sprint" and
+  "Sprint off" at every change; the right controller pulses. The gesture is
+  `port/linux/src/vr_stick_gesture.h` (`stick_gesture_update`).
+- stdout.log: `vr: sprint on/off (why)` at each change, and from `bipeds.c`
+  as a sprint starts and ends `vr: sprint x1.50: forward speed 2.250 ->
+  3.375 world units/s (6.86 -> 10.29 m/s), acceleration ... (full speed in
+  ... s)`: the run's speed and acceleration before and after the scale (the
+  time to full speed stays the same).
 - `"arm_swing"`: swing both arms up and down as you run; the faster the
   slower arm moves (from 0.6 m/s, full at 1.5 m/s) the faster you go, up to
   `vr.sprint_speed`. With the left stick let go the swing walks you forward

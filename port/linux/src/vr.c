@@ -38,6 +38,7 @@ the view while the crouch is the head's: the head has already come down.
 #include "port_config.h"
 #include "vr.h"
 #include "vr_host.h"
+#include "vr_stick_gesture.h"
 #include "vr_visor.h"
 
 extern int halo_load_trace_enabled(void);
@@ -229,20 +230,19 @@ dead zone, and the push past it to the full ask */
 #define COMFORT_DEADZONE 0.15f
 #define COMFORT_FULL 0.6f
 /* vr.sprint_mode = "toggle" and vr.bullet_time (comfort_update): the right
-stick pushed up past STICK_UP_PRESSED (STICK_UP_RELEASED lets it go) and
-less than STICK_UP_SIDEWAYS sideways (not a turn); let go within
-STICK_UP_HOLD_SECONDS a flick (sprint's toggle), held that long bullet
-time's. A toggled sprint ends with the left stick let go
-SPRINT_STOP_SECONDS (under SPRINT_STOP_PUSH), crouching, or off foot.
-Sprint's effort is none with the left stick pulled back past
-SPRINT_BACK or sideways past SPRINT_SIDEWAYS. */
+stick pushed up (vr_stick_gesture.h's STICK_UP_*): a flick toggles sprint
+(with bullet time off, at once as it is pushed), a hold of
+STICK_UP_HOLD_SECONDS toggles bullet time, and while bullet time is on a
+flick ends it (OpenFrame, headset trial 3: a push held a little long took
+bullet time, the slowed world, and the flicks meant to end it toggled
+sprint). A toggled sprint stays on until flicked off: it ends by itself only
+off foot (a vehicle, death) for SPRINT_OFF_FOOT_SECONDS, menus aside; a
+crouch only pauses it (bipeds.c sprints standing). Sprint's effort is none
+with the left stick pulled back past SPRINT_BACK or sideways past
+SPRINT_SIDEWAYS. */
 #define SPRINT_OFF 0
 #define SPRINT_TOGGLE 1
 #define SPRINT_ARM_SWING 2
-#define STICK_UP_PRESSED 0.75f
-#define STICK_UP_RELEASED 0.55f
-#define STICK_UP_SIDEWAYS 0.6f
-#define STICK_UP_HOLD_SECONDS 0.5f
 /* vr.third_person (comfort_update; after HaloCE-DecompRemix-VR's VR third
 person by moistman42069, AGPL-3.0-or-later): the turning stick pushed down
 (as STICK_UP_* above, the other way) and held STICK_DOWN_HOLD_SECONDS
@@ -251,8 +251,7 @@ down is no game control while the controllers aim; with vr.manual_reload
 a push down ejects the magazine first, as ever (a hold, not a flick, so
 that an eject does not switch the view) */
 #define STICK_DOWN_HOLD_SECONDS 0.75f
-#define SPRINT_STOP_SECONDS 1.0f
-#define SPRINT_STOP_PUSH 0.2f
+#define SPRINT_OFF_FOOT_SECONDS 0.5f
 #define SPRINT_BACK (-0.15f)
 #define SPRINT_SIDEWAYS 0.6f
 /* vr.sprint_mode = "arm_swing" (after HaloCE-DecompRemix-VR's arm run by
@@ -697,18 +696,16 @@ static struct
 	/* comfort_update: the vignette the sticks ask for this frame
 	(vr.vignette = "always"), a snap turn's moment of it, and whether a
 	snap turn was made this frame; the right stick up (held, for how long,
-	and whether bullet time took this push), sprint (toggled on, the
-	seconds the left stick has been let go, the arms' effort and each
+	and whether this push was taken), sprint (toggled on, the seconds
+	the player has been off foot, the arms' effort and each
 	hand's last height and vertical speed, smoothed) and bullet time
 	(toggled on) */
 	float comfort_asked;
 	float comfort_snap;
 	int comfort_snapped;
-	int stick_up;
-	float stick_up_seconds;
-	int stick_up_taken;
+	struct stick_gesture stick_up;
 	int sprint_on;
-	float sprint_stopped;
+	float sprint_off_foot;
 	float arm_swing;
 	int arm_heights_valid;
 	float arm_heights[2];
@@ -4006,7 +4003,7 @@ static void comfort_update(float seconds, float turn)
 	float up = vr.input.right_stick[1], sideways = fabsf(vr.input.right_stick[0]);
 	float move = comfort_stick(vr.input.left_stick[0], vr.input.left_stick[1]);
 	float asked = 0.0f;
-	int was_up = vr.stick_up, was_down = vr.stick_down;
+	int was_down = vr.stick_down, gesture;
 
 	arm_swing_update(seconds);
 	/* the third person on foot: on as vr.third_person turns on, switched
@@ -4034,50 +4031,35 @@ static void comfort_update(float seconds, float turn)
 		vr.stick_down_seconds = 0.0f;
 		vr.stick_down_taken = 0;
 	}
-	vr.stick_up = able && sideways < STICK_UP_SIDEWAYS && up > (vr.stick_up ? STICK_UP_RELEASED : STICK_UP_PRESSED);
-	if (vr.stick_up)
+	/* the right stick up: a hold toggles bullet time; a flick ends bullet
+	time if it is on, else toggles sprint */
+	gesture = stick_gesture_update(&vr.stick_up, able, up, sideways, settings.bullet_time, seconds);
+	if (gesture == STICK_GESTURE_HOLD || (gesture == STICK_GESTURE_FLICK && vr.bullet_time_on))
 	{
-		vr.stick_up_seconds = was_up ? vr.stick_up_seconds + seconds : 0.0f;
-		/* (held: bullet time's; without it a push is sprint's at once) */
-		if (!vr.stick_up_taken && settings.bullet_time && vr.stick_up_seconds >= STICK_UP_HOLD_SECONDS)
-		{
-			vr.stick_up_taken = 1;
-			vr.bullet_time_on = !vr.bullet_time_on;
-			hand_haptic(0, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
-			hand_haptic(1, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
-			platform_log("vr: bullet time %s", vr.bullet_time_on ? "on" : "off");
-		}
-		if (!vr.stick_up_taken && !settings.bullet_time && settings.sprint_mode == SPRINT_TOGGLE)
-		{
-			vr.stick_up_taken = 1;
-			vr.sprint_on = !vr.sprint_on;
-			vr.sprint_stopped = 0.0f;
-			hand_haptic(0, 0.3f, 0.04f);
-		}
+		vr.bullet_time_on = !vr.bullet_time_on;
+		hand_haptic(0, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+		hand_haptic(1, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+		platform_log("vr: bullet time %s (the stick %s)", vr.bullet_time_on ? "on" : "off",
+			gesture == STICK_GESTURE_HOLD ? "held up" : "flicked up");
 	}
-	else
+	else if (gesture == STICK_GESTURE_FLICK && settings.sprint_mode == SPRINT_TOGGLE)
 	{
-		/* (a flick, let go before bullet time took it: sprint's) */
-		if (was_up && !vr.stick_up_taken && settings.sprint_mode == SPRINT_TOGGLE && able)
-		{
-			vr.sprint_on = !vr.sprint_on;
-			vr.sprint_stopped = 0.0f;
-			hand_haptic(0, 0.3f, 0.04f);
-		}
-		vr.stick_up_seconds = 0.0f;
-		vr.stick_up_taken = 0;
+		vr.sprint_on = !vr.sprint_on;
+		vr.sprint_off_foot = 0.0f;
+		hand_haptic(0, vr.sprint_on ? 0.3f : 0.2f, 0.04f);
+		platform_log("vr: sprint %s (the stick flicked up)", vr.sprint_on ? "on" : "off");
 	}
 	if (!settings.bullet_time)
 		vr.bullet_time_on = 0;
-	/* a toggled sprint ends as the player stops, crouches or leaves the
-	ground's play (a vehicle, a cinematic, the menus, death) */
+	/* a toggled sprint ends with its mode, or off foot a while (a vehicle,
+	death; not the menus, a stop or a crouch) */
 	if (vr.sprint_on)
 	{
-		vr.sprint_stopped = move < SPRINT_STOP_PUSH ? vr.sprint_stopped + seconds : 0.0f;
-		if (settings.sprint_mode != SPRINT_TOGGLE || !able || vr.crouch_button || vr.crouching ||
-			vr.sprint_stopped >= SPRINT_STOP_SECONDS)
+		vr.sprint_off_foot = vr.crouch_able_frame || vr.menus ? 0.0f : vr.sprint_off_foot + seconds;
+		if (settings.sprint_mode != SPRINT_TOGGLE || vr.sprint_off_foot >= SPRINT_OFF_FOOT_SECONDS)
 		{
 			vr.sprint_on = 0;
+			platform_log("vr: sprint off (%s)", settings.sprint_mode != SPRINT_TOGGLE ? "vr.sprint_mode" : "off foot");
 		}
 	}
 	/* the vignette (vr.vignette = "always"): on foot, the left stick's push

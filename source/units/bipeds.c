@@ -290,6 +290,8 @@ boolean network_objects_may_delete(long object_index);
 #ifdef HALO_VR
 /* port: the VR mode's sprint (vr.sprint_mode, port/linux/game/vr_comfort.c) */
 real vr_sprint_speed_scale(long biped_index);
+void vr_sprint_speeds_log(long biped_index, real scale, real forward_speed, real scaled_forward_speed,
+	real acceleration, real scaled_acceleration);
 /* port: the VR mode's parkour (vr.parkour, port/linux/game/vr_parkour.c) */
 boolean vr_parkour_tick(long biped_index, real_point3d const *position, real height, real width,
 	real_vector3d const *facing, real run_speed, real_vector3d *velocity);
@@ -4240,11 +4242,15 @@ static boolean biped_physics_prepare(
 				if (crouch < 0.1f && biped->unit.animation.base_seat_index != _unit_base_seat_alert)
 				{
 					real sprint = vr_sprint_speed_scale(biped_index);
+					real run = speeds->forward_speed[1];
+					real run_acceleration = acceleration;
 
 					speeds->forward_speed[1] *= sprint;
 					speeds->sideways_speed[0] *= sprint;
 					speeds->sideways_speed[1] *= sprint;
 					acceleration *= sprint;
+					vr_sprint_speeds_log(biped_index, sprint, run, speeds->forward_speed[1],
+						run_acceleration, acceleration);
 				}
 #endif
 				speeds->stun_scale = stun_scale;

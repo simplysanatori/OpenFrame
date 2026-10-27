@@ -5,8 +5,10 @@ The VR mode's sprint and bullet time (HALO_VR; vr.sprint_mode,
 vr.sprint_speed, vr.bullet_time, vr.bullet_time_scale;
 docs/openframe-features.md): the game's side of them, for main.c and
 bipeds.c. vr.c reads the controllers (comfort_update): the right stick
-flicked up toggles sprint, held up half a second toggles bullet time, and
-with vr.sprint_mode = "arm_swing" both arms pumping are a run's effort.
+flicked up toggles sprint (or ends bullet time while it is on), held up
+four fifths of a second toggles bullet time, and with vr.sprint_mode =
+"arm_swing" both arms pumping are a run's effort. The HUD says each:
+"Sprint", "Sprint off", "Bullet time", "Bullet time off".
 
 Both are a game of this computer alone (game_connection: the campaign),
 never a network game's host or client, split screen or a game with bots
@@ -24,7 +26,10 @@ effects, game_frame) slows with it. Nothing of it is in the game state: a
 checkpoint, a revert or a saved game knows nothing of it, and a revert
 (the game's time going back) turns it off. It eases in and out over about
 a sixth of a second, and ends at once in a cinematic, at death or where
-the game takes the player's control. The sounds keep their pitch (their
+the game takes the player's control. The player's own body is of the
+world: in bullet time it runs, falls and jumps slowed with it (OpenFrame,
+headset trial 3: bullet time taken by a push held a little long, the run
+at 40% of the sprint's and the jumps floating, was felt as a slow sprint). The sounds keep their pitch (their
 voices play at the mixer's rate): a slowed world sounds as fast as ever.
 
 Sprint quickens the first local player's running on foot, standing (not
@@ -53,6 +58,9 @@ between ticks) and its VR layer.
 #include "../src/vr.h"
 
 #include <math.h>
+
+/* the platform layer's */
+void platform_log(char const *format, ...);
 
 /* bullet time eases toward its scale with this time constant (seconds):
 about a sixth of a second in all */
@@ -107,13 +115,12 @@ real vr_comfort_frame(
 		allowed = FALSE;
 	vr_comfort.game_time = now;
 
-	/* sprint's toggle, said on the HUD as it comes on (not as it ends,
-	with every stop) */
+	/* sprint's toggle, said on the HUD as it comes on and as it goes off
+	(a flick, off foot, its mode changed) */
 	if (halo_vr_sprint_toggled() != vr_comfort.sprint)
 	{
 		vr_comfort.sprint = !vr_comfort.sprint;
-		if (vr_comfort.sprint)
-			comfort_message(local ? L"Sprint" : L"Sprint: offline only");
+		comfort_message(!vr_comfort.sprint ? L"Sprint off" : local ? L"Sprint" : L"Sprint: offline only");
 	}
 
 	target = halo_vr_bullet_time();
@@ -162,6 +169,37 @@ real vr_sprint_speed_scale(
 	if (effort > 1.0f)
 		effort = 1.0f;
 	return 1.0f + (halo_vr_sprint_speed() - 1.0f) * effort;
+}
+
+/* bipeds.c, after its sprint's scaling of a player's speeds for a tick:
+the scale, the forward run's speed (world units a second) and the
+acceleration (bipeds.c's: a tick's velocity change is a 30th of it) before
+and after it. The first local player's, logged as a sprint starts and ends,
+so that a trial's stdout.log shows what the sprint did */
+void vr_sprint_speeds_log(
+	long biped_index,
+	real scale,
+	real forward_speed,
+	real scaled_forward_speed,
+	real acceleration,
+	real scaled_acceleration)
+{
+	static boolean sprinting = FALSE;
+	long player_index = local_player_get_player_index(0);
+
+	if (player_index == NONE || player_get(player_index)->unit_index != biped_index ||
+		(scale > 1.0f) == sprinting)
+	{
+		return;
+	}
+	sprinting = scale > 1.0f;
+	platform_log("vr: sprint x%.2f: forward speed %.3f -> %.3f world units/s (%.2f -> %.2f m/s), "
+		"acceleration %.3f -> %.3f (full speed in %.2f -> %.2f s)",
+		(double)scale, (double)forward_speed, (double)scaled_forward_speed,
+		(double)(forward_speed * 3.048f), (double)(scaled_forward_speed * 3.048f),
+		(double)acceleration, (double)scaled_acceleration,
+		acceleration > 0.0f ? (double)(forward_speed / acceleration / 30.0f) : 0.0,
+		scaled_acceleration > 0.0f ? (double)(scaled_forward_speed / scaled_acceleration / 30.0f) : 0.0);
 }
 
 #endif
