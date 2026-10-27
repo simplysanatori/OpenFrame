@@ -829,6 +829,47 @@ static struct {
 	struct render_camera camera;
 } preparation_headwall;
 
+/* (OpenFrame, vr.auto_recentre) a level's start: a game that is new to
+the frames drawn (a map loaded: vr_render_initialize_for_new_map; the
+game's time gone back: a mission restarted, a checkpoint gone back to),
+told to vr.c (halo_vr_level_start, which recentres) on its first frame drawn
+with the player's unit placed, not one preparing the map's pipelines under
+the loading picture */
+static struct
+{
+	boolean seen;
+	long tick;
+	boolean armed;
+	const char *why;
+} level_start;
+
+/* render.c, as a map is loaded */
+void vr_render_initialize_for_new_map(void)
+{
+	level_start.armed = TRUE;
+	level_start.why = "a map loaded";
+	level_start.seen = FALSE;
+}
+
+static void level_start_check(boolean preparing)
+{
+	long tick = game_time_get();
+	long player_index = local_player_get_player_index(0);
+
+	if (level_start.seen && tick < level_start.tick)
+	{
+		level_start.armed = TRUE;
+		level_start.why = "the game's time went back";
+	}
+	level_start.seen = TRUE;
+	level_start.tick = tick;
+	if (level_start.armed && !preparing && player_index != NONE && player_get(player_index)->unit_index != NONE)
+	{
+		level_start.armed = FALSE;
+		halo_vr_level_start(level_start.why);
+	}
+}
+
 boolean vr_render_camera(struct render_camera *camera, struct render_camera *rasterizer_camera, boolean preparing)
 {
 	struct halo_vr_view *view = &vr_render.view;
@@ -851,6 +892,7 @@ boolean vr_render_camera(struct render_camera *camera, struct render_camera *ras
 	third_person.shown = FALSE;
 	if (!halo_vr_view(view))
 		return FALSE;
+	level_start_check(preparing);
 	game_eye = camera->position;
 	vr_feel_frame(view->seconds);
 	vr_render.cinematic_head = cinematic_head();
@@ -942,20 +984,28 @@ boolean vr_render_camera(struct render_camera *camera, struct render_camera *ras
 	view_rotate(base_yaw, pitch, view->head_up, &camera->up);
 	{
 		/* (OpenFrame, vr.held_lean) while the scripts hold the player still
-		(Pillar of Autumn's cryo tube), the head moves the eye only so far
-		across the floor from the player's: a head away from where it was
-		recentred would see the player from outside */
+		(Pillar of Autumn's cryo tube, a scripted seat, a cinematic's hand-
+		off: player_enable_input off) and for a level's first moments
+		(halo_vr_level_settling: before its recentre lands), the head moves
+		the eye only so far from where it was recentred, any way (up and
+		down too: standing, from the head's height then): a head away from
+		where it was recentred would see the player from outside */
 		float head[3];
 		real lean = (real)config_real("vr.held_lean");
-		real across;
+		real rise = (real)halo_vr_recentred_rise();
+		real away;
+		boolean held = !cinematic_in_progress() && (!player_input_enabled() || halo_vr_level_settling());
 
 		memcpy(head, view->head_position, sizeof(head));
-		across = (real)sqrt(head[0] * head[0] + head[1] * head[1]);
-		if (lean >= 0.0f && across > lean && !player_input_enabled() && !cinematic_in_progress())
+		head[2] -= rise;
+		away = (real)sqrt(head[0] * head[0] + head[1] * head[1] + head[2] * head[2]);
+		if (lean >= 0.0f && away > lean && held)
 		{
-			head[0] *= lean / across;
-			head[1] *= lean / across;
+			head[0] *= lean / away;
+			head[1] *= lean / away;
+			head[2] *= lean / away;
 		}
+		head[2] += rise;
 		view_rotate(base_yaw, pitch, head, &offset);
 	}
 	camera->position.x += offset.i * view->world_units_per_metre;

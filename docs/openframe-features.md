@@ -326,16 +326,36 @@ the side). Unlike the features above, `vr.auto_recentre` is on by default.
   kept its recentred origin from before, so the eye was as far from the
   player's as the head had been from where it was then, and the menus were
   as far round.
-- `vr.auto_recentre` (default `true`): the game recentres as play comes
-  back after a load, a cinematic or the scripts holding the facing (half a
-  second or more), and places each menu in front of where you look as it
-  opens (VR Setup > PLAYER... > AUTO RECENTRE). `false`: only both grips held (or a gamepad's Back), SteamVR's
-  recentre and the headset going on recentre, and the menus are where the
-  last recentre put them, as OpenH1 had it.
+- `vr.auto_recentre` (default `true`): the game recentres (as both grips
+  do) on the first frame drawn of each level start: a map loaded (a new
+  game, CONTINUE, the next mission), a mission restarted or a checkpoint
+  gone back to (the game's time going back). That is the frame the
+  loading picture fades into the level, not the start of the load: the
+  third trial's recentre came as the 16 s of a10's pipelines began, and the
+  head moved while they were made (`port/linux/game/vr_render.c`,
+  `level_start_check`). It also recentres as play comes back after a
+  cinematic or the scripts letting go of the aim (half a second or more;
+  held back while the loading picture is up), and places each menu in
+  front of where you look as it opens (VR Setup > PLAYER... > AUTO
+  RECENTRE). It never fights your own recentre: none of its own within 5 s
+  of one by hand (both grips, a gamepad's Back, SteamVR's), and with a stick
+  pushed it waits up to 2 s for it to be let go, then gives up. `false`:
+  only both grips held (or a gamepad's Back), SteamVR's recentre and the
+  headset going on recentre, and the menus are where the last recentre put
+  them, as OpenH1 had it.
 - `vr.held_lean` (default `0.15` metres): while the scripts hold the
-  player still (the cryo tube), the head moves the view at most this far
-  across the floor from the player's eye. `10` lets it go as far as the
-  head does (VR Setup > PLAYER... > HELD LEAN).
+  player still (the cryo tube, scripted seats, a cutscene's hand-off: the
+  player's input off), and for the first 2 s of a level start (before its
+  recentre has landed), the head moves the view at most this far from where
+  it was recentred, in any direction (up and down too; standing, from the
+  head's height at the recentre). `10` lets it go as far as the head does
+  (VR Setup > PLAYER... > HELD LEAN).
+- The log (`stdout.log`) says where the head was each time: `vr: head
+  offset: F L U m (yaw D°) at level start (a map loaded)` and `... at
+  recentre (both grips held)` (metres forward, left and up of the recentred
+  head, before the recentre; the yaw it had turned), then `vr: recentred
+  (seated)`. A recentre skipped says why (`vr: level start: no recentre
+  (recentred by hand 1.2 s before)`).
 - The scripts' gaze tests (`unit_can_see_object`, `objects_can_see_flag`:
   the tutorial's lights) pass when the head looks at the thing, as well as
   when the player's facing (the controller, with `vr.aim = "controller"`)

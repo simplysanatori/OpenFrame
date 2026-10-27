@@ -528,6 +528,17 @@ int halo_vr_aim(float current_yaw, int long_gun, float *yaw, float *pitch);
 /* the aim no longer follows the head (a cinematic, a vehicle's camera
 taking over): the next halo_vr_aim starts again from the player's facing */
 void halo_vr_aim_release(void);
+/* (OpenFrame, vr.auto_recentre) a level has started: the first frame drawn
+of a new game (a map loaded, a mission restarted, a checkpoint gone back to:
+vr_render.c), which recentres (as both grips held do) unless the user did
+moments ago, once the sticks are let go; why is logged */
+void halo_vr_level_start(const char *why);
+/* whether a level started moments ago (or its recentre still waits): the
+eye is then kept near the player's (vr.held_lean: vr_render.c) */
+int halo_vr_level_settling(void);
+/* the head's rise above the origin when last recentred (game axes, metres:
+standing, the head's height less vr.player_height; seated, 0) */
+float halo_vr_recentred_rise(void);
 /* with the right controller aiming (vr.aim = "controller"), the line
 halo_vr_aim aimed along last: from the controller (game axes from the
 recentred head, metres) along its aim (halo_vr_view's aim_forward, as it is
