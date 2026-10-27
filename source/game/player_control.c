@@ -1681,7 +1681,7 @@ static void get_local_player_input_blob(
 					(port/linux/src/vr.c) */
 					extern int halo_vr_crouch(void);
 					boolean vr_physical_crouch = local_player_index == 0 &&
-						(halo_vr_crouch() & 1 /* HALO_VR_CROUCH_PHYSICAL */);
+						(halo_vr_crouch() & 3 /* HALO_VR_CROUCH_PHYSICAL | HALO_VR_CROUCH_BUTTON: the stick click crouches at a full push too, so a slide can start */);
 #endif
 
 					if (biped &&
@@ -2552,7 +2552,7 @@ static void player_control_substep_read(
 #ifdef HALO_VR
 	extern int halo_vr_crouch(void);
 	boolean vr_physical_crouch = local_player_index == 0 &&
-		(halo_vr_crouch() & 1 /* HALO_VR_CROUCH_PHYSICAL */);
+		(halo_vr_crouch() & 3 /* HALO_VR_CROUCH_PHYSICAL | HALO_VR_CROUCH_BUTTON: the stick click crouches at a full push too, so a slide can start */);
 #endif
 
 	for (button_index = 0; button_index < NUMBER_OF_ACTION_CONTROL_BUTTONS; button_index++)
