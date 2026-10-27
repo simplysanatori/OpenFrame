@@ -848,6 +848,9 @@ void halo_vr_bullet_time_off(void);
 on and not switched off by the turning stick held down); the game says
 where it shows it (vr_render.c) */
 int halo_vr_third_person(void);
+/* a pulse in both controllers, this strong (0 to 1) for this long
+(seconds): the parkour's slide and wall jump (vr_parkour.c) */
+void halo_vr_pulse(float amplitude, float seconds);
 /* this frame's eyes' images multiplied by this colour as they are
 presented, all of each, before the helmet's rim; each call multiplies it
 further (vr_seat.c's blinks, vr_death.c's dimming: the game's screen flash

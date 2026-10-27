@@ -53,6 +53,46 @@ game's (`source/render/render_objects.c` and
   rather than the aim; its switching of the hands' features off (the head
   aiming) is not carried over: the controller aims as ever.
 
+### Parkour: slide, wall jump, wall run (untested in the headset)
+
+`port/linux/game/vr_parkour.c`, from `source/units/bipeds.c` (marked port
+changes) as each tick's movement is made ready, and in each sub-step of
+`game.sim_rate`. The game's own collision moves the body; nothing is sent.
+
+- Slide: crouch (the left stick's click, or your head lowered with
+  `vr.physical_crouch`) while sprinting (`vr.sprint_mode`; the sprint now,
+  or a third of a second before, as a crouch ends a toggled sprint), on the
+  ground at a run or faster, and you slide on, crouched (the game's lower
+  height), at the speed you ran and 15% more, losing speed to friction,
+  faster down a slope, steered a little by the stick (pulled back, it
+  brakes). It ends as you stand, jump (the speed carried into the jump),
+  leave the ground, meet a wall, slow to half a run, or after 1.1 seconds.
+- Wall jump: in the air beside a wall, press Jump again to leap off it
+  where your head looks (turned off the wall at least a third of the way),
+  at least 5 m/s and as fast as you were going (up to half as fast again),
+  as high as a jump (more looking up), both times `vr.walljump_scale`; once
+  a wall until you land. The leap is held against the air control for
+  0.4 s so that the stick does not turn it back.
+- Wall run: jump at a wall with the stick pushed (past 60%) along it, within
+  a second of the jump (or two seconds of a wall jump, chaining wall to
+  wall), and you run along it at 1.5 times the speed you came with (4 to
+  9 m/s), level for 1.2 s and then easing into a fall, 2 s at most. Steer
+  away from the wall to drop off it; a wall jump leaps off it.
+- Keys: `vr.parkour` (default `false`), `vr.slide_momentum` (0.5 to 2,
+  default `1`: a slide starts `0.15 x` this faster than you ran and lasts
+  at most `0.55 + 0.55 x` this seconds), `vr.walljump_scale` (0.5 to 1.5,
+  default `1.5`, moistman42069's). Wall run's speed and time are fixed at
+  its defaults.
+- Input: the game's own (crouch, Jump, the stick); nothing taken.
+- Where: the first player, on foot, in a game of this computer alone, as
+  sprint (never online, split screen or with bots); not in a cinematic or
+  where the game takes your control.
+- Not carried over: the slide's blows to the AI (moistman42069's knockdowns
+  and damage, which need its fist combat), and grip climbing (a free hand's
+  grip on any wall pulls you up it): this port's grips already hold
+  holsters, the foregrip, magazines, grenades and a vehicle's holds, and
+  both together recentre.
+
 ### Bullet time (untested in the headset)
 
 Slows the world while your head and hands keep the display's rate. The

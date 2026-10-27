@@ -290,6 +290,11 @@ boolean network_objects_may_delete(long object_index);
 #ifdef HALO_VR
 /* port: the VR mode's sprint (vr.sprint_mode, port/linux/game/vr_comfort.c) */
 real vr_sprint_speed_scale(long biped_index);
+/* port: the VR mode's parkour (vr.parkour, port/linux/game/vr_parkour.c) */
+boolean vr_parkour_tick(long biped_index, real_point3d const *position, real height, real width,
+	real_vector3d const *facing, real run_speed, real_vector3d *velocity);
+void vr_parkour_movement(long biped_index, real_vector3d const *facing, real_vector3d *movement_desired,
+	real *acceleration_maximum);
 #endif
 
 /* port: an unarmed player's melee's length, in ticks (a weapon's is about
@@ -4257,6 +4262,21 @@ static boolean biped_physics_prepare(
 				{
 					physics.forward = biped->unit.desired_facing_vector;
 				}
+#ifdef HALO_VR
+				/* port: the VR mode's parkour, the first local player's in a
+				game of this computer alone (port/linux/game/vr_parkour.c): a
+				wall jump's or a wall run's velocity, which the tick starts
+				from (the object's too, so that the sub-steps start from it),
+				and a slide's movement (again in each sub-step:
+				biped_substep_move) */
+				if (vr_parkour_tick(biped_index, &physics.position, physics.height, physics.width,
+					&physics.forward, player_information->run_forward_speed, &physics.velocity))
+				{
+					biped->object.translational_velocity = physics.velocity;
+				}
+				vr_parkour_movement(biped_index, &physics.forward, &physics.movement_desired,
+					&physics.acceleration_maximum);
+#endif
 			}
 		}
 		else
@@ -4814,6 +4834,12 @@ static void biped_substep_move(
 					physics.forward = *global_forward3d;
 			}
 		}
+#ifdef HALO_VR
+		/* port: the VR mode's slide (port/linux/game/vr_parkour.c), as the
+		tick's (biped_physics_prepare) */
+		vr_parkour_movement(biped_index, &physics.forward, &physics.movement_desired,
+			&physics.acceleration_maximum);
+#endif
 	}
 	if (substep_index == 0)
 		datum->tick_position = physics.position;

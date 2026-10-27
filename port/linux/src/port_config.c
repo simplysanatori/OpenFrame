@@ -638,6 +638,17 @@ static const struct config_setting config_settings[] =
 	{ "vr.third_person_distance", _config_real, "1.7", "HALO_VR_THIRD_PERSON_DISTANCE", _environment_value, _platform_desktop,
 		"How far behind your head the third person's view is, in metres, 1 to\n"
 		"4 (walls bring it nearer)." },
+	{ "vr.parkour", _config_boolean, "false", "HALO_VR_PARKOUR", _environment_value, _platform_desktop,
+		"Parkour, in a game of this computer alone (the campaign; never online,\n"
+		"split screen or with bots): crouching as you sprint slides on with the\n"
+		"run's momentum; jumping again in the air beside a wall leaps off it\n"
+		"where you look; jumping at a wall with the stick pushed along it runs\n"
+		"along the wall for a moment." },
+	{ "vr.slide_momentum", _config_real, "1.0", "HALO_VR_SLIDE_MOMENTUM", _environment_value, _platform_desktop,
+		"Parkour, a slide's momentum, 0.5 to 2: how much faster than the run it\n"
+		"starts and how long it may last (1: 15% faster, at most 1.1 seconds)." },
+	{ "vr.walljump_scale", _config_real, "1.5", "HALO_VR_WALLJUMP_SCALE", _environment_value, _platform_desktop,
+		"Parkour, a wall jump's strength, 0.5 to 1.5, times the jump's." },
 	{ "vr.death_view", _config_string, "\"crt\"", "HALO_VR_DEATH_VIEW", _environment_value, _platform_desktop,
 		"As you die: \"crt\" the helmet's view switches off as a CRT does and\n"
 		"cuts to a death cam, a feed from beside your body (the right stick\n"

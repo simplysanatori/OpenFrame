@@ -4004,6 +4004,15 @@ int halo_vr_third_person(void)
 	return vr.initialized && settings.third_person && vr.third_person_on;
 }
 
+void halo_vr_pulse(float amplitude, float seconds)
+{
+	if (vr.initialized)
+	{
+		hand_haptic(0, amplitude, seconds);
+		hand_haptic(1, amplitude, seconds);
+	}
+}
+
 /* the comfort vignette, once a frame (VIGNETTE_* above): a vehicle's asks
 (vr.vignette = "vehicle", the default), the sticks' too ("always": comfort_
 update), stronger or lighter by vr.vignette_strength */

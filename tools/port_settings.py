@@ -159,7 +159,7 @@ VR_SCREENS = {
              "The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy.",
              None),
             ("COMFORT, SPRINT...", None, VR_COMFORT,
-             "The comfort vignette, sprinting, bullet time\nand the third person.", None),
+             "The comfort vignette, sprinting, bullet time,\nthe third person and parkour.", None),
         ],
     },
 }
@@ -242,6 +242,14 @@ VR_SCREENS["vr_comfort"] = {
         ("VIEW DISTANCE:", "vr.third_person_distance",
          [(f"{distance:g} M", f"{distance:g}") for distance in (1, 1.5, 1.7, 2, 2.5, 3, 4)],
          "How far behind your head the third person's view\nis (walls bring it nearer).", None),
+        ("PARKOUR:", "vr.parkour", ON_OFF,
+         "Offline: crouch as you sprint to slide, jump off\nwalls and run along them.", None),
+        ("SLIDE MOMENTUM:", "vr.slide_momentum",
+         [(f"{momentum:g}X", f"{momentum:g}") for momentum in (0.5, 0.75, 1, 1.5, 2)],
+         "How fast a slide starts and how long it lasts.", None),
+        ("WALL JUMP:", "vr.walljump_scale",
+         [(f"{scale:g}X", f"{scale:g}") for scale in (0.5, 0.75, 1, 1.25, 1.5)],
+         "How strong a jump off a wall is.", None),
     ],
 }
 SCREENS.update(VR_SCREENS)

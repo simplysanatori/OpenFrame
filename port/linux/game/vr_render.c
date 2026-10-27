@@ -1820,6 +1820,16 @@ boolean vr_render_world_place(real_point3d const *point, float place[3])
 	return TRUE;
 }
 
+/* vr_parkour.c: where the head looked (in the world, its pitch too) as the
+last eye pass drew it while the VR mode aimed the player; FALSE, none */
+boolean vr_render_head_forward(real_vector3d *forward)
+{
+	if (!vr_render.aim_base_valid)
+		return FALSE;
+	view_rotate(vr_render.base_yaw, view_pitch(), vr_render.view.head_forward, forward);
+	return normalize3d(forward) > 0.0f;
+}
+
 /* first_person_legs.c: where the player's body is drawn in the eye pass,
 under the real head rather than the game's eye: the top of the neck
 (halo_vr_view's body_neck) in the world, and the body's heading there;
