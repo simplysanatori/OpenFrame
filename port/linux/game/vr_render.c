@@ -52,6 +52,7 @@ though they aim nothing (cinematic_head).
 #include "tag_files/tag_files.h"
 #include "interface/hud.h"
 #include "interface/hud_unit.h"
+#include "interface/hud_messaging.h"
 #include "game/game_engine.h"
 #include "physics/collision_usage.h"
 #include "physics/collisions.h"
@@ -566,6 +567,158 @@ static void crouch_log(real lift)
 		(vr_render.base_position.z - lift - biped->object.position.z) / units, lift / units, view->head_position[2]);
 }
 
+/* ---------- the third person on foot
+
+vr.third_person (docs/openframe-features.md; ported from
+HaloCE-DecompRemix-VR by moistman42069, AGPL-3.0-or-later: its VR third
+person, vr_third_person.c and third_person.c, the camera behind the player
+along the body's heading rather than the aim, so that aiming swings
+nothing). On foot, the eye pass is drawn from behind and above the head:
+the head's own place and turn as ever (it leans and looks about from
+there), moved back along the body's heading (vr.c's: the head's, followed
+past a turn and slowly) by vr.third_person_distance, up THIRD_PERSON_UP and
+right THIRD_PERSON_RIGHT, brought in by what is between (pulled in at
+once, let out at THIRD_PERSON_EASE_OUT). Only the view moves: the hands,
+the aim (the controller's, from the hand where the body is), the reticle
+and the listener stay the body's, and the body is drawn as the game
+animates it, its weapon in its hands (render_objects.c), the first-person
+weapon and hands not (first_person_weapons.c). Never in a multiplayer
+game (seeing round corners), a vehicle's seat, a cinematic, zoomed, dead or
+climbing a vehicle; the turning stick held down switches it (vr.c). */
+
+/* metres: above the head, to its right, nearest the head, kept off a wall;
+the speed it is let out at (metres a second) */
+#define THIRD_PERSON_UP 0.3f
+#define THIRD_PERSON_RIGHT 0.25f
+#define THIRD_PERSON_NEAREST 0.3f
+#define THIRD_PERSON_WALL_GAP 0.2f
+#define THIRD_PERSON_EASE_OUT 2.0f
+
+static real body_heading(void);
+double config_real(char const *name);
+unsigned long config_changes(void);
+boolean vr_climb_active(void);
+
+static struct
+{
+	/* this frame's eye pass is drawn from behind (vr_render_camera to
+	vr_render_end), and the player's unit drawn there */
+	boolean shown;
+	long unit_index;
+	/* how far back it is now (metres, as the walls let it), and was */
+	boolean distance_valid;
+	real distance;
+	/* vr.third_person_distance (metres), read as the settings change */
+	unsigned long changes;
+	real setting;
+	/* halo_vr_third_person as the HUD last said it */
+	boolean asked;
+} third_person = { FALSE, NONE, FALSE, 0.0f, (unsigned long)-1, 1.7f, FALSE };
+
+/* the first player's unit, if the view may be drawn from behind it now */
+static long third_person_unit(boolean dead)
+{
+	long player_index = local_player_get_player_index(0);
+	long unit_index;
+	struct object_datum *object;
+
+	if (!halo_vr_third_person() || dead || player_index == NONE || cinematic_in_progress() || !halo_vr_aiming() ||
+		game_engine_running() || vr_render.seated_unit_index != NONE || vr_climb_active() ||
+		director_get_perspective(0) != _director_perspective_first_person ||
+		player_control_get_zoom_level(0) != NONE)
+	{
+		return NONE;
+	}
+	unit_index = player_get(player_index)->unit_index;
+	object = unit_index != NONE ? object_try_and_get(unit_index) : NULL;
+	if (!object || object->object.type != _object_type_biped || object->object.parent_object_index != NONE ||
+		TEST_FLAG(object->object.damage_flags, _object_dead_bit))
+	{
+		return NONE;
+	}
+	return unit_index;
+}
+
+/* the HUD says the switch (not each vehicle or zoom that suspends it) */
+static void third_person_message(void)
+{
+	boolean asked = halo_vr_third_person() != 0;
+
+	if (asked == third_person.asked)
+		return;
+	third_person.asked = asked;
+	if (local_player_get_player_index(0) == NONE)
+		return;
+	if (asked && game_engine_running())
+		hud_print_message(0, L"Third person: not in multiplayer");
+	else
+		hud_print_message(0, asked ? L"Third person" : L"First person");
+}
+
+/* the eye (the head, in the world) moved behind and above it, on foot,
+for the unit (third_person_unit) */
+static void third_person_eye(long unit_index, real_point3d *eye)
+{
+	struct halo_vr_view const *view = &vr_render.view;
+	real units = view->world_units_per_metre;
+	real yaw = vr_render.base_yaw + body_heading();
+	real c = (real)cos(yaw), s = (real)sin(yaw);
+	real reach, length;
+	real_vector3d vector;
+	struct collision_result collision;
+
+	if (third_person.changes != config_changes())
+	{
+		third_person.changes = config_changes();
+		third_person.setting = (real)config_real("vr.third_person_distance");
+		if (!(third_person.setting >= 1.0f && third_person.setting <= 4.0f))
+			third_person.setting = third_person.setting > 4.0f ? 4.0f : third_person.setting > 0.0f ? 1.0f : 1.7f;
+	}
+	/* (back along the heading, right of it, up) */
+	vector.i = (-c * third_person.setting + s * THIRD_PERSON_RIGHT) * units;
+	vector.j = (-s * third_person.setting - c * THIRD_PERSON_RIGHT) * units;
+	vector.k = THIRD_PERSON_UP * units;
+	length = (real)sqrt(third_person.setting * third_person.setting + THIRD_PERSON_RIGHT * THIRD_PERSON_RIGHT +
+		THIRD_PERSON_UP * THIRD_PERSON_UP);
+	reach = length;
+	if (global_current_collision_user_depth < MAXIMUM_COLLISION_USER_STACK_DEPTH)
+	{
+		global_current_collision_users[global_current_collision_user_depth++] = _collision_user_ui;
+		if (collision_test_vector(FLAG(_collision_test_front_facing_surfaces_bit) | FLAG(_collision_test_structure_bit) |
+			FLAG(_collision_test_objects_bit) | FLAG(_collision_test_objects_vehicles_bit) |
+			FLAG(_collision_test_objects_scenery_bit) | FLAG(_collision_test_objects_machines_bit),
+			eye, &vector, object_get_ultimate_parent(unit_index), &collision))
+		{
+			reach = collision.t * length - THIRD_PERSON_WALL_GAP;
+		}
+		--global_current_collision_user_depth;
+	}
+	reach = PIN(reach, MIN(THIRD_PERSON_NEAREST, length), length);
+	/* (nearer at once, farther eased out) */
+	if (!third_person.distance_valid || reach < third_person.distance)
+		third_person.distance = reach;
+	else
+		third_person.distance = MIN(reach, third_person.distance + THIRD_PERSON_EASE_OUT * view->seconds);
+	third_person.distance_valid = TRUE;
+	eye->x += vector.i * third_person.distance / length;
+	eye->y += vector.j * third_person.distance / length;
+	eye->z += vector.k * third_person.distance / length;
+}
+
+/* render_objects.c: the object is the first player's unit, drawn in this
+eye pass from behind it (not taken for the first person's own body) */
+boolean vr_render_third_person_object(long object_index)
+{
+	return vr_render.active && third_person.shown && object_index != NONE && object_index == third_person.unit_index;
+}
+
+/* first_person_weapons.c: the eye pass is drawn from behind the player: no
+first-person weapon nor hands (nor what the VR mode's hands hold) */
+boolean vr_render_third_person(void)
+{
+	return vr_render.active && third_person.shown;
+}
+
 /* turns the window's camera into the VR frame's centre camera (both its
 render and rasterizer cameras); FALSE without a VR frame to draw */
 /* The projection and culling frusta depend only on the current camera/pose. */
@@ -692,6 +845,7 @@ boolean vr_render_camera(struct render_camera *camera, struct render_camera *ras
 	vr_render.weapon_camera_valid = FALSE;
 	vr_render.weapon_in_hand = FALSE;
 	vr_render.cinematic_head = FALSE;
+	third_person.shown = FALSE;
 	if (!halo_vr_view(view))
 		return FALSE;
 	game_eye = camera->position;
@@ -802,6 +956,16 @@ boolean vr_render_camera(struct render_camera *camera, struct render_camera *ras
 	vr_death_camera(&camera->position, &camera->forward, &camera->up,
 		(real)atan(MIN(-MIN(view->fov[0][0], view->fov[1][0]), MAX(view->fov[0][1], view->fov[1][1]))),
 		(real)atan(MIN(MAX(view->fov[0][2], view->fov[1][2]), -MIN(view->fov[0][3], view->fov[1][3]))));
+	/* (on foot, the view from behind and above, vr.third_person: the eye
+	alone, after the head is placed and tested against the walls) */
+	if (!preparing)
+		third_person_message();
+	third_person.unit_index = third_person_unit(dead);
+	third_person.shown = third_person.unit_index != NONE;
+	if (third_person.shown)
+		third_person_eye(third_person.unit_index, &camera->position);
+	else
+		third_person.distance_valid = FALSE;
 	crouch_log(lift);
 	/* (the gamepad's weapon, posed from the eye whichever way the head
 	leans, comes down with the head's crouch as far as the game's drop is
@@ -1272,7 +1436,7 @@ boolean vr_render_scope_view(struct render_camera *weapon_camera, real_point3d e
 	boolean placed;
 
 	if (!vr_render.active || !vr_render.view.controller_aim || !halo_vr_aiming() || cinematic_in_progress() ||
-		vr_render.seated_unit_index != NONE)
+		vr_render.seated_unit_index != NONE || third_person.shown)
 	{
 		return FALSE;
 	}
@@ -1765,6 +1929,7 @@ boolean vr_render_long_gun(long weapon_index)
 void vr_render_end(void)
 {
 	vr_render.active = FALSE;
+	third_person.shown = FALSE;
 	structure_culling_set_camera_radius(0.0f);
 	vr_render.seated_unit_index = NONE;
 	vr_render.infinite = FALSE;

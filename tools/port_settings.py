@@ -159,7 +159,7 @@ VR_SCREENS = {
              "The HUD on your helmet's visor: its depths, its\nglass and glow, the helmet's rim, the shields' energy.",
              None),
             ("COMFORT, SPRINT...", None, VR_COMFORT,
-             "The comfort vignette, sprinting and bullet time.", None),
+             "The comfort vignette, sprinting, bullet time\nand the third person.", None),
         ],
     },
 }
@@ -236,6 +236,12 @@ VR_SCREENS["vr_comfort"] = {
         ("BULLET TIME SPEED:", "vr.bullet_time_scale",
          [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
          "How fast the world runs in bullet time.", None),
+        ("THIRD PERSON:", "vr.third_person", ON_OFF,
+         "On foot, the view from behind you (not in\nmultiplayer); hold the right stick down to switch.",
+         None),
+        ("VIEW DISTANCE:", "vr.third_person_distance",
+         [(f"{distance:g} M", f"{distance:g}") for distance in (1, 1.5, 1.7, 2, 2.5, 3, 4)],
+         "How far behind your head the third person's view\nis (walls bring it nearer).", None),
     ],
 }
 SCREENS.update(VR_SCREENS)

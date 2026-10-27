@@ -628,6 +628,16 @@ static const struct config_setting config_settings[] =
 		"hands stay at full speed; the sounds keep their pitch." },
 	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
 		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
+	{ "vr.third_person", _config_boolean, "false", "HALO_VR_THIRD_PERSON", _environment_value, _platform_desktop,
+		"On foot, the view from behind and above your body (the campaign and\n"
+		"other games without a multiplayer engine): your body drawn as others\n"
+		"see it, the weapon aimed by the controller as ever, the HUD as ever.\n"
+		"Holding the right stick down (three quarters of a second) switches\n"
+		"between it and the first person. A vehicle's seat, a scope, death and\n"
+		"the cinematics keep their own views." },
+	{ "vr.third_person_distance", _config_real, "1.7", "HALO_VR_THIRD_PERSON_DISTANCE", _environment_value, _platform_desktop,
+		"How far behind your head the third person's view is, in metres, 1 to\n"
+		"4 (walls bring it nearer)." },
 	{ "vr.death_view", _config_string, "\"crt\"", "HALO_VR_DEATH_VIEW", _environment_value, _platform_desktop,
 		"As you die: \"crt\" the helmet's view switches off as a CRT does and\n"
 		"cuts to a death cam, a feed from beside your body (the right stick\n"

@@ -218,6 +218,14 @@ SPRINT_BACK or sideways past SPRINT_SIDEWAYS. */
 #define STICK_UP_RELEASED 0.55f
 #define STICK_UP_SIDEWAYS 0.6f
 #define STICK_UP_HOLD_SECONDS 0.5f
+/* vr.third_person (comfort_update; after HaloCE-DecompRemix-VR's VR third
+person by moistman42069, AGPL-3.0-or-later): the turning stick pushed down
+(as STICK_UP_* above, the other way) and held STICK_DOWN_HOLD_SECONDS
+switches the view on foot between the first person and the third. Its
+down is no game control while the controllers aim; with vr.manual_reload
+a push down ejects the magazine first, as ever (a hold, not a flick, so
+that an eject does not switch the view) */
+#define STICK_DOWN_HOLD_SECONDS 0.75f
 #define SPRINT_STOP_SECONDS 1.0f
 #define SPRINT_STOP_PUSH 0.2f
 #define SPRINT_BACK (-0.15f)
@@ -669,6 +677,15 @@ static struct
 	float arm_heights[2];
 	float arm_speeds[2];
 	int bullet_time_on;
+	/* the turning stick held down (and for how long, and whether this
+	push has been taken) and the third person on foot (toggled on: on as
+	vr.third_person turns on); vr.third_person as comfort_update last saw
+	it */
+	int stick_down;
+	float stick_down_seconds;
+	int stick_down_taken;
+	int third_person_on;
+	int third_person_was;
 	/* debug.vr_test_target: the right controller pointed along this
 	(halo_vr_test_point: game axes from the recentred head), if set */
 	int test_point_valid;
@@ -990,6 +1007,8 @@ static struct
 	float sprint_speed;
 	int bullet_time;
 	float bullet_time_scale;
+	/* vr.third_person (comfort_update) */
+	int third_person;
 	/* vr.late_latch */
 	int late_latch;
 	float test_turn;
@@ -1152,6 +1171,7 @@ static void settings_read(void)
 	if (!(settings.bullet_time_scale >= 0.2f && settings.bullet_time_scale <= 0.8f))
 		settings.bullet_time_scale = settings.bullet_time_scale > 0.8f ? 0.8f :
 			settings.bullet_time_scale > 0.0f && settings.bullet_time_scale < 0.2f ? 0.2f : 0.4f;
+	settings.third_person = config_boolean("vr.third_person");
 	settings.late_latch = config_boolean("vr.late_latch");
 	settings.test_turn = (float)config_real("debug.vr_test_turn") * (float)M_PI / 180.0f;
 	settings.test_jitter = (float)config_real("debug.vr_test_jitter") * 0.001f;
@@ -3852,9 +3872,34 @@ static void comfort_update(float seconds, float turn)
 	float up = vr.input.right_stick[1], sideways = fabsf(vr.input.right_stick[0]);
 	float move = comfort_stick(vr.input.left_stick[0], vr.input.left_stick[1]);
 	float asked = 0.0f;
-	int was_up = vr.stick_up;
+	int was_up = vr.stick_up, was_down = vr.stick_down;
 
 	arm_swing_update(seconds);
+	/* the third person on foot: on as vr.third_person turns on, switched
+	by the turning stick held down (STICK_DOWN_HOLD_SECONDS) */
+	if (settings.third_person != vr.third_person_was)
+	{
+		vr.third_person_was = settings.third_person;
+		vr.third_person_on = settings.third_person;
+	}
+	vr.stick_down = able && sideways < STICK_UP_SIDEWAYS && -up > (vr.stick_down ? STICK_UP_RELEASED : STICK_UP_PRESSED);
+	if (vr.stick_down)
+	{
+		vr.stick_down_seconds = was_down ? vr.stick_down_seconds + seconds : 0.0f;
+		if (!vr.stick_down_taken && settings.third_person && vr.stick_down_seconds >= STICK_DOWN_HOLD_SECONDS)
+		{
+			vr.stick_down_taken = 1;
+			vr.third_person_on = !vr.third_person_on;
+			hand_haptic(0, 0.3f, 0.05f);
+			hand_haptic(1, 0.3f, 0.05f);
+			platform_log("vr: third person %s", vr.third_person_on ? "on" : "off");
+		}
+	}
+	else
+	{
+		vr.stick_down_seconds = 0.0f;
+		vr.stick_down_taken = 0;
+	}
 	vr.stick_up = able && sideways < STICK_UP_SIDEWAYS && up > (vr.stick_up ? STICK_UP_RELEASED : STICK_UP_PRESSED);
 	if (vr.stick_up)
 	{
@@ -3952,6 +3997,11 @@ float halo_vr_bullet_time(void)
 void halo_vr_bullet_time_off(void)
 {
 	vr.bullet_time_on = 0;
+}
+
+int halo_vr_third_person(void)
+{
+	return vr.initialized && settings.third_person && vr.third_person_on;
 }
 
 /* the comfort vignette, once a frame (VIGNETTE_* above): a vehicle's asks

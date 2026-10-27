@@ -17,6 +17,42 @@ AGPL-3.0-or-later, as OpenH1 is), re-implemented on OpenH1's VR layer
 share almost no code, so mostly the ideas and the tuning were carried over;
 the few functions whose lines came across say so at their top.
 
+### Third person on foot (untested in the headset)
+
+On foot, the view from behind and above you, your body drawn as the game
+animates it for everyone else, its weapon in its hands. Only the view
+moves: you still aim with the controller from where your body's hand is
+(the reticle where it points), the HUD is as ever, and you hear from your
+body. The view sits back along your body's heading (the head's, which it
+follows past a turn and slowly, so aiming and glancing about swing
+nothing), 0.3 m above the head and 0.25 m to its right; your head looks and
+leans about from there. A wall between brings it in at once, and it eases
+back out. The first-person weapon and hands (and what they hold: a
+grenade, a magazine, the holstered weapon) are not drawn. It is OpenH1's
+own VR view (`port/linux/game/vr_render.c`) with the eye moved, as its
+vehicle third person rides the game's chase camera; the body is the
+game's (`source/render/render_objects.c` and
+`source/interface/first_person_weapons.c`, marked port changes).
+
+- Keys: `vr.third_person` (default `false`), `vr.third_person_distance`
+  (metres behind the head, 1 to 4, default `1.7`).
+- Input: hold the turning stick (the right, or the left with
+  `vr.swap_sticks`) pushed down for three quarters of a second to switch
+  between it and the first person (it starts in the third person as you
+  turn the setting on). The stick's down is no game control while the
+  controllers aim; with `vr.manual_reload` (on by default) the push still
+  ejects the magazine first, as ever, so switching with a magazine that can
+  be ejected ejects it. The HUD says "Third person" and "First person".
+- Where: on foot, alive, not zoomed (the scopes and the smart-link are the
+  first person's), not in a vehicle's seat (`vr.vehicle_view` has its own
+  third person), a cinematic or as you die; never in a multiplayer game
+  (it would see round corners; the HUD says "Third person: not in
+  multiplayer").
+- After moistman42069's VR third person (`vr_third_person.c`,
+  `third_person.c`), which also has the camera behind along the heading
+  rather than the aim; its switching of the hands' features off (the head
+  aiming) is not carried over: the controller aims as ever.
+
 ### Bullet time (untested in the headset)
 
 Slows the world while your head and hands keep the display's rate. The

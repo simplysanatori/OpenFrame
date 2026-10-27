@@ -844,6 +844,10 @@ int halo_vr_sprint_toggled(void);
 turned off, where the game will not slow the world (vr_comfort.c) */
 float halo_vr_bullet_time(void);
 void halo_vr_bullet_time_off(void);
+/* the third person on foot (vr.third_person): asked for now (the setting
+on and not switched off by the turning stick held down); the game says
+where it shows it (vr_render.c) */
+int halo_vr_third_person(void);
 /* this frame's eyes' images multiplied by this colour as they are
 presented, all of each, before the helmet's rim; each call multiplies it
 further (vr_seat.c's blinks, vr_death.c's dimming: the game's screen flash

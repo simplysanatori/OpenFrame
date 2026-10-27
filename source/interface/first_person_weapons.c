@@ -416,6 +416,8 @@ boolean vr_render_eye_pass(void);
 /* and the hands on a vehicle's handlebars, without the weapon, from its
 seat (port/linux/game/vr_vehicle.c) */
 boolean vr_render_handlebar_hands(void);
+/* port: the view from behind the player on foot (vr.third_person) */
+boolean vr_render_third_person(void);
 /* port/linux/game/vr_climb.c's: a hand holds a vehicle's hold, climbing
 it */
 boolean vr_climb_hands_hold(void);
@@ -531,7 +533,9 @@ void first_person_weapon_draw(
 	if (!viewmodel_is_visible())
 		return;
 #ifdef HALO_VR
-	if (vr_render_scope_pass())
+	/* (port: nor from behind the player, vr.third_person, whose body holds
+	its weapon) */
+	if (vr_render_scope_pass() || (render.local_player_index==0 && vr_render_third_person()))
 		return;
 #endif
 	if (render.local_player_index!=NONE)
@@ -821,6 +825,10 @@ void first_person_weapon_render_update(
 			Ghost's: port/linux/game/vr_vehicle.c), without the weapon */
 			if (render.local_player_index==0 && vr_render_handlebar_hands())
 				visible= TRUE;
+			/* port: from behind the player on foot (vr.third_person:
+			port/linux/game/vr_render.c), the body's weapon alone */
+			if (render.local_player_index==0 && vr_render_third_person())
+				visible= FALSE;
 #endif
 
 			first_person_weapon_set_visibility(render.local_player_index, visible);

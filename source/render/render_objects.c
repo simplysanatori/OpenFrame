@@ -490,6 +490,15 @@ static boolean object_is_first_person_camera(
 		if (vr_render_hides_object(object_index))
 			return TRUE;
 	}
+	{
+		/* port: the VR mode's view from behind the player on foot
+		(vr.third_person, port/linux/game/vr_render.c): its body drawn as
+		others see it */
+		extern boolean vr_render_third_person_object(long object_index);
+
+		if (vr_render_third_person_object(object_index))
+			return FALSE;
+	}
 #endif
 	return (unit_index == object_index &&
 		director_get_perspective(render.local_player_index) ==
