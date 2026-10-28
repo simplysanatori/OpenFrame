@@ -24,6 +24,14 @@ its release is nothing. A push begun while the gesture is not able (menus, a
 vehicle), or kept from it longer than STICK_UP_ABLE_SECONDS, is spent: it
 does nothing, and only a new push after letting go counts.
 
+With hold 2 (vr.bullet_time_binding = "double_flick" or "off", and the
+third person's double flick down): a push is a flick at once, as it begins,
+and it goes on to be a hold as well if held STICK_UP_HOLD_SECONDS (the
+result then is the hold, the flick before it already given): whoever acts
+on the flick undoes it at the hold, so that a held stick, a camera script's
+second of it, does nothing in the end. stick_double (below) reads two
+flicks quickly in a row.
+
 When a push is over, ended is set for that call: ended_seconds is how long
 it was held, ended_result what it came to (STICK_GESTURE_*, none: spent),
 and ended_across and ended_along the most sideways and the least forward it
@@ -49,6 +57,13 @@ along it keeps; the third person's stick down uses the first three, plain) */
 #define STICK_GESTURE_NONE 0
 #define STICK_GESTURE_FLICK 1
 #define STICK_GESTURE_HOLD 2
+/* the hold parameter: no hold (a flick at once), a hold or a flick (let go
+early), a flick at once and a hold as well */
+#define STICK_HOLD_NONE 0
+#define STICK_HOLD_OR_FLICK 1
+#define STICK_HOLD_AFTER_FLICK 2
+/* two flicks quickly in a row: the seconds from the first's end */
+#define STICK_DOUBLE_SECONDS 0.35f
 
 struct stick_gesture
 {
@@ -67,6 +82,10 @@ struct stick_gesture
 	int ended_result;
 	float ended_across;
 	float ended_along;
+	/* seconds of the push's last frames out of the cone (its grace), and
+	whether the flick of a hold of 2 was given */
+	float ended_gap;
+	int flicked;
 	/* what the push has come to (a flick, a hold) */
 	int result;
 };
@@ -106,7 +125,7 @@ static inline int stick_gesture_update(struct stick_gesture *g, int able, float 
 	{
 		if (g->held)
 		{
-			if (g->unable < STICK_UP_ABLE_SECONDS && !g->taken)
+			if (g->unable < STICK_UP_ABLE_SECONDS && !g->taken && !g->flicked)
 			{
 				result = STICK_GESTURE_FLICK;
 				g->result = result;
@@ -116,8 +135,10 @@ static inline int stick_gesture_update(struct stick_gesture *g, int able, float 
 			g->ended_result = g->result;
 			g->ended_across = g->across;
 			g->ended_along = g->along;
+			g->ended_gap = g->gap + seconds;
 		}
 		g->held = 0;
+		g->flicked = 0;
 		g->seconds = 0.0f;
 		g->taken = 0;
 		g->gap = 0.0f;
@@ -134,6 +155,7 @@ static inline int stick_gesture_update(struct stick_gesture *g, int able, float 
 		g->result = STICK_GESTURE_NONE;
 		/* (begun not able: spent) */
 		g->taken = !able;
+		g->flicked = 0;
 	}
 	else
 	{
@@ -150,7 +172,25 @@ static inline int stick_gesture_update(struct stick_gesture *g, int able, float 
 		g->taken = 1;
 	if (g->taken || !able)
 		return STICK_GESTURE_NONE;
-	if (!hold)
+	if (hold == STICK_HOLD_AFTER_FLICK)
+	{
+		/* (the flick as the push begins, the hold when it has lasted; a
+		push of a flick that is let go is nothing more) */
+		if (g->seconds >= STICK_UP_HOLD_SECONDS)
+		{
+			g->taken = 1;
+			g->result = STICK_GESTURE_HOLD;
+			return STICK_GESTURE_HOLD;
+		}
+		if (!g->flicked)
+		{
+			g->flicked = 1;
+			g->result = STICK_GESTURE_FLICK;
+			return STICK_GESTURE_FLICK;
+		}
+		return STICK_GESTURE_NONE;
+	}
+	if (hold == STICK_HOLD_NONE)
 		result = STICK_GESTURE_FLICK;
 	else if (g->seconds >= STICK_UP_HOLD_SECONDS)
 		result = STICK_GESTURE_HOLD;
@@ -160,6 +200,74 @@ static inline int stick_gesture_update(struct stick_gesture *g, int able, float 
 		g->result = result;
 	}
 	return result;
+}
+
+/* two flicks quickly in a row (the double flick): the first flick acts at
+once (kind says how: STICK_KIND_*), and if the second begins within
+STICK_DOUBLE_SECONDS of the first's end, the caller undoes the first and
+does the double's. A hold (hold 2) that comes of the first's push undoes it
+and ends the chance. */
+#define STICK_KIND_NOTHING 0
+#define STICK_KIND_TOGGLED 1
+#define STICK_ACT_NONE 0
+/* a flick on its own: the caller acts, then sets kind */
+#define STICK_ACT_FLICK 1
+/* the second flick: undo the first's toggle (kind TOGGLED), and go on to
+the double's */
+#define STICK_ACT_DOUBLE 2
+/* the push of the first flick came to a hold: undo it by kind */
+#define STICK_ACT_HOLD 3
+
+struct stick_double
+{
+	/* a flick done and its push still held or its chance open; the push let
+	go; seconds since it ended; what the flick did */
+	int armed;
+	int released;
+	float since;
+	int kind;
+};
+
+/* one frame: gesture, what stick_gesture_update returned; the gesture's
+ended flag and seconds out of the cone at its end; seconds the frame's;
+doubles, whether two flicks in a row mean something (else only the hold's
+undo does) */
+static inline int stick_double_update(struct stick_double *d, int gesture, int ended, float ended_gap, float seconds,
+	int doubles)
+{
+	if (d->armed && !d->released && ended)
+	{
+		d->released = 1;
+		d->since = ended_gap;
+	}
+	else if (d->armed && d->released)
+	{
+		d->since += seconds;
+	}
+	if (d->armed && d->released && d->since > STICK_DOUBLE_SECONDS)
+		d->armed = 0;
+	if (gesture == STICK_GESTURE_HOLD)
+	{
+		int act = d->armed && !d->released ? STICK_ACT_HOLD : STICK_ACT_NONE;
+
+		if (act == STICK_ACT_HOLD)
+			d->armed = 0;
+		return act;
+	}
+	if (gesture == STICK_GESTURE_FLICK)
+	{
+		if (doubles && d->armed && d->released)
+		{
+			d->armed = 0;
+			return STICK_ACT_DOUBLE;
+		}
+		d->armed = 1;
+		d->released = 0;
+		d->since = 0.0f;
+		d->kind = STICK_KIND_NOTHING;
+		return STICK_ACT_FLICK;
+	}
+	return STICK_ACT_NONE;
 }
 
 #endif

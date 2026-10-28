@@ -378,6 +378,9 @@
 	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/header_vr_fists">
 		<frame png="ce/port/main_menu/settings_select/player_setup/player_profile_edit/vr_fists/header_vr_fists.png" width="512" height="64"/>
 	</bitmap>
+	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/header_vr_gestures">
+		<frame png="ce/port/main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/header_vr_gestures.png" width="512" height="64"/>
+	</bitmap>
 	<bitmap name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/header_vr_hands">
 		<frame png="ce/port/main_menu/settings_select/player_setup/player_profile_edit/vr_hands/header_vr_hands.png" width="512" height="64"/>
 	</bitmap>

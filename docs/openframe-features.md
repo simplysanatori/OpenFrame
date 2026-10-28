@@ -149,8 +149,12 @@ game's (`source/render/render_objects.c` and
 `source/interface/first_person_weapons.c`, marked port changes).
 
 - Keys: `vr.third_person` (default `false`), `vr.third_person_distance`
-  (metres behind the head, 1 to 4, default `1.7`).
-- Input: hold the turning stick (the right, or the left with
+  (metres behind the head, 1 to 4, default `1.7`), `vr.third_person_binding`
+  (`"hold"`, the default, unchanged; `"double_flick_down"`: two quick flicks
+  down of the turning stick, the second within 0.35 s of the first's end, for
+  a Steam Input script that holds the stick; a single flick down, or a hold,
+  does nothing here, bar `vr.manual_reload`'s eject; `"off"`).
+- Input, `"hold"`: hold the turning stick (the right, or the left with
   `vr.swap_sticks`) pushed down for three quarters of a second to switch
   between it and the first person (it starts in the third person as you
   turn the setting on). The stick's down is no game control while the
@@ -237,10 +241,27 @@ it is saved: a checkpoint or a saved game knows nothing of it, and a revert
 turns it off. It eases in and out over about a sixth of a second.
 
 - Keys: `vr.bullet_time` (default `false`), `vr.bullet_time_scale` (the
-  world's speed, 0.2 to 0.8, default `0.4`).
-- Input: hold the turning stick (the right, or the left with
-  `vr.swap_sticks`) pushed up for 0.8 s; a flick up (or another hold) ends
-  it. "Up" is a wide cone (`vr_stick_gesture.h`): the push begins past 0.6
+  world's speed, 0.2 to 0.8, default `0.4`), `vr.bullet_time_binding`
+  (`"double_flick"`, the default; `"hold"`; `"off"`).
+- Input, `"double_flick"` (the default; a hold of 0.8 s was the first binding
+  and conflicts with a Steam Input script that holds the stick for a second):
+  two quick flicks up of the turning stick (the right, or the left with
+  `vr.swap_sticks`), the second beginning within 0.35 s of the first's end.
+  The first flick toggles sprint at once as ever (no added latency); the
+  second undoes that toggle (sprint is back as it was, the HUD may say
+  "Sprint" and "Sprint off" in between: a sprint blip of 0.3 s, which a slide
+  begun then may read as a sprint within its last third of a second) and
+  toggles bullet time ("Bullet time", "Bullet time off"), on or off alike.
+  Sprint and bullet time are independent: a single flick toggles sprint
+  whether bullet time is on or not, and only the double flick toggles bullet
+  time (nothing else ends it but a cinematic, death, the menus' and the
+  offline-only rules, and the setting). A push held 0.8 s does nothing: its
+  flick (sprint) is undone at the hold, so a script's one-second hold
+  neither sprints nor slows time. (With `vr.bullet_time` off the same holds still
+  undo their flick.) `"hold"`: hold the stick up for 0.8 s to toggle bullet
+  time, on or off alike; a flick toggles sprint, bullet time on or off (with
+  bullet time enabled it waits for the stick's release). `"off"`: bullet time never
+  from the stick (flicks sprint; holds do nothing). "Up" is a wide cone (`vr_stick_gesture.h`): the push begins past 0.6
   and more up than sideways (within 45 degrees of straight up), and is kept
   while past 0.4 and within 54 degrees; a thumb's drift, or a dip out of the
   cone shorter than 0.15 s, or a game frame or two that did not say you are
@@ -263,6 +284,10 @@ turns it off. It eases in and out over about a sixth of a second.
   the HUD says "Bullet time: offline only" there. It ends in a cinematic, at
   death and where the game takes your control.
 - The HUD says "Bullet time" and "Bullet time off"; both controllers pulse.
+- With sprint: the two multiply. Sprint runs the player faster per game tick
+  (`vr.sprint_speed`) and bullet time makes fewer ticks a second, so sprint
+  x2 in a world at 0.4 runs you at 0.8 of a normal run in real time, twice
+  as fast relative to the slowed world: the world is slow and you feel fast.
 - Limitation: the sounds keep their pitch and speed (the mixer plays each
   voice at its own rate), so a slowed world sounds as fast as ever.
 
@@ -277,8 +302,10 @@ local player (`vr_sprint_speed_scale`).
   `"arm_swing"`), `vr.sprint_speed` (times the run, 1.1 to 2, default `1.5`).
 - `"toggle"`: flick the turning stick up (as bullet time's input, but let go
   within 0.8 s; with bullet time off it toggles at once as you push) to
-  sprint, and again to stop. While bullet time is on, a flick ends bullet time
-  instead. The sprint stays on as you stop or crouch (a crouch pauses it:
+  sprint, and again to stop, with bullet time on or off. With bullet time
+  enabled and the default `vr.bullet_time_binding = "double_flick"`, two quick
+  flicks toggle bullet time instead of sprint twice (the second undoes the
+  first's toggle). The two multiply (bullet time's entry). The sprint stays on as you stop or crouch (a crouch pauses it:
   `bipeds.c` sprints standing), and ends by itself only off foot (a vehicle,
   death; half a second of it, the menus aside). The HUD says "Sprint" and
   "Sprint off" at every change; the right controller pulses. The gesture is

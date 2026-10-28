@@ -625,12 +625,22 @@ static const struct config_setting config_settings[] =
 	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
 		"Sprinting, how many times the running speed, 1.1 to 2." },
 	{ "vr.bullet_time", _config_boolean, "false", "HALO_VR_BULLET_TIME", _environment_value, _platform_desktop,
-		"Bullet time: holding the turning stick up (most of a second; the\n"
-		"right, or the left with vr.swap_sticks) slows the world, your body's\n"
-		"run and jumps with it; a flick up (or another hold) ends it. In a game\n"
+		"Bullet time: a double flick of the turning stick up (the right, or the\n"
+		"left with vr.swap_sticks; vr.bullet_time_binding) slows the world,\n"
+		"your body's run and jumps with it (sprint multiplies with it); the\n"
+		"same gesture ends it. In a game\n"
 		"of this computer alone (the campaign; never online, split screen or\n"
 		"with bots). Your head and hands stay at full speed; the sounds keep\n"
 		"their pitch." },
+	{ "vr.bullet_time_binding", _config_string, "\"double_flick\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
+		"What toggles bullet time (vr.bullet_time) from the turning stick,\n"
+		"on or off alike: \"double_flick\" two quick flicks up, the second\n"
+		"within a third of a second of the first's end (the first toggles\n"
+		"sprint at once, as ever, and the second takes that back; a hold of\n"
+		"the stick up does nothing, for a Steam Input script that holds it);\n"
+		"\"hold\" holding the stick up most of a second; \"off\" never from\n"
+		"the stick. Sprint is its own: a flick up toggles it with bullet time\n"
+		"on or off. The stick's click stays the game's zoom." },
 	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
 		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
 	{ "vr.third_person", _config_boolean, "false", "HALO_VR_THIRD_PERSON", _environment_value, _platform_desktop,
@@ -638,9 +648,16 @@ static const struct config_setting config_settings[] =
 		"other games without a multiplayer engine): your body drawn as others\n"
 		"see it, the weapon aimed by the controller as ever, the HUD as ever.\n"
 		"Holding the turning stick down (three quarters of a second; the right,\n"
-		"or the left with vr.swap_sticks) switches between it and the first\n"
-		"person; the view is over the weapon hand's shoulder. A vehicle's\n"
-		"seat, a scope, death and the cinematics keep their own views." },
+		"or the left with vr.swap_sticks; vr.third_person_binding) switches\n"
+		"between it and the first person; the view is over the weapon hand's\n"
+		"shoulder. A vehicle's seat, a scope, death and the cinematics keep\n"
+		"their own views." },
+	{ "vr.third_person_binding", _config_string, "\"hold\"", "HALO_VR_THIRD_PERSON_BINDING", _environment_value, _platform_desktop,
+		"What switches the third person (vr.third_person) from the turning\n"
+		"stick: \"hold\" holding it down (the default); \"double_flick_down\"\n"
+		"two quick flicks down, the second within a third of a second of the\n"
+		"first's end (for a Steam Input script that holds the stick down);\n"
+		"\"off\" never from the stick." },
 	{ "vr.third_person_distance", _config_real, "1.7", "HALO_VR_THIRD_PERSON_DISTANCE", _environment_value, _platform_desktop,
 		"How far behind your head the third person's view is, in metres, 1 to\n"
 		"4 (walls bring it nearer)." },

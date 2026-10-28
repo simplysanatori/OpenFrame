@@ -243,9 +243,16 @@ dead zone, and the push past it to the full ask */
 #define COMFORT_FULL 0.6f
 /* vr.sprint_mode = "toggle" and vr.bullet_time (comfort_update): the right
 stick pushed up (vr_stick_gesture.h's STICK_UP_*): a flick toggles sprint
-(with bullet time off, at once as it is pushed), a hold of
-STICK_UP_HOLD_SECONDS toggles bullet time, and while bullet time is on a
-flick ends it (OpenFrame, headset trial 3: a push held a little long took
+at once as it is pushed. Bullet time by vr.bullet_time_binding: a double
+flick (the default; a second flick within STICK_DOUBLE_SECONDS of the first's
+end undoes its sprint toggle and toggles bullet time, and a push held
+STICK_UP_HOLD_SECONDS, a camera script's second of it, undoes its flick and
+does nothing), or a hold of STICK_UP_HOLD_SECONDS ("hold": a flick then
+waits for the stick's release), or never from the stick ("off"). Sprint and
+bullet time are independent: a flick toggles sprint with bullet time on or
+off, and only the double flick (or the hold) toggles bullet time, on or off
+(sprint's speed and bullet time's clock multiply: sprint x2 at a world of
+0.4 runs the player at 0.8 of a normal run in real time) (OpenFrame, headset trial 3: a push held a little long took
 bullet time, the slowed world, and the flicks meant to end it toggled
 sprint). A toggled sprint stays on until flicked off: it ends by itself only
 off foot (a vehicle, death) for SPRINT_OFF_FOOT_SECONDS, menus aside; a
@@ -263,6 +270,15 @@ down is no game control while the controllers aim; with vr.manual_reload
 a push down ejects the magazine first, as ever (a hold, not a flick, so
 that an eject does not switch the view) */
 #define STICK_DOWN_HOLD_SECONDS 0.75f
+/* vr.bullet_time_binding (comfort_update): what takes bullet time from the
+turning stick pushed up; vr.third_person_binding: what switches the third
+person from the stick pushed down */
+#define BULLET_BINDING_DOUBLE_FLICK 0
+#define BULLET_BINDING_HOLD 1
+#define BULLET_BINDING_OFF 2
+#define THIRD_BINDING_HOLD 0
+#define THIRD_BINDING_DOUBLE_FLICK 1
+#define THIRD_BINDING_OFF 2
 #define SPRINT_OFF_FOOT_SECONDS 0.5f
 #define SPRINT_BACK (-0.15f)
 #define SPRINT_SIDEWAYS 0.6f
@@ -732,7 +748,12 @@ static struct
 	float comfort_snap;
 	int comfort_snapped;
 	struct stick_gesture stick_up;
+	struct stick_double stick_up_double;
+	/* sprint as the last flick found it (to undo) */
+	int sprint_before_flick;
 	const char *stick_up_note;
+	struct stick_gesture stick_down_gesture;
+	struct stick_double stick_down_double;
 	int sprint_on;
 	float sprint_off_foot;
 	float arm_swing;
@@ -1100,6 +1121,10 @@ static struct
 	float sprint_speed;
 	int bullet_time;
 	float bullet_time_scale;
+	/* vr.bullet_time_binding (BULLET_BINDING_*) and
+	vr.third_person_binding (THIRD_BINDING_*) */
+	int bullet_time_binding;
+	int third_person_binding;
 	/* vr.third_person (comfort_update) */
 	int third_person;
 	/* (OpenFrame) vr.fists and vr.fist_speed (metres a second), and
@@ -1274,6 +1299,11 @@ static void settings_read(void)
 		settings.bullet_time_scale = settings.bullet_time_scale > 0.8f ? 0.8f :
 			settings.bullet_time_scale > 0.0f && settings.bullet_time_scale < 0.2f ? 0.2f : 0.4f;
 	settings.third_person = config_boolean("vr.third_person");
+	settings.bullet_time_binding = !strcmp(config_string("vr.bullet_time_binding"), "hold") ? BULLET_BINDING_HOLD :
+		!strcmp(config_string("vr.bullet_time_binding"), "off") ? BULLET_BINDING_OFF : BULLET_BINDING_DOUBLE_FLICK;
+	settings.third_person_binding = !strcmp(config_string("vr.third_person_binding"), "double_flick_down") ?
+		THIRD_BINDING_DOUBLE_FLICK : !strcmp(config_string("vr.third_person_binding"), "off") ? THIRD_BINDING_OFF :
+		THIRD_BINDING_HOLD;
 	settings.fists = config_boolean("vr.fists");
 	settings.fist_speed = (float)config_real("vr.fist_speed");
 	if (!(settings.fist_speed >= 1.0f && settings.fist_speed <= 4.0f))
@@ -4156,7 +4186,30 @@ static void comfort_update(float seconds, float turn)
 		vr.third_person_was = settings.third_person;
 		vr.third_person_on = settings.third_person;
 	}
-	vr.stick_down = able && sideways < STICK_UP_SIDEWAYS && -up > (vr.stick_down ? STICK_UP_RELEASED : STICK_UP_PRESSED);
+	vr.stick_down = settings.third_person_binding == THIRD_BINDING_HOLD && able && sideways < STICK_UP_SIDEWAYS &&
+		-up > (vr.stick_down ? STICK_UP_RELEASED : STICK_UP_PRESSED);
+	if (settings.third_person_binding == THIRD_BINDING_DOUBLE_FLICK)
+	{
+		/* a double flick down (vr.third_person_binding): a flick on its own is
+		nothing (an eject with vr.manual_reload, as ever), two within
+		STICK_DOUBLE_SECONDS switch the view; a hold is nothing */
+		int flick = stick_gesture_update(&vr.stick_down_gesture, able, -up, sideways, STICK_HOLD_NONE, seconds);
+		int act = stick_double_update(&vr.stick_down_double, flick, vr.stick_down_gesture.ended,
+			vr.stick_down_gesture.ended_gap, seconds, 1);
+
+		if (act == STICK_ACT_DOUBLE && settings.third_person)
+		{
+			vr.third_person_on = !vr.third_person_on;
+			hand_haptic(0, 0.3f, 0.05f);
+			hand_haptic(1, 0.3f, 0.05f);
+			platform_log("vr: third person %s (the stick flicked down twice)", vr.third_person_on ? "on" : "off");
+		}
+	}
+	else
+	{
+		memset(&vr.stick_down_gesture, 0, sizeof(vr.stick_down_gesture));
+		memset(&vr.stick_down_double, 0, sizeof(vr.stick_down_double));
+	}
 	if (vr.stick_down)
 	{
 		vr.stick_down_seconds = was_down ? vr.stick_down_seconds + seconds : 0.0f;
@@ -4174,29 +4227,74 @@ static void comfort_update(float seconds, float turn)
 		vr.stick_down_seconds = 0.0f;
 		vr.stick_down_taken = 0;
 	}
-	/* the right stick up: a hold toggles bullet time; a flick ends bullet
-	time if it is on, else toggles sprint */
-	gesture = stick_gesture_update(&vr.stick_up, able, up, sideways, settings.bullet_time, seconds);
-	if (gesture == STICK_GESTURE_HOLD || (gesture == STICK_GESTURE_FLICK && vr.bullet_time_on))
+	/* the right stick up (vr.bullet_time_binding): a flick toggles sprint,
+	bullet time on or off alike; bullet time itself from a double flick, a
+	hold or not from the stick */
 	{
-		vr.bullet_time_on = !vr.bullet_time_on;
-		hand_haptic(0, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
-		hand_haptic(1, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
-		platform_log("vr: bullet time %s (the stick %s)", vr.bullet_time_on ? "on" : "off",
-			gesture == STICK_GESTURE_HOLD ? "held up" : "flicked up");
-		vr.stick_up_note = vr.bullet_time_on ? "bullet time on" : "bullet time off";
-	}
-	else if (gesture == STICK_GESTURE_FLICK && settings.sprint_mode == SPRINT_TOGGLE)
-	{
-		vr.sprint_on = !vr.sprint_on;
-		vr.sprint_off_foot = 0.0f;
-		hand_haptic(0, vr.sprint_on ? 0.3f : 0.2f, 0.04f);
-		platform_log("vr: sprint %s (the stick flicked up)", vr.sprint_on ? "on" : "off");
-		vr.stick_up_note = vr.sprint_on ? "sprint on" : "sprint off";
-	}
-	else if (gesture == STICK_GESTURE_FLICK)
-	{
-		vr.stick_up_note = "no sprint toggle (vr.sprint_mode)";
+		int hold_mode = settings.bullet_time && settings.bullet_time_binding == BULLET_BINDING_HOLD ?
+			STICK_HOLD_OR_FLICK : settings.bullet_time_binding == BULLET_BINDING_HOLD ? STICK_HOLD_NONE :
+			STICK_HOLD_AFTER_FLICK;
+		int act = STICK_ACT_NONE, bullet_toggle = 0, flick = 0;
+		const char *how = "";
+
+		gesture = stick_gesture_update(&vr.stick_up, able, up, sideways, hold_mode, seconds);
+		if (hold_mode == STICK_HOLD_AFTER_FLICK)
+		{
+			act = stick_double_update(&vr.stick_up_double, gesture, vr.stick_up.ended, vr.stick_up.ended_gap,
+				seconds, settings.bullet_time && settings.bullet_time_binding == BULLET_BINDING_DOUBLE_FLICK);
+			flick = act == STICK_ACT_FLICK;
+		}
+		else
+		{
+			memset(&vr.stick_up_double, 0, sizeof(vr.stick_up_double));
+			bullet_toggle = gesture == STICK_GESTURE_HOLD;
+			flick = gesture == STICK_GESTURE_FLICK;
+			if (gesture == STICK_GESTURE_HOLD)
+				how = "held up";
+		}
+		if (act == STICK_ACT_DOUBLE || act == STICK_ACT_HOLD)
+		{
+			struct stick_double *d = &vr.stick_up_double;
+
+			/* the first flick's doing, undone (a sprint toggled on or off) */
+			if (d->kind == STICK_KIND_TOGGLED && vr.sprint_on != vr.sprint_before_flick)
+			{
+				vr.sprint_on = vr.sprint_before_flick;
+				vr.sprint_off_foot = 0.0f;
+				platform_log("vr: sprint %s (the flick before undone)", vr.sprint_on ? "on" : "off");
+			}
+			if (act == STICK_ACT_DOUBLE)
+			{
+				bullet_toggle = 1;
+				how = "flicked up twice";
+			}
+			else
+			{
+				vr.stick_up_note = "held: nothing";
+			}
+		}
+		if (bullet_toggle)
+		{
+			vr.bullet_time_on = !vr.bullet_time_on;
+			hand_haptic(0, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+			hand_haptic(1, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+			platform_log("vr: bullet time %s (the stick %s)", vr.bullet_time_on ? "on" : "off", how);
+			vr.stick_up_note = vr.bullet_time_on ? "bullet time on" : "bullet time off";
+		}
+		else if (flick && settings.sprint_mode == SPRINT_TOGGLE)
+		{
+			vr.sprint_before_flick = vr.sprint_on;
+			vr.sprint_on = !vr.sprint_on;
+			vr.sprint_off_foot = 0.0f;
+			vr.stick_up_double.kind = STICK_KIND_TOGGLED;
+			hand_haptic(0, vr.sprint_on ? 0.3f : 0.2f, 0.04f);
+			platform_log("vr: sprint %s (the stick flicked up)", vr.sprint_on ? "on" : "off");
+			vr.stick_up_note = vr.sprint_on ? "sprint on" : "sprint off";
+		}
+		else if (flick)
+		{
+			vr.stick_up_note = "no sprint toggle (vr.sprint_mode)";
+		}
 	}
 	/* each push once, as it is over: how long, what it came to, and how far
 	the stick strayed (headset trial 7: a hold that never was) */
@@ -4763,6 +4861,11 @@ static void input_update(void)
 	is no hold; headset trial 7) */
 	if ((settings.bullet_time || settings.sprint_mode == SPRINT_TOGGLE) && comfort_on_foot() &&
 		stick_gesture_inside(&vr.stick_up, vr.input.right_stick[1], fabsf(vr.input.right_stick[0])))
+		x = 0.0f;
+	/* (and the same for the stick pushed down, with vr.third_person_binding =
+	"double_flick_down") */
+	if (settings.third_person && settings.third_person_binding == THIRD_BINDING_DOUBLE_FLICK && comfort_on_foot() &&
+		stick_gesture_inside(&vr.stick_down_gesture, -vr.input.right_stick[1], fabsf(vr.input.right_stick[0])))
 		x = 0.0f;
 	/* (driving a vehicle steered toward the aim: the left stick's sideways
 	push turns smoothly too, STICK_DRIVE_FASTEST) */

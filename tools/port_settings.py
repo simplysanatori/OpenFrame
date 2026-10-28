@@ -79,11 +79,14 @@ VR_COMFORT = f"{PE}/vr_comfort/vr_comfort_screen"
 VR_HANDS_PAGE = f"{PE}/vr_hands/vr_hands_screen"
 # (OpenFrame: the hands' fists, pull, swap and throw, docs/openframe-features.md)
 VR_FISTS = f"{PE}/vr_fists/vr_fists_screen"
+# (OpenFrame: which stick gestures start bullet time and the third person)
+VR_GESTURES = f"{PE}/vr_gestures/vr_gestures_screen"
 # the pages' titles (TITLES): a page's folder, then its title
 VR_TITLES = {
     "vr_setup": "VR SETUP", "vr_display": "DISPLAY", "vr_hud": "HUD", "vr_visor": "VISOR LOOK",
     "vr_wrist": "WRIST HUD", "vr_hud_layout": "HUD LAYOUT", "vr_player": "PLAYER",
     "vr_comfort": "MOVEMENT AND COMFORT", "vr_hands": "HANDS AND WEAPONS", "vr_fists": "FISTS AND GRABBING",
+    "vr_gestures": "GESTURES",
 }
 VR_SCREENS = {}
 # (OpenFrame) where the HUD's corners are placed, the wrist HUD's offsets from
@@ -334,8 +337,8 @@ VR_SCREENS["vr_player"] = {
 VR_SCREENS["vr_comfort"] = {
     "screen": "vr_comfort_screen",
     "header": ("header_vr_comfort", f"{PE}/vr_comfort/header_vr_comfort"),
-    # (fifteen rows: closer than the others' 28px, the help line lower)
-    "spacing": 19,
+    # (sixteen rows: closer than the others' 28px, the help line lower)
+    "spacing": 18,
     "help_top": 366,
     "rows": [
         ("TURNING:", "vr.turn", [("SNAP", "snap"), ("SMOOTH", "smooth")],
@@ -375,11 +378,33 @@ VR_SCREENS["vr_comfort"] = {
          [(f"{scale:g}X", f"{scale:g}") for scale in (0.5, 0.75, 1, 1.25, 1.5)],
          "How strong a jump off a wall is.", None),
         ("BULLET TIME:", "vr.bullet_time", ON_OFF,
-         "Offline: hold the turning stick up to slow the\nworld; flick it up to end it.",
+         "Offline: double-flick the turning stick up to slow\nthe world, again to end it (see GESTURES).",
          None),
         ("BULLET TIME SPEED:", "vr.bullet_time_scale",
          [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
          "How fast the world runs in bullet time.", None),
+        ("GESTURES...", None, VR_GESTURES,
+         "Which stick gestures start bullet time and switch\nthe third person (for a Steam Input script's holds).",
+         None),
+    ],
+}
+# (OpenFrame) the stick gestures: how bullet time and the third person are
+# asked for from the turning stick (vr.c, comfort_update; vr_stick_gesture.h)
+VR_SCREENS["vr_gestures"] = {
+    "screen": "vr_gestures_screen",
+    "header": ("header_vr_gestures", f"{PE}/vr_gestures/header_vr_gestures"),
+    # (two rows)
+    "spacing": 28,
+    "help_top": 366,
+    "rows": [
+        ("BULLET TIME BINDING:", "vr.bullet_time_binding",
+         [("DOUBLE FLICK", "double_flick"), ("HOLD", "hold"), ("OFF", "off")],
+         "Double flick: flick the turning stick up twice\nquickly. Hold: hold it up 0.8 s. Off: not from the stick.",
+         None),
+        ("THIRD PERSON BINDING:", "vr.third_person_binding",
+         [("HOLD", "hold"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("OFF", "off")],
+         "Hold: hold the turning stick down. Double flick:\nflick it down twice quickly. Off: not from the stick.",
+         None),
     ],
 }
 # HANDS AND WEAPONS: the hands and the weapons in them
