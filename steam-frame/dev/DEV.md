@@ -112,6 +112,15 @@ Personal strings (real names, e-mail, SSIDs, hosts) live in `~/.config/openframe
 case-insensitive regular expression a line, outside the repository. The script falls back to the list the
 other Frame ports read. Commits must be authored and committed by a GitHub no-reply address.
 
+## Left out on purpose
+
+- **Turning-stick magazine eject.** OpenH1's right stick pushed down ejected the magazine
+  (`vr.manual_reload`). OpenFrame removed it entirely (headset trial 10, 2026-10-28): in play it left
+  the HUD showing rounds (e.g. 29) while the gun could not fire, which was confusing. A flick down
+  does nothing (the log says `vr: stick down: held ... -> nothing`); the hand eject (the left grip at
+  the left hip takes a new magazine and the old one ejects itself) and X reload stay. There is no
+  config key that brings the stick eject back; do not re-add it as a default path.
+
 ## What is confirmed
 
 Nothing in a headset yet. Not run: the installer on a clean Frame (only a dry run against scratch

@@ -536,8 +536,8 @@ static const struct config_setting config_settings[] =
 		"where you point): from 0 (none) to 1 (the default)." },
 	{ "vr.manual_reload", _config_boolean, "true", "HALO_VR_MANUAL_RELOAD", _environment_value, _platform_desktop,
 		"With vr.aim = \"controller\", reload by hand: take another magazine from\n"
-		"your left hip with the left grip (the one in the weapon ejects itself,\n"
-		"or push the right stick down to eject it) and push it into the weapon,\n"
+		"your left hip with the left grip (the one in the weapon ejects itself)\n"
+		"and push it into the weapon,\n"
 		"loaded at once (the rocket launcher's tubes from behind your left\n"
 		"shoulder; the shotgun's shells one at a time, without ejecting). An\n"
 		"empty weapon does not reload itself; X reloads as ever." },
@@ -625,33 +625,34 @@ static const struct config_setting config_settings[] =
 	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
 		"Sprinting, how many times the running speed, 1.1 to 2." },
 	{ "vr.bullet_time", _config_boolean, "false", "HALO_VR_BULLET_TIME", _environment_value, _platform_desktop,
-		"Bullet time: two quick flicks of the turning stick down (the right, or\n"
-		"the left with vr.swap_sticks; vr.bullet_time_binding) slow the world,\n"
+		"Bullet time: pressing in the turning stick (its click; the right, or\n"
+		"the left with vr.swap_sticks; vr.bullet_time_binding) slows the world,\n"
 		"your body's run and jumps with it (sprint multiplies with it); the\n"
-		"same gesture ends it. In a game\n"
+		"same press ends it. In a game\n"
 		"of this computer alone (the campaign; never online, split screen or\n"
 		"with bots). Your head and hands stay at full speed; the sounds keep\n"
 		"their pitch." },
-	{ "vr.bullet_time_binding", _config_string, "\"double_flick_down\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
-		"What toggles bullet time (vr.bullet_time) from the turning stick,\n"
-		"on or off alike: \"double_flick_down\" two quick flicks DOWN, each let\n"
-		"go within 0.3 s, the second begun within a third of a second of the\n"
-		"first's end (the default; one flick down alone ejects the magazine,\n"
-		"as ever, a moment after it; a flick UP is sprint's, the two\n"
-		"independent; a hold down is the third person's, vr.third_person_binding;\n"
+	{ "vr.bullet_time_binding", _config_string, "\"stick_click\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
+		"What toggles bullet time (vr.bullet_time), on or off alike:\n"
+		"\"stick_click\" pressing in the turning stick (the default; on foot in\n"
+		"the first person with the controllers aiming: in the third person, in\n"
+		"a vehicle and with vr.aim = \"gamepad\" the click stays the game's zoom,\n"
+		"and so it does while bullet time cannot work, online; it rests half a\n"
+		"second after a toggle; with vr.scope_view = \"smartlink\" the click's\n"
+		"zoom is given up in the first person); \"double_flick_down\" two quick\n"
+		"flicks DOWN, each let go within 0.45 s, the second begun within a\n"
+		"third of a second of the first's end (one flick down alone does\n"
+		"nothing; a hold down is the third person's, vr.third_person_binding;\n"
 		"a push begins only within about 34 degrees of straight down, so a\n"
-		"diagonal look does nothing; bullet time rests half a second after a\n"
-		"toggle); \"flick_down\" one quick flick DOWN (the stick's down then\n"
-		"ejects no magazine: take another from the pouch at the left hip, and\n"
-		"the old one ejects itself);\n"
-		"\"double_flick\" two quick flicks up, the second within a third of a\n"
-		"second of the first's end (the first toggles sprint at once, and the\n"
-		"second takes that back; the stick's down ejects as ever; a hold of\n"
-		"the stick up does nothing, for a Steam Input script that holds it);\n"
-		"\"hold\" holding the stick up most of a second; \"off\" never from\n"
-		"the stick. With vr.third_person_binding = \"double_flick_down\" the\n"
-		"down is the third person's and the downs work as \"double_flick\".\n"
-		"The stick's click stays the game's zoom." },
+		"diagonal look does nothing); \"double_flick\" two quick flicks up, the\n"
+		"second within a third of a second of the first's end (the first\n"
+		"toggles sprint at once, and the second takes that back; a hold of the\n"
+		"stick up does nothing, for a Steam Input script that holds it); \"hold\"\n"
+		"holding the stick up most of a second; \"off\" never. A flick UP is\n"
+		"always sprint's, the two independent. With vr.third_person_binding =\n"
+		"\"double_flick_down\" the down is the third person's and\n"
+		"\"double_flick_down\" works as \"double_flick\". The stick pushed down\n"
+		"does not eject the magazine (take another from the left hip, or X)." },
 	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
 		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
 	{ "vr.third_person", _config_boolean, "false", "HALO_VR_THIRD_PERSON", _environment_value, _platform_desktop,
@@ -792,13 +793,15 @@ static const struct config_setting config_settings[] =
 		_platform_desktop,
 		"With vr.hud_mode = \"wrist\", raises the wrist HUD off the wrist, in\n"
 		"metres (-0.2 to 0.2; less lowers it)." },
-	{ "vr.hud_inset", _config_real, "0.0", "HALO_VR_HUD_INSET", _environment_value, _platform_desktop,
+	{ "vr.hud_inset", _config_real, "0.05", "HALO_VR_HUD_INSET", _environment_value, _platform_desktop,
 		"With vr.hud = \"visor\", the HUD's corners (the weapon's, the shields'\n"
 		"and the motion tracker's panels) brought in toward the middle of your\n"
 		"view, by this much of their angle from it (0 where the game puts them,\n"
 		"to 0.5 halfway in), after each one's own move (vr.hud_weapon_x, ...):\n"
-		"for a view narrower than the headset's (the Steam Frame with a glasses\n"
-		"spacer). The reticle, the messages and the waypoints stay where they are." },
+		"for a view narrower than the headset's. The shipped values (this one\n"
+		"0.05 and the corners' own moves) suit the Steam Frame, whose view puts\n"
+		"OpenH1's corners too far out. The reticle, the messages and the\n"
+		"waypoints stay where they are." },
 	{ "vr.hud_offset_x", _config_real, "0.0", "HALO_VR_HUD_OFFSET_X", _environment_value, _platform_desktop,
 		"With vr.hud = \"visor\", moves the HUD's corners together right (less\n"
 		"than 0: left), after vr.hud_inset, by this much of the HUD's width\n"
@@ -810,11 +813,11 @@ static const struct config_setting config_settings[] =
 	{ "vr.hud_scale", _config_real, "1.0", "HALO_VR_HUD_SCALE", _environment_value, _platform_desktop,
 		"With vr.hud = \"visor\", the HUD's corners' size, each about its outer\n"
 		"corner (0.5 to 1.5; vr.hud_size sizes the whole HUD, the reticle too)." },
-	{ "vr.hud_weapon_x", _config_real, "0.0", "HALO_VR_HUD_WEAPON_X", _environment_value, _platform_desktop,
+	{ "vr.hud_weapon_x", _config_real, "0.2", "HALO_VR_HUD_WEAPON_X", _environment_value, _platform_desktop,
 		"With vr.hud = \"visor\", moves the weapon's panel (the ammunition and\n"
 		"grenades, top left) right (less than 0: left), before vr.hud_inset, by\n"
 		"this much of the HUD's width (-0.5 to 0.5)." },
-	{ "vr.hud_weapon_y", _config_real, "0.0", "HALO_VR_HUD_WEAPON_Y", _environment_value, _platform_desktop,
+	{ "vr.hud_weapon_y", _config_real, "-0.1", "HALO_VR_HUD_WEAPON_Y", _environment_value, _platform_desktop,
 		"With vr.hud = \"visor\", moves the weapon's panel (the ammunition and\n"
 		"grenades, top left) up (less than 0: down), before vr.hud_inset, by this\n"
 		"much of the HUD's height (-0.5 to 0.5)." },
@@ -822,11 +825,11 @@ static const struct config_setting config_settings[] =
 		"With vr.hud = \"visor\", the size of the weapon's panel (the ammunition\n"
 		"and grenades, top left), about its outer corner (0.5 to 1.5), times\n"
 		"vr.hud_scale." },
-	{ "vr.hud_status_x", _config_real, "0.0", "HALO_VR_HUD_STATUS_X", _environment_value, _platform_desktop,
+	{ "vr.hud_status_x", _config_real, "-0.08", "HALO_VR_HUD_STATUS_X", _environment_value, _platform_desktop,
 		"With vr.hud = \"visor\", moves the shields' panel (the shields and\n"
 		"health, top right) right (less than 0: left), before vr.hud_inset, by\n"
 		"this much of the HUD's width (-0.5 to 0.5)." },
-	{ "vr.hud_status_y", _config_real, "0.0", "HALO_VR_HUD_STATUS_Y", _environment_value, _platform_desktop,
+	{ "vr.hud_status_y", _config_real, "-0.1", "HALO_VR_HUD_STATUS_Y", _environment_value, _platform_desktop,
 		"With vr.hud = \"visor\", moves the shields' panel (the shields and\n"
 		"health, top right) up (less than 0: down), before vr.hud_inset, by this\n"
 		"much of the HUD's height (-0.5 to 0.5)." },
@@ -834,7 +837,7 @@ static const struct config_setting config_settings[] =
 		"With vr.hud = \"visor\", the size of the shields' panel (the shields and\n"
 		"health, top right), about its outer corner (0.5 to 1.5), times\n"
 		"vr.hud_scale." },
-	{ "vr.hud_tracker_x", _config_real, "0.0", "HALO_VR_HUD_TRACKER_X", _environment_value, _platform_desktop,
+	{ "vr.hud_tracker_x", _config_real, "0.1", "HALO_VR_HUD_TRACKER_X", _environment_value, _platform_desktop,
 		"With vr.hud = \"visor\", moves the motion tracker's panel (bottom left)\n"
 		"right (less than 0: left), before vr.hud_inset, by this much of the\n"
 		"HUD's width (-0.5 to 0.5)." },

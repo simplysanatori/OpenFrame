@@ -370,9 +370,9 @@ struct halo_vr_cockpit_window
 };
 
 /* the reload by hand (vr.manual_reload, port/linux/game/vr_reload.c): the
-right stick pushed down ejects the magazine (or the rocket launcher's
-tubes), the left hand takes another from its pouch on the body and pushes
-it into the weapon, which presses the game's reload; the shotgun takes its
+left hand takes another magazine (or the rocket launcher's tubes) from its
+pouch on the body, the one in the weapon ejecting itself, and pushes it into
+the weapon, which presses the game's reload; the shotgun takes its
 shells one at a time, each a reload of one */
 enum
 {
@@ -851,10 +851,13 @@ float halo_vr_sprint(void);
 float halo_vr_sprint_speed(void);
 int halo_vr_sprint_toggled(void);
 /* bullet time (vr.bullet_time): the world's speed asked for, 1 when off
-(vr.bullet_time_scale while toggled on, the right stick held up); and
-turned off, where the game will not slow the world (vr_comfort.c) */
+(vr.bullet_time_scale while toggled on); and turned off, where the game will
+not slow the world (vr_comfort.c). The game says each frame whether it may
+(the campaign, a player on foot): where it may not, the turning stick's click
+stays the zoom (vr.bullet_time_binding = "stick_click") */
 float halo_vr_bullet_time(void);
 void halo_vr_bullet_time_off(void);
+void halo_vr_bullet_time_able(int able);
 /* the third person on foot (vr.third_person): asked for now (the setting
 on and not switched off by the turning stick held down); the game says
 where it shows it (vr_render.c) */

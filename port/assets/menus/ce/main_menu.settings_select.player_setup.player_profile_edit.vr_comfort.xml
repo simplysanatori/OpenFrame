@@ -222,8 +222,8 @@
 		<string text="Offline: crouch as you sprint to slide, jump off\nwalls and run along them."/>
 		<string text="How fast a slide starts and how long it lasts."/>
 		<string text="How strong a jump off a wall is."/>
-		<string text="Offline: double-flick the turning stick down to slow\nthe world, again to end it (see GESTURES)."/>
+		<string text="Offline: press in the turning stick to slow the\nworld, again to end it (see GESTURES)."/>
 		<string text="How fast the world runs in bullet time."/>
-		<string text="Which stick gestures start bullet time and switch\nthe third person (for a Steam Input script's holds)."/>
+		<string text="Which press or stick gesture starts bullet time and\nswitches the third person (for a Steam Input script)."/>
 	</strings>
 </menus>

@@ -3082,7 +3082,7 @@ The Steam Frame's controllers are the halves of an Xbox controller:
 | A swing of the right controller: hard, or softer with the right grip held | Melee (`vr.melee_gesture`, below) |
 | The right hand over the right shoulder or at the right hip, gripping | Draw the weapon carried there (`vr.holsters`, below) |
 | The sniper rifle's or the pistol's scope raised to an eye | Look through it, magnified (`vr.scope_view = "eye"`, below) |
-| The left hand gripping at the left hip and pushing what it took into the weapon (the right stick flicked down ejects the magazine first, if you like; not with bullet time on the stick's single flick down) | Reload by hand: take another magazine, the one in the weapon ejecting itself, and push it in (`vr.manual_reload`, below) |
+| The left hand gripping at the left hip and pushing what it took into the weapon (the old magazine ejects itself as the new one is taken) | Reload by hand: take another magazine, the one in the weapon ejecting itself, and push it in (`vr.manual_reload`, below) |
 | The left grip held, the left hand drawn back and swung, the grip let go | Throw a grenade where the hand threw it, as hard as it did (`vr.grenade_throw`, below) |
 | Beside an overturned vehicle, both hands low gripping it, then lifted together | Flip it (`vr.vehicle_flip`, below; X reloads there) |
 | The right hand reaching down to a weapon on the ground, gripping | Pick it up, or swap the one in hand for it (`vr.grab_world`, below; X held as ever) |
@@ -3122,7 +3122,7 @@ the left controller).
   marks on its display are mirrored.
 - The sticks swap with the hand (`vr.swap_sticks = "auto"`, VR Setup > PLAYER's
   SWAP STICKS): the right stick moves (its click crouches) and the left
-  turns, its click zooms and pushed down it ejects the magazine.
+  turns, its click zooms (or toggles bullet time).
   `vr.swap_sticks = "no"` keeps the left stick moving, `"yes"` swaps them
   for a right hand too.
 - The buttons stay where they are, as the game's prompts name them: A and
@@ -3475,12 +3475,10 @@ and rounds to fill it: the magazine in the weapon ejects itself as you take
 the new one (a clack and the magazine sliding out, in the right hand; the
 weapon is empty now, and does not fire). Push it into the weapon where it
 goes, still gripping (a firm click in the left hand as it seats, and a
-lighter one in the right). The right stick pushed down ejects the magazine
-before you reach, if you like (the same clack), unless bullet time has the
-stick's single flick down (`vr.bullet_time` on and `vr.bullet_time_binding =
-"flick_down"`): then take the new magazine from the pouch, which ejects the
-old. With the default `"double_flick_down"` one flick down ejects, a third of
-a second after it (a second flick is bullet time's). These are firmer than the
+lighter one in the right). The right stick pushed down no longer ejects the
+magazine (removed on purpose: it could leave the HUD showing rounds while
+the gun could not fire); take the new magazine from the pouch, which ejects
+the old, or press X. These are firmer than the
 pouch's ticks, and the game's rumble (a weapon's firing goes on a moment
 after it stops) and the weapons' and the hits' feel ("The weapons' feel",
 below) wait while they play. The rounds are in the weapon the moment
@@ -3505,7 +3503,7 @@ leave it.
   from your hip whenever it has room, and push it in at the loading port,
   under the receiver ahead of the grip. Each shell is loaded as it goes
   in (a short click in each hand), one round (on the flat screen the game loads to full).
-- The rocket launcher: the right stick ejects its tubes, and new ones are
+- The rocket launcher: new tubes are
   behind your left shoulder (where your left hand reaches over it, as the
   right one does for a long gun).
 - The plasma weapons have no magazine, and are as ever.
@@ -4332,7 +4330,7 @@ the next start.
 | `vr.aim` | `"controller"` | `HALO_VR_AIM` | `"controller"`: the right controller aims and holds the weapon. `"head"`: the head aims. `"gamepad"`: a gamepad aims and plays, as on the flat screen, and the head looks about freely (above, "With a gamepad"). |
 | `vr.gamepad_view` | `"camera"` | `HALO_VR_GAMEPAD_VIEW` | With `vr.aim = "gamepad"`: `"camera"`, the stick turns and pitches the view as the flat screen's camera, the head's turn on top (the most like the Xbox game, and the most likely to make you sick); `"level"`, it turns the view smoothly, and its pitch moves only the reticle; `"snap"`, the view turns a step of `vr.snap_turn_angle` each time the aim is more than that from it, and its pitch moves only the reticle. |
 | `vr.dominant_hand` | `"right"` | `HALO_VR_DOMINANT_HAND` | The hand that holds the weapon: `"right"`, or `"left"`: the weapon in the left controller, drawn mirrored with both hands, the left trigger firing, the right hand on the foregrip, at the magazines (at the right hip) and throwing, the holsters on the left, the haptics swapped with the hands (above, "Left-handed"). Not with `vr.aim = "gamepad"`. |
-| `vr.swap_sticks` | `"auto"` | `HALO_VR_SWAP_STICKS` | `"yes"`: the right stick moves (its click crouches) and the left turns (its click zooms, pushed down it ejects the magazine); `"no"`: as they are; `"auto"`: swapped with `vr.dominant_hand = "left"`. Not with `vr.aim = "gamepad"`. |
+| `vr.swap_sticks` | `"auto"` | `HALO_VR_SWAP_STICKS` | `"yes"`: the right stick moves (its click crouches) and the left turns (its click zooms or toggles bullet time); `"no"`: as they are; `"auto"`: swapped with `vr.dominant_hand = "left"`. Not with `vr.aim = "gamepad"`. |
 | `vr.weapon_offset` | `"0.15, -0.22, 0.30"` | `HALO_VR_WEAPON_OFFSET` | With `vr.hands = "game"`: where the weapon's grip is from the eye that the game poses it for, in metres: right, up, forward. |
 | `vr.depth` | `false` | `HALO_VR_DEPTH` | `true`: give the runtime the eyes' depth too (`XR_KHR_composition_layer_depth`), for its reprojection. SteamVR on the Steam Frame could not make a depth swapchain for the OpenGL session the VR build had before it drew with Vulkan. |
 | `vr.foveation` | `"eye"` | `HALO_VR_FOVEATION` | Foveated rendering (below, "How it operates"): each eye's image at its full resolution in an inset where you look, and at less about it, which draws half of the eyes' pixels (at the default `vr.foveation_inset`). `"eye"`: the inset follows the eyes, where the runtime tracks them (`XR_EXT_eye_gaze_interaction`; else as `"fixed"`); `"fixed"`: it stays in the middle of each eye's view; `"off"`: all of each image at full resolution. In VR Setup > DISPLAY (FOVEATION); from the next start. |
@@ -4352,7 +4350,7 @@ the next start.
 | `vr.weapon_haptics` | `1.0` | `HALO_VR_WEAPON_HAPTICS` | With `vr.aim = "controller"`: how strongly the controllers feel each weapon firing, each its own way, and the hits on you, in the hand on the side they came from, in place of the gamepad's rumble for them, from `0` (none) to `1` (above, "The weapons' feel"). In VR Setup > HANDS AND WEAPONS (HAPTICS). |
 | `vr.vehicle_flip` | `"lift"` | `HALO_VR_VEHICLE_FLIP` | How an overturned vehicle the game offers to flip is flipped (above, "Flipping a vehicle"): `"lift"`, by both hands gripping it low beside it and lifting together, fast (X reloads there); `"button"`, by X, as ever; `"both"`, by either. With `vr.aim = "gamepad"`, by X. Not in VR Setup. |
 | `vr.grab_world` | `true` | `HALO_VR_GRAB_WORLD` | With `vr.aim = "controller"`: the hands take hold of the world (above, "Picking up a weapon by hand", "Pressing a control by hand"): a weapon on the ground the game offers is taken by reaching down to it with the right hand and gripping; a control the game offers to activate is pressed by pushing either hand into it. `false`: X alone, which works either way. In VR Setup > HANDS AND WEAPONS (GRAB WORLD). |
-| `vr.manual_reload` | `true` | `HALO_VR_MANUAL_RELOAD` | With `vr.aim = "controller"`: reload by hand (above, "Reloading by hand"): the left hand takes another magazine from the left hip (the one in the weapon ejecting itself, or the right stick pushed down ejects it) and pushes it in, loaded at once (as a network game's client, after the game's reload time); the shotgun's shells one at a time; an empty weapon does not reload itself. X reloads as ever. |
+| `vr.manual_reload` | `true` | `HALO_VR_MANUAL_RELOAD` | With `vr.aim = "controller"`: reload by hand (above, "Reloading by hand"): the left hand takes another magazine from the left hip (the one in the weapon ejecting itself) and pushes it in, loaded at once (as a network game's client, after the game's reload time); the shotgun's shells one at a time; an empty weapon does not reload itself. X reloads as ever. |
 | `vr.grenade_throw` | `"gesture"` | `HALO_VR_GRENADE_THROW` | With `vr.aim = "controller"`: `"gesture"`, a grenade is thrown by throwing it with the left hand alone (above, "Throwing a grenade with the left hand"; on foot the left trigger throws nothing); `"both"`, with the left hand or the left trigger; `"button"`, with the left trigger alone. |
 | `vr.aim_assist` | `1.0` | `HALO_VR_AIM_ASSIST` | With `vr.aim = "controller"`: the aim assist (above, "Aiming with the controller"): near an enemy the game's magnetism would be drawn to, the aim is slow to leave it, and zoomed, is drawn gently toward it; how strongly, from `0` (none) to `2`. Zoomed, it reaches as far as the zoom's and is as wide as unzoomed (the flat game narrows it by the zoom's magnification, as its whole view is magnified; in the headset only a window is). The bullets' own autoaim is the game's whatever this is. With the left hand on a long gun's foregrip, half as strong again. The aim never moves while your hand is still but for that zoomed pull: away from a target it comes back to your hand's line only as your hand turns (not on its own as a reload, a melee or a kill loses the target), and a long frame (a hitch) does not reset it. |
 | `vr.two_handed` | `true` | `HALO_VR_TWO_HANDED` | With `vr.aim = "controller"`: a long gun (any but the pistols, the needler, the flag and the ball) is aimed along the line from the right hand to the left while the left grip holds it by the foregrip (pressed within 18 cm of the line ahead of the right hand). The aim turns to that line over 0.15 s, smoothed, and back when the grip is let go. |
@@ -4469,8 +4467,8 @@ HALO_VR_TEST_HANDS="-0.25 -0.45 0.15 0 0 0, R, 0, 0, 0, 0, 1300, 0;
   -0.25 -0.45 0.15 0 0 0, R, 0, 0, 0, 0, 400, 20"
 ```
 
-(on one line): the right trigger fires a burst, the right stick ejects,
-the left hand goes to the left hip and takes a magazine, comes under the
+(on one line): the right trigger fires a burst, the right stick is pushed down
+(which ejects nothing now), the left hand goes to the left hip and takes a magazine, comes under the
 rifle and pushes it home behind the grip. The log says each step (`vr:
 reload:` and `vr reload:`): where the magazine goes, from the recentred
 head as the hands are placed here, how far off it was pushed home, the tick

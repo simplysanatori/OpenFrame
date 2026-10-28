@@ -28,7 +28,7 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/bullet_time_binding_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/bullet_time_binding_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="DOUBLE FLICK DOWN|FLICK DOWN|DOUBLE FLICK UP|HOLD UP|OFF" setting="vr.bullet_time_binding" values="double_flick_down|flick_down|double_flick|hold|off" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/bullet_time_binding_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="STICK CLICK|DOUBLE FLICK DOWN|DOUBLE FLICK UP|HOLD UP|OFF" setting="vr.bullet_time_binding" values="stick_click|double_flick_down|double_flick|hold|off" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
 		<on event="created" run="port setting load"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/op_third_person_binding" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
@@ -56,7 +56,7 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/help_strings">
 		<string text=""/>
-		<string text="Double flick down: two quick flicks down (one alone ejects the magazine; up is sprint). Flick down: one, and its down then ejects nothing."/>
+		<string text="Stick click: press in the turning stick (first person; the third person keeps it as the zoom). Double flick down: two quick flicks, one alone does nothing. Up is sprint."/>
 		<string text="Hold: hold the turning stick down (it switches on or off, whatever THIRD PERSON says). Double flick: flick it down twice (bullet time then moves to a double flick up). Off: not from the stick."/>
 	</strings>
 </menus>

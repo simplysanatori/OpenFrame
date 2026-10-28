@@ -8,7 +8,7 @@ first_person_weapons.c.
 The hand reloads as it would a real gun: the left hand takes another
 magazine from its pouch on the body (the left hip; the rocket launcher's
 tubes from behind the left shoulder), the one in the weapon ejecting itself
-(or the right stick pushed down ejects it first), and pushes it into the
+(the right stick pushed down ejects nothing), and pushes it into the
 weapon where it goes (port/linux/src/vr.c, which has the hands). The
 shotgun is fed a shell at a time, with no magazine to eject.
 
