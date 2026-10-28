@@ -83,6 +83,9 @@ static struct
 	boolean bullet_time;
 	long game_time;
 	boolean sprint;
+	/* sprint's toggle changed and its speeds are not yet logged
+	(vr_sprint_speeds_log says them once, at the next tick on foot) */
+	boolean sprint_log;
 } vr_comfort = { 1.0f, FALSE, NONE, FALSE };
 
 /* the first local player's unit, alive, in the player's control, else NONE */
@@ -128,6 +131,7 @@ real vr_comfort_frame(
 	if (halo_vr_sprint_toggled() != vr_comfort.sprint)
 	{
 		vr_comfort.sprint = !vr_comfort.sprint;
+		vr_comfort.sprint_log = TRUE;
 		comfort_message(!vr_comfort.sprint ? L"Sprint off" : local ? L"Sprint" : L"Sprint: offline only");
 	}
 
@@ -182,8 +186,10 @@ real vr_sprint_speed_scale(
 /* bipeds.c, after its sprint's scaling of a player's speeds for a tick:
 the scale, the forward run's speed (world units a second) and the
 acceleration (bipeds.c's: a tick's velocity change is a 30th of it) before
-and after it. The first local player's, logged as a sprint starts and ends,
-so that a trial's stdout.log shows what the sprint did */
+and after it. The first local player's, logged once for each toggle of the
+sprint (the first tick on foot standing after vr_comfort_frame sees it
+change: its speeds with the sprint on or off), so that a trial's stdout.log
+shows what the sprint did without a line for every crossing of the scale */
 void vr_sprint_speeds_log(
 	long biped_index,
 	real scale,
@@ -192,15 +198,14 @@ void vr_sprint_speeds_log(
 	real acceleration,
 	real scaled_acceleration)
 {
-	static boolean sprinting = FALSE;
 	long player_index = local_player_get_player_index(0);
 
 	if (player_index == NONE || player_get(player_index)->unit_index != biped_index ||
-		(scale > 1.0f) == sprinting)
+		!vr_comfort.sprint_log)
 	{
 		return;
 	}
-	sprinting = scale > 1.0f;
+	vr_comfort.sprint_log = FALSE;
 	platform_log("vr: sprint x%.2f: forward speed %.3f -> %.3f world units/s (%.2f -> %.2f m/s), "
 		"acceleration %.3f -> %.3f (full speed in %.2f -> %.2f s)",
 		(double)scale, (double)forward_speed, (double)scaled_forward_speed,

@@ -178,17 +178,25 @@ changes) as each tick's movement is made ready, and in each sub-step of
   or a third of a second before), on the ground at a run or faster, and you
   slide on, crouched (the game's lower height), at the speed you ran and 15%
   more, losing speed to friction, faster down a slope, steered a little by
-  the stick (pulled back, it brakes). It ends as you let the crouch go, jump
+  the stick (pulled back, it brakes). It ends as you jump
   (the speed carried into the jump; Jump again in the air beside a wall is
-  then a wall jump), leave the ground, meet a wall, slow to half a run, or
-  after 1.1 seconds. A toggled sprint is only paused by the crouch, so as
+  then a wall jump), leave the ground, meet a wall, slow to half a run,
+  after 1.1 seconds, or, with the head, as you let the crouch go (the head
+  coming up). A slide begun by the click is latched (`vr.slide_latch`,
+  default `true`): the Frame's stick click is a tap (headset trial 4: a
+  slide of 0.17 s), so click once and it runs its whole time with the click
+  let go; click again to stop it early. The game's crouch is held for it
+  (`player_control.c`'s two marked sites ask `vr_parkour_slide_active()`),
+  so the body and its hitbox stay low. `vr.slide_latch = false` holds the
+  click like the head: the slide ends as it is let go. A toggled sprint is only paused by the crouch, so as
   you stand it is back by itself and the next slide needs no new flick. The
   crouch is read from the click or the head (not only the game's crouch,
-  which the game drops at a full stick push), so a slide holds for as long
-  as you hold the crouch. Arm swing: the swing just before the duck counts.
+  which the game drops at a full stick push). Arm swing: the swing just before the duck counts.
 - stdout.log: `vr: slide start (head crouch|crouch button, sprint on|by
-  arms) at N m/s, the run M`, `vr: no slide (why; speed, run)` when a crouch
-  began and did not slide, `vr: slide end (why) after N s, sprint ...`,
+  arms) at N m/s, the run M` (`crouch button, latched` when latched), `vr: no slide (why; speed, run)` when a crouch
+  began and did not slide, `vr: slide end (why) after N s, sprint ...` (why: `its time`, `stood`
+  for a held crouch, `stood early` for the second click, `jumped`, `left
+  the ground`, `a wall`, `slowed`),
   `vr: wall jump [from a run] at N m/s`, `vr: wall run start [(chained)]`
   and `vr: wall run end (why)`.
 - Wall jump: in the air beside a wall, press Jump again to leap off it
@@ -204,7 +212,8 @@ changes) as each tick's movement is made ready, and in each sub-step of
   away from the wall to drop off it; a wall jump leaps off it.
 - Keys: `vr.parkour` (default `false`), `vr.slide_momentum` (0.5 to 2,
   default `1`: a slide starts `0.15 x` this faster than you ran and lasts
-  at most `0.55 + 0.55 x` this seconds), `vr.walljump_scale` (0.5 to 1.5,
+  at most `0.55 + 0.55 x` this seconds), `vr.slide_latch` (default `true`:
+  a click slides its whole time; `false`: held), `vr.walljump_scale` (0.5 to 1.5,
   default `1.5`, moistman42069's). Wall run's speed and time are fixed at
   its defaults.
 - Input: the game's own (crouch, Jump, the stick); nothing taken.
@@ -264,7 +273,8 @@ local player (`vr_sprint_speed_scale`).
   "Sprint off" at every change; the right controller pulses. The gesture is
   `port/linux/src/vr_stick_gesture.h` (`stick_gesture_update`).
 - stdout.log: `vr: sprint on/off (why)` at each change, and from `bipeds.c`
-  as a sprint starts and ends `vr: sprint x1.50: forward speed 2.250 ->
+  once for each toggle (the first tick standing after the HUD says it, not
+  for every crossing of the scale) `vr: sprint x1.50: forward speed 2.250 ->
   3.375 world units/s (6.86 -> 10.29 m/s), acceleration ... (full speed in
   ... s)`: the run's speed and acceleration before and after the scale (the
   time to full speed stays the same).

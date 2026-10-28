@@ -653,6 +653,11 @@ static const struct config_setting config_settings[] =
 	{ "vr.slide_momentum", _config_real, "1.0", "HALO_VR_SLIDE_MOMENTUM", _environment_value, _platform_desktop,
 		"Parkour, a slide's momentum, 0.5 to 2: how much faster than the run it\n"
 		"starts and how long it may last (1: 15% faster, at most 1.1 seconds)." },
+	{ "vr.slide_latch", _config_boolean, "true", "HALO_VR_SLIDE_LATCH", _environment_value, _platform_desktop,
+		"Parkour, a slide begun by the crouch button (the stick's click, a tap)\n"
+		"runs its whole time with the click let go, the crouch held for it; a\n"
+		"second click ends it early. false: the click is held like the head's\n"
+		"crouch (the slide ends as it is let go)." },
 	{ "vr.walljump_scale", _config_real, "1.5", "HALO_VR_WALLJUMP_SCALE", _environment_value, _platform_desktop,
 		"Parkour, a wall jump's strength, 0.5 to 1.5, times the jump's." },
 	{ "vr.fists", _config_boolean, "false", "HALO_VR_FISTS", _environment_value, _platform_desktop,

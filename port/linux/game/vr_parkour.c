@@ -2,7 +2,7 @@
 VR_PARKOUR.C
 
 The VR mode's parkour (HALO_VR; vr.parkour, vr.slide_momentum,
-vr.walljump_scale; docs/openframe-features.md), for bipeds.c: the first
+vr.slide_latch, vr.walljump_scale; docs/openframe-features.md), for bipeds.c: the first
 local player's movement on foot, a tick at a time.
 
 - A slide: a crouch begun (the left stick's click, or the head lowered with
@@ -15,13 +15,21 @@ local player's movement on foot, a tick at a time.
   momentum (a little more, by vr.slide_momentum), crouched (the game's
   crouch: its lower height), giving it up to friction, taking a slope's
   share of gravity, steered a little by the stick. It ends as the crouch is
-  let go, the player jumps (the momentum carried into the jump), leaves the
-  ground, meets a wall, slows to half a run, or after its time (by
-  vr.slide_momentum: 1.1 seconds at 1). The crouch is read from the
-  controls (halo_vr_crouch: the click, the head) as well as the game's
-  crouch flag: player_control.c drops that flag at a stick pushed past 98%
-  (the run's full push), which ended a slide in two or three ticks (headset
-  trial 3) and would not begin one at a full push.
+  let go (a head crouch: the head coming up), the player jumps (the
+  momentum carried into the jump), leaves the ground, meets a wall, slows to
+  half a run, or after its time (by vr.slide_momentum: 1.1 seconds at 1).
+  The crouch is read from the controls (halo_vr_crouch: the click, the
+  head) as well as the game's crouch flag: player_control.c drops that flag
+  at a stick pushed past 98% (the run's full push), which ended a slide in
+  two or three ticks (headset trial 3) and would not begin one at a full
+  push.
+  A slide begun by the click is latched (vr.slide_latch, default on; off:
+  the click is held like the head's): the Frame's stick click is a tap
+  (headset trial 4: a slide of 0.17 s), so the slide runs its whole time
+  with the click let go, and a second click during it ends it early
+  ("stood early"). The game's crouch flag is held for it, so that the body
+  and its hitbox stay low: player_control.c's two marked sites ask
+  vr_parkour_slide_active() as well as halo_vr_crouch().
 - A wall jump: in the air beside a wall (probed about the body at the knee,
   the waist and the chest), Jump pressed again leaps off it where the head
   looks (turned off the wall at least 35% of the way), at least as fast as
@@ -136,7 +144,8 @@ static struct
 	boolean on;
 	real momentum;
 	real walljump;
-} parkour_settings = { (unsigned long)-1, FALSE, 1.0f, 1.5f };
+	boolean latch;
+} parkour_settings = { (unsigned long)-1, FALSE, 1.0f, 1.5f, TRUE };
 
 static struct
 {
@@ -149,8 +158,11 @@ static struct
 	long walljump_age;
 	/* the slide: on, its velocity (metres a second, level, in the world),
 	its ticks, the ticks in the air and stalled, the ticks since a sprint,
-	and the crouch last tick */
+	and the crouch last tick; the slide latched (begun by the click: it
+	goes on with the click let go), the click let go since it began */
 	boolean sliding;
+	boolean slide_latched;
+	boolean slide_click_let_go;
 	real slide_velocity[2];
 	long slide_ticks;
 	long slide_airborne_ticks;
@@ -183,6 +195,7 @@ static void parkour_settings_read(void)
 	parkour_settings.momentum = (real)config_real("vr.slide_momentum");
 	if (!(parkour_settings.momentum >= 0.5f && parkour_settings.momentum <= 2.0f))
 		parkour_settings.momentum = 1.0f;
+	parkour_settings.latch = config_boolean("vr.slide_latch") != 0;
 	parkour_settings.walljump = (real)config_real("vr.walljump_scale");
 	if (!(parkour_settings.walljump >= 0.5f && parkour_settings.walljump <= 1.5f))
 		parkour_settings.walljump = 1.5f;
@@ -308,7 +321,15 @@ static void slide_end(char const *why)
 			(double)parkour.slide_ticks / TICKS_PER_SECOND, halo_vr_sprint_toggled() ? "on" : "not toggled on");
 	}
 	parkour.sliding = FALSE;
+	parkour.slide_latched = parkour.slide_click_let_go = FALSE;
 	parkour.slide_ticks = parkour.slide_airborne_ticks = parkour.slide_stall_ticks = 0;
+}
+
+/* player_control.c's (the crouch flag): a slide is latched on, so that the
+game's crouch is held for it with the click let go */
+boolean vr_parkour_slide_active(void)
+{
+	return parkour.sliding && parkour.slide_latched;
 }
 
 /* a tick of the slide: begun, stepped or ended (forward: the facing,
@@ -350,14 +371,32 @@ static void slide_tick(long biped_index, struct biped_datum *biped, real_vector3
 		parkour.slide_velocity[0] = horizontal.i * speed;
 		parkour.slide_velocity[1] = horizontal.j * speed;
 		parkour.sliding = TRUE;
+		/* (the click's, unless the head is down too: that one is held) */
+		parkour.slide_latched = parkour_settings.latch &&
+			(halo_vr_crouch() & (HALO_VR_CROUCH_PHYSICAL | HALO_VR_CROUCH_BUTTON)) == HALO_VR_CROUCH_BUTTON;
+		parkour.slide_click_let_go = FALSE;
 		parkour.slide_ticks = parkour.slide_airborne_ticks = parkour.slide_stall_ticks = 0;
 		halo_vr_pulse(0.35f, 0.08f);
-		platform_log("vr: slide start (%s, sprint %s) at %.1f m/s, the run %.1f",
+		platform_log("vr: slide start (%s%s, sprint %s) at %.1f m/s, the run %.1f",
 			(halo_vr_crouch() & HALO_VR_CROUCH_PHYSICAL) ? "head crouch" : "crouch button",
+			parkour.slide_latched ? ", latched" : "",
 			halo_vr_sprint_toggled() ? "on" : "by arms", (double)speed, (double)run);
 	}
 
-	if (!crouch)
+	if (parkour.slide_latched)
+	{
+		/* (the click let go, then clicked again: the player stands) */
+		if (!(halo_vr_crouch() & HALO_VR_CROUCH_BUTTON))
+		{
+			parkour.slide_click_let_go = TRUE;
+		}
+		else if (parkour.slide_click_let_go)
+		{
+			slide_end("stood early");
+			return;
+		}
+	}
+	else if (!crouch)
 	{
 		slide_end("stood");
 		return;
