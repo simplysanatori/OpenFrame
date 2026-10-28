@@ -405,12 +405,12 @@ VR_SCREENS["vr_gestures"] = {
     "help_top": 366,
     "rows": [
         ("BULLET TIME BINDING:", "vr.bullet_time_binding",
-         [("DOUBLE FLICK", "double_flick"), ("HOLD", "hold"), ("OFF", "off")],
-         "Double flick: flick the turning stick up twice\nquickly. Hold: hold it up 0.8 s. Off: not from the stick.",
+         [("FLICK DOWN", "flick_down"), ("DOUBLE FLICK UP", "double_flick"), ("HOLD UP", "hold"), ("OFF", "off")],
+         "Flick down: flick the turning stick down (up is sprint). Its down then ejects no magazine: take a new one from the hip pouch and the old ejects itself.",
          None),
         ("THIRD PERSON BINDING:", "vr.third_person_binding",
          [("HOLD", "hold"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("OFF", "off")],
-         "Hold: hold the turning stick down. Double flick:\nflick it down twice quickly. Off: not from the stick.",
+         "Hold: hold the turning stick down. Double flick: flick it down twice quickly (bullet time then moves to a double flick up). Off: not from the stick.",
          None),
     ],
 }

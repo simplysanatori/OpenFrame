@@ -32,6 +32,13 @@ on the flick undoes it at the hold, so that a held stick, a camera script's
 second of it, does nothing in the end. stick_double (below) reads two
 flicks quickly in a row.
 
+The stick pushed down (vr.bullet_time_binding = "flick_down"; stick_down_update
+below): a flick is told as the push is let go (hold 1: a push let go before
+STICK_UP_HOLD_SECONDS), so that a hold, which is the third person's, never
+is one. The third person's own hold is timed by vr.c (STICK_DOWN_HOLD_SECONDS,
+a little shorter and its cone tighter), so a push it has taken is no flick
+either, whichever of the two ends first.
+
 When a push is over, ended is set for that call: ended_seconds is how long
 it was held, ended_result what it came to (STICK_GESTURE_*, none: spent),
 and ended_across and ended_along the most sideways and the least forward it
@@ -199,6 +206,25 @@ static inline int stick_gesture_update(struct stick_gesture *g, int able, float 
 		g->taken = 1;
 		g->result = result;
 	}
+	return result;
+}
+
+/* one frame of the stick pushed down for bullet time (flick_down): along is
+the push down (-y), third_taken what the caller sets when the third person's
+hold took this push (cleared here when the push is over). STICK_GESTURE_FLICK
+once, as a flick is let go; a hold (or a push the third person took) is
+nothing. */
+static inline int stick_down_update(struct stick_gesture *g, int *third_taken, int able, float along, float across,
+	float seconds)
+{
+	int result = stick_gesture_update(g, able, along, across, STICK_HOLD_OR_FLICK, seconds);
+
+	if (result == STICK_GESTURE_HOLD)
+		result = STICK_GESTURE_NONE;
+	if (result == STICK_GESTURE_FLICK && *third_taken)
+		result = STICK_GESTURE_NONE;
+	if (!g->held)
+		*third_taken = 0;
 	return result;
 }
 

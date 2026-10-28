@@ -625,22 +625,28 @@ static const struct config_setting config_settings[] =
 	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
 		"Sprinting, how many times the running speed, 1.1 to 2." },
 	{ "vr.bullet_time", _config_boolean, "false", "HALO_VR_BULLET_TIME", _environment_value, _platform_desktop,
-		"Bullet time: a double flick of the turning stick up (the right, or the\n"
+		"Bullet time: a flick of the turning stick down (the right, or the\n"
 		"left with vr.swap_sticks; vr.bullet_time_binding) slows the world,\n"
 		"your body's run and jumps with it (sprint multiplies with it); the\n"
 		"same gesture ends it. In a game\n"
 		"of this computer alone (the campaign; never online, split screen or\n"
 		"with bots). Your head and hands stay at full speed; the sounds keep\n"
 		"their pitch." },
-	{ "vr.bullet_time_binding", _config_string, "\"double_flick\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
+	{ "vr.bullet_time_binding", _config_string, "\"flick_down\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
 		"What toggles bullet time (vr.bullet_time) from the turning stick,\n"
-		"on or off alike: \"double_flick\" two quick flicks up, the second\n"
-		"within a third of a second of the first's end (the first toggles\n"
-		"sprint at once, as ever, and the second takes that back; a hold of\n"
+		"on or off alike: \"flick_down\" one flick DOWN, let go within three\n"
+		"quarters of a second (the default; a flick UP is sprint's, the two\n"
+		"independent; a hold down is the third person's, vr.third_person_binding;\n"
+		"the stick's down then ejects no magazine: take another from the\n"
+		"pouch at the left hip, and the old one ejects itself);\n"
+		"\"double_flick\" two quick flicks up, the second within a third of a\n"
+		"second of the first's end (the first toggles sprint at once, and the\n"
+		"second takes that back; the stick's down ejects as ever; a hold of\n"
 		"the stick up does nothing, for a Steam Input script that holds it);\n"
 		"\"hold\" holding the stick up most of a second; \"off\" never from\n"
-		"the stick. Sprint is its own: a flick up toggles it with bullet time\n"
-		"on or off. The stick's click stays the game's zoom." },
+		"the stick. With vr.third_person_binding = \"double_flick_down\" the\n"
+		"down is the third person's and \"flick_down\" works as \"double_flick\".\n"
+		"The stick's click stays the game's zoom." },
 	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
 		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
 	{ "vr.third_person", _config_boolean, "false", "HALO_VR_THIRD_PERSON", _environment_value, _platform_desktop,

@@ -3082,7 +3082,7 @@ The Steam Frame's controllers are the halves of an Xbox controller:
 | A swing of the right controller: hard, or softer with the right grip held | Melee (`vr.melee_gesture`, below) |
 | The right hand over the right shoulder or at the right hip, gripping | Draw the weapon carried there (`vr.holsters`, below) |
 | The sniper rifle's or the pistol's scope raised to an eye | Look through it, magnified (`vr.scope_view = "eye"`, below) |
-| The left hand gripping at the left hip and pushing what it took into the weapon (the right stick pushed down ejects the magazine first, if you like) | Reload by hand: take another magazine, the one in the weapon ejecting itself, and push it in (`vr.manual_reload`, below) |
+| The left hand gripping at the left hip and pushing what it took into the weapon (the right stick pushed down ejects the magazine first, if you like; not with bullet time on the stick's down) | Reload by hand: take another magazine, the one in the weapon ejecting itself, and push it in (`vr.manual_reload`, below) |
 | The left grip held, the left hand drawn back and swung, the grip let go | Throw a grenade where the hand threw it, as hard as it did (`vr.grenade_throw`, below) |
 | Beside an overturned vehicle, both hands low gripping it, then lifted together | Flip it (`vr.vehicle_flip`, below; X reloads there) |
 | The right hand reaching down to a weapon on the ground, gripping | Pick it up, or swap the one in hand for it (`vr.grab_world`, below; X held as ever) |
@@ -3476,7 +3476,10 @@ the new one (a clack and the magazine sliding out, in the right hand; the
 weapon is empty now, and does not fire). Push it into the weapon where it
 goes, still gripping (a firm click in the left hand as it seats, and a
 lighter one in the right). The right stick pushed down ejects the magazine
-before you reach, if you like (the same clack). These are firmer than the
+before you reach, if you like (the same clack), unless bullet time has the
+stick's down (`vr.bullet_time` on and `vr.bullet_time_binding =
+"flick_down"`, the default there): then take the new magazine from the pouch,
+which ejects the old. These are firmer than the
 pouch's ticks, and the game's rumble (a weapon's firing goes on a moment
 after it stops) and the weapons' and the hits' feel ("The weapons' feel",
 below) wait while they play. The rounds are in the weapon the moment

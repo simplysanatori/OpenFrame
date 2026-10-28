@@ -243,8 +243,10 @@ dead zone, and the push past it to the full ask */
 #define COMFORT_FULL 0.6f
 /* vr.sprint_mode = "toggle" and vr.bullet_time (comfort_update): the right
 stick pushed up (vr_stick_gesture.h's STICK_UP_*): a flick toggles sprint
-at once as it is pushed. Bullet time by vr.bullet_time_binding: a double
-flick (the default; a second flick within STICK_DOUBLE_SECONDS of the first's
+at once as it is pushed. Bullet time by vr.bullet_time_binding: a flick
+down ("flick_down", the default; the sprint's flick stays up, the two
+independent), or a double
+flick (a second flick within STICK_DOUBLE_SECONDS of the first's
 end undoes its sprint toggle and toggles bullet time, and a push held
 STICK_UP_HOLD_SECONDS, a camera script's second of it, undoes its flick and
 does nothing), or a hold of STICK_UP_HOLD_SECONDS ("hold": a flick then
@@ -271,11 +273,16 @@ a push down ejects the magazine first, as ever (a hold, not a flick, so
 that an eject does not switch the view) */
 #define STICK_DOWN_HOLD_SECONDS 0.75f
 /* vr.bullet_time_binding (comfort_update): what takes bullet time from the
-turning stick pushed up; vr.third_person_binding: what switches the third
-person from the stick pushed down */
+turning stick: "flick_down" (the default) a flick DOWN, let go before
+STICK_UP_HOLD_SECONDS (a hold down is the third person's, and a flick down
+no eject: with bullet time on the stick's down the magazine is ejected by
+hand, the new one taken from the pouch, reload_update), the others from the
+stick pushed up; vr.third_person_binding: what switches the third person
+from the stick pushed down. A flick up is sprint's in every binding. */
 #define BULLET_BINDING_DOUBLE_FLICK 0
 #define BULLET_BINDING_HOLD 1
 #define BULLET_BINDING_OFF 2
+#define BULLET_BINDING_FLICK_DOWN 3
 #define THIRD_BINDING_HOLD 0
 #define THIRD_BINDING_DOUBLE_FLICK 1
 #define THIRD_BINDING_OFF 2
@@ -754,6 +761,12 @@ static struct
 	const char *stick_up_note;
 	struct stick_gesture stick_down_gesture;
 	struct stick_double stick_down_double;
+	/* the turning stick pushed down as bullet time's (vr.bullet_time_binding
+	= "flick_down", and for the log whatever the binding): its gesture, whether
+	the third person's hold took this push, and what the push did */
+	struct stick_gesture bullet_down;
+	int bullet_down_third;
+	const char *stick_down_note;
 	int sprint_on;
 	float sprint_off_foot;
 	float arm_swing;
@@ -1300,7 +1313,9 @@ static void settings_read(void)
 			settings.bullet_time_scale > 0.0f && settings.bullet_time_scale < 0.2f ? 0.2f : 0.4f;
 	settings.third_person = config_boolean("vr.third_person");
 	settings.bullet_time_binding = !strcmp(config_string("vr.bullet_time_binding"), "hold") ? BULLET_BINDING_HOLD :
-		!strcmp(config_string("vr.bullet_time_binding"), "off") ? BULLET_BINDING_OFF : BULLET_BINDING_DOUBLE_FLICK;
+		!strcmp(config_string("vr.bullet_time_binding"), "off") ? BULLET_BINDING_OFF :
+		!strcmp(config_string("vr.bullet_time_binding"), "double_flick") ? BULLET_BINDING_DOUBLE_FLICK :
+		BULLET_BINDING_FLICK_DOWN;
 	settings.third_person_binding = !strcmp(config_string("vr.third_person_binding"), "double_flick_down") ?
 		THIRD_BINDING_DOUBLE_FLICK : !strcmp(config_string("vr.third_person_binding"), "off") ? THIRD_BINDING_OFF :
 		THIRD_BINDING_HOLD;
@@ -3158,6 +3173,7 @@ room for it (a tick of its controller as it gets there, and a firmer one as
 it takes it; the magazine in the weapon ejects itself if the stick has not)
 and pushes it home where it goes (a knock in both hands): the game's reload
 (vr_reload.c presses it). */
+static int bullet_on_stick_down(void);
 static void reload_update(void)
 {
 	static const char *const names[] = { "", "magazine", "shell", "tubes" };
@@ -3229,15 +3245,23 @@ static void reload_update(void)
 		r->held = 0;
 	}
 
-	/* the right stick down ejects the magazine */
+	/* the right stick down ejects the magazine (not with bullet time on the
+	stick's down, vr.bullet_time_binding = "flick_down": there the new
+	magazine taken from the pouch ejects the old, as it ever does) */
 	if (stick < -RELOAD_STICK_PRESSED)
 	{
-		if (!vr.reload_stick_down && r->kind != HALO_VR_RELOAD_NONE)
+		if (!vr.reload_stick_down && r->kind != HALO_VR_RELOAD_NONE && bullet_on_stick_down())
+		{
+			platform_log("vr: reload: no eject from the stick down: it is bullet time's (take another magazine from the "
+				"pouch: the old one ejects itself)");
+		}
+		else if (!vr.reload_stick_down && r->kind != HALO_VR_RELOAD_NONE)
 		{
 			if (r->kind != HALO_VR_RELOAD_SHELL && !r->ejected && w->can_reload)
 			{
 				r->ejected = 1;
 				haptic_play(1, HAPTIC_FEEL(reload_eject_feel));
+				vr.stick_down_note = "eject";
 			}
 			platform_log("vr: reload: eject: %s", r->kind == HALO_VR_RELOAD_SHELL ? "the shotgun takes shells, not a magazine" :
 				r->ejected && w->can_reload ? (r->kind == HALO_VR_RELOAD_TUBE ? "the tubes out" : "the magazine out") :
@@ -4129,6 +4153,23 @@ static int comfort_on_foot(void)
 		vr.views.focused;
 }
 
+/* the binding bullet time works by: the third person's double flick down
+(vr.third_person_binding, with vr.third_person) has the stick's down, so a
+bullet time on the down falls back to the double flick up */
+static int bullet_binding(void)
+{
+	if (settings.bullet_time_binding == BULLET_BINDING_FLICK_DOWN && settings.third_person &&
+		settings.third_person_binding == THIRD_BINDING_DOUBLE_FLICK)
+		return BULLET_BINDING_DOUBLE_FLICK;
+	return settings.bullet_time_binding;
+}
+
+/* whether the turning stick's down is bullet time's (a flick) and no eject */
+static int bullet_on_stick_down(void)
+{
+	return settings.bullet_time && bullet_binding() == BULLET_BINDING_FLICK_DOWN;
+}
+
 /* the arms' run (vr.sprint_mode = "arm_swing", ARM_SWING_* above): ported
 from HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later), its
 effort from the hands' vertical speeds in the play space */
@@ -4216,7 +4257,9 @@ static void comfort_update(float seconds, float turn)
 		if (!vr.stick_down_taken && settings.third_person && vr.stick_down_seconds >= STICK_DOWN_HOLD_SECONDS)
 		{
 			vr.stick_down_taken = 1;
+			vr.bullet_down_third = 1;
 			vr.third_person_on = !vr.third_person_on;
+			vr.stick_down_note = vr.third_person_on ? "third person on" : "third person off";
 			hand_haptic(0, 0.3f, 0.05f);
 			hand_haptic(1, 0.3f, 0.05f);
 			platform_log("vr: third person %s", vr.third_person_on ? "on" : "off");
@@ -4227,12 +4270,48 @@ static void comfort_update(float seconds, float turn)
 		vr.stick_down_seconds = 0.0f;
 		vr.stick_down_taken = 0;
 	}
-	/* the right stick up (vr.bullet_time_binding): a flick toggles sprint,
-	bullet time on or off alike; bullet time itself from a double flick, a
-	hold or not from the stick */
+	/* the stick down for bullet time (vr.bullet_time_binding = "flick_down"):
+	a push let go before STICK_UP_HOLD_SECONDS toggles it, on or off alike
+	(told as it is let go: a hold is the third person's, or nothing); the push
+	is followed in any binding, for the log */
 	{
-		int hold_mode = settings.bullet_time && settings.bullet_time_binding == BULLET_BINDING_HOLD ?
-			STICK_HOLD_OR_FLICK : settings.bullet_time_binding == BULLET_BINDING_HOLD ? STICK_HOLD_NONE :
+		int third = vr.bullet_down_third;
+		int flick_down = stick_down_update(&vr.bullet_down, &vr.bullet_down_third, able, -up, sideways, seconds);
+
+		if (flick_down == STICK_GESTURE_FLICK && bullet_on_stick_down())
+		{
+			vr.bullet_time_on = !vr.bullet_time_on;
+			hand_haptic(0, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+			hand_haptic(1, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
+			platform_log("vr: bullet time %s (the stick flicked down)", vr.bullet_time_on ? "on" : "off");
+			vr.stick_down_note = vr.bullet_time_on ? "bullet time on" : "bullet time off";
+		}
+		if (vr.bullet_down.ended)
+		{
+			const struct stick_gesture *g = &vr.bullet_down;
+			int hold = g->ended_result == STICK_GESTURE_HOLD || third;
+			const char *kind = hold ? "hold" : g->ended_result == STICK_GESTURE_FLICK ? "flick" : "nothing";
+			const char *what = vr.stick_down_note ? vr.stick_down_note :
+				g->ended_result == STICK_GESTURE_NONE ? "spent, off foot" :
+				hold ? (settings.third_person ? "third person: vr.third_person_binding is not hold" :
+					"third person off (vr.third_person)") :
+				bullet_on_stick_down() ? "nothing" : settings.bullet_time ? "bullet time is on another binding" :
+				"vr.bullet_time off";
+
+			platform_log("vr: stick down: held %.2f s -> %s (%s; sideways at most %.2f, down at least %.2f%s)",
+				g->ended_seconds, kind, what, g->ended_across, g->ended_along,
+				g->ended_result == STICK_GESTURE_NONE ? (vr.menus ? "; menus" : !vr.aimed ? "; not aimed" :
+				!vr.crouch_able_frame ? "; not on a biped" : !vr.views.focused ? "; not focused" : "") : "");
+			vr.stick_down_note = NULL;
+		}
+	}
+	/* the right stick up (vr.bullet_time_binding): a flick toggles sprint,
+	bullet time on or off alike; bullet time itself from a flick down (below),
+	a double flick up, a hold up or not from the stick */
+	{
+		int binding = bullet_binding();
+		int hold_mode = settings.bullet_time && binding == BULLET_BINDING_HOLD ?
+			STICK_HOLD_OR_FLICK : binding == BULLET_BINDING_HOLD ? STICK_HOLD_NONE :
 			STICK_HOLD_AFTER_FLICK;
 		int act = STICK_ACT_NONE, bullet_toggle = 0, flick = 0;
 		const char *how = "";
@@ -4241,7 +4320,7 @@ static void comfort_update(float seconds, float turn)
 		if (hold_mode == STICK_HOLD_AFTER_FLICK)
 		{
 			act = stick_double_update(&vr.stick_up_double, gesture, vr.stick_up.ended, vr.stick_up.ended_gap,
-				seconds, settings.bullet_time && settings.bullet_time_binding == BULLET_BINDING_DOUBLE_FLICK);
+				seconds, settings.bullet_time && binding == BULLET_BINDING_DOUBLE_FLICK);
 			flick = act == STICK_ACT_FLICK;
 		}
 		else
@@ -4866,6 +4945,10 @@ static void input_update(void)
 	"double_flick_down") */
 	if (settings.third_person && settings.third_person_binding == THIRD_BINDING_DOUBLE_FLICK && comfort_on_foot() &&
 		stick_gesture_inside(&vr.stick_down_gesture, -vr.input.right_stick[1], fabsf(vr.input.right_stick[0])))
+		x = 0.0f;
+	/* (and for bullet time's flick down, vr.bullet_time_binding = "flick_down") */
+	if (bullet_on_stick_down() && comfort_on_foot() &&
+		stick_gesture_inside(&vr.bullet_down, -vr.input.right_stick[1], fabsf(vr.input.right_stick[0])))
 		x = 0.0f;
 	/* (driving a vehicle steered toward the aim: the left stick's sideways
 	push turns smoothly too, STICK_DRIVE_FASTEST) */
