@@ -5,9 +5,10 @@ The VR mode's sprint and bullet time (HALO_VR; vr.sprint_mode,
 vr.sprint_speed, vr.bullet_time, vr.bullet_time_scale;
 docs/openframe-features.md): the game's side of them, for main.c and
 bipeds.c. vr.c reads the controllers (comfort_update): the right stick
-flicked up toggles sprint (also while bullet time is on); a flick down
-toggles bullet time (vr.bullet_time_binding = flick_down, the default;
-"double_flick" = two flicks up within 0.35 s, "hold" = held up 0.8 s); and with vr.sprint_mode =
+flicked up toggles sprint (also while bullet time is on); two flicks down
+toggle bullet time (vr.bullet_time_binding = double_flick_down, the default: two flicks down
+within 0.35 s, one on its own the eject; "flick_down", "double_flick" = two flicks up within
+0.35 s, "hold" = held up 0.8 s); and with vr.sprint_mode =
 "arm_swing" both arms pumping are a run's effort. The HUD says each:
 "Sprint", "Sprint off", "Bullet time", "Bullet time off".
 

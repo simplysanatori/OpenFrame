@@ -625,27 +625,32 @@ static const struct config_setting config_settings[] =
 	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
 		"Sprinting, how many times the running speed, 1.1 to 2." },
 	{ "vr.bullet_time", _config_boolean, "false", "HALO_VR_BULLET_TIME", _environment_value, _platform_desktop,
-		"Bullet time: a flick of the turning stick down (the right, or the\n"
-		"left with vr.swap_sticks; vr.bullet_time_binding) slows the world,\n"
+		"Bullet time: two quick flicks of the turning stick down (the right, or\n"
+		"the left with vr.swap_sticks; vr.bullet_time_binding) slow the world,\n"
 		"your body's run and jumps with it (sprint multiplies with it); the\n"
 		"same gesture ends it. In a game\n"
 		"of this computer alone (the campaign; never online, split screen or\n"
 		"with bots). Your head and hands stay at full speed; the sounds keep\n"
 		"their pitch." },
-	{ "vr.bullet_time_binding", _config_string, "\"flick_down\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
+	{ "vr.bullet_time_binding", _config_string, "\"double_flick_down\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
 		"What toggles bullet time (vr.bullet_time) from the turning stick,\n"
-		"on or off alike: \"flick_down\" one flick DOWN, let go within three\n"
-		"quarters of a second (the default; a flick UP is sprint's, the two\n"
+		"on or off alike: \"double_flick_down\" two quick flicks DOWN, each let\n"
+		"go within 0.3 s, the second begun within a third of a second of the\n"
+		"first's end (the default; one flick down alone ejects the magazine,\n"
+		"as ever, a moment after it; a flick UP is sprint's, the two\n"
 		"independent; a hold down is the third person's, vr.third_person_binding;\n"
-		"the stick's down then ejects no magazine: take another from the\n"
-		"pouch at the left hip, and the old one ejects itself);\n"
+		"a push begins only within about 34 degrees of straight down, so a\n"
+		"diagonal look does nothing; bullet time rests half a second after a\n"
+		"toggle); \"flick_down\" one quick flick DOWN (the stick's down then\n"
+		"ejects no magazine: take another from the pouch at the left hip, and\n"
+		"the old one ejects itself);\n"
 		"\"double_flick\" two quick flicks up, the second within a third of a\n"
 		"second of the first's end (the first toggles sprint at once, and the\n"
 		"second takes that back; the stick's down ejects as ever; a hold of\n"
 		"the stick up does nothing, for a Steam Input script that holds it);\n"
 		"\"hold\" holding the stick up most of a second; \"off\" never from\n"
 		"the stick. With vr.third_person_binding = \"double_flick_down\" the\n"
-		"down is the third person's and \"flick_down\" works as \"double_flick\".\n"
+		"down is the third person's and the downs work as \"double_flick\".\n"
 		"The stick's click stays the game's zoom." },
 	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
 		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
@@ -653,10 +658,10 @@ static const struct config_setting config_settings[] =
 		"On foot, the view from behind and above your body (the campaign and\n"
 		"other games without a multiplayer engine): your body drawn as others\n"
 		"see it, the weapon aimed by the controller as ever, the HUD as ever.\n"
-		"Holding the turning stick down (three quarters of a second; the right,\n"
-		"or the left with vr.swap_sticks; vr.third_person_binding) switches\n"
-		"between it and the first person; the view is over the weapon hand's\n"
-		"shoulder. A vehicle's seat, a scope, death and the cinematics keep\n"
+		"Holding the turning stick down (0.8 s; the right, or the left with\n"
+		"vr.swap_sticks; vr.third_person_binding) switches between it and the\n"
+		"first person, whichever this was set to, and writes the state here;\n"
+		"the view is over the weapon hand's shoulder. A vehicle's seat, a scope, death and the cinematics keep\n"
 		"their own views." },
 	{ "vr.third_person_binding", _config_string, "\"hold\"", "HALO_VR_THIRD_PERSON_BINDING", _environment_value, _platform_desktop,
 		"What switches the third person (vr.third_person) from the turning\n"

@@ -7,8 +7,9 @@ vr.bullet_time): a flick or a hold. No dependencies, so that a check can
 drive it frame by frame.
 
 A push is the stick inside a cone about the way: pushed past
-STICK_UP_PRESSED with more along than across (within 45 degrees of it) to
-begin, and kept while past STICK_UP_RELEASED with STICK_UP_STAY_ACROSS or
+STICK_UP_BEGIN with STICK_UP_BEGIN_RATIO times as much along as across
+(within about 34 degrees of it: a diagonal push of a look around never
+begins one, headset trial 9) to begin, and kept while past STICK_UP_RELEASED with STICK_UP_STAY_ACROSS or
 less across for each along (a thumb that holds a stick drifts, and a hold
 of 0.8 s that a drift ended as a flick was never a hold: headset trial 7).
 A dip out of the cone shorter than STICK_UP_GRACE_SECONDS is part of the
@@ -33,10 +34,13 @@ second of it, does nothing in the end. stick_double (below) reads two
 flicks quickly in a row.
 
 The stick pushed down (vr.bullet_time_binding = "flick_down"; stick_down_update
-below): a flick is told as the push is let go (hold 1: a push let go before
+below; the default, "double_flick_down", reads it like the double flick up): a flick is told as the push is let go (hold 1: a push let go before
 STICK_UP_HOLD_SECONDS), so that a hold, which is the third person's, never
-is one. The third person's own hold is timed by vr.c (STICK_DOWN_HOLD_SECONDS,
-a little shorter and its cone tighter), so a push it has taken is no flick
+is one. The third person's hold is a gesture of its own in vr.c with
+loose set (it begins as the cone used to, down more than sideways, so a push
+that began on a diagonal and settled still counts, and its keeping cone is
+the generous one: trial 9's holds drifted to 0.5 sideways and 0.5 down, which
+the old, tighter hold cone ended unheard), so a push it has taken is no flick
 either, whichever of the two ends first.
 
 When a push is over, ended is set for that call: ended_seconds is how long
@@ -54,6 +58,9 @@ along it keeps; the third person's stick down uses the first three, plain) */
 #define STICK_UP_RELEASED 0.55f
 #define STICK_UP_SIDEWAYS 0.6f
 #define STICK_UP_BEGIN 0.6f
+/* (to begin a push: along must be this many times across; a loose gesture,
+the third person's hold, begins with just more along than across) */
+#define STICK_UP_BEGIN_RATIO 1.5f
 #define STICK_UP_KEEP 0.4f
 #define STICK_UP_STAY_ACROSS 1.4f
 #define STICK_UP_HOLD_SECONDS 0.8f
@@ -95,6 +102,9 @@ struct stick_gesture
 	int flicked;
 	/* what the push has come to (a flick, a hold) */
 	int result;
+	/* set by the caller: begins on more along than across (the third
+	person's hold), not STICK_UP_BEGIN_RATIO times */
+	int loose;
 };
 
 /* whether the stick is in the cone: along, the push the gesture's way (up:
@@ -102,7 +112,8 @@ the stick's y); across, its sideways push (its size) */
 static inline int stick_gesture_inside(const struct stick_gesture *g, float along, float across)
 {
 	if (!g->held)
-		return along >= STICK_UP_BEGIN && along > across;
+		return along >= STICK_UP_BEGIN &&
+			(g->loose ? along > across : along >= across * STICK_UP_BEGIN_RATIO);
 	return along >= STICK_UP_KEEP && across <= along * STICK_UP_STAY_ACROSS;
 }
 
@@ -207,6 +218,64 @@ static inline int stick_gesture_update(struct stick_gesture *g, int able, float 
 		g->result = result;
 	}
 	return result;
+}
+
+/* the pushes that did not begin because they were diagonal (along past
+STICK_UP_BEGIN and more than across, but not STICK_UP_BEGIN_RATIO times it:
+what the old cone took for a push), told for the log as the stick leaves
+them: ended is set for that call, with the seconds and the extremes. A push
+that goes on to begin (the thumb settles) is no diagonal. */
+struct stick_diag
+{
+	int active;
+	int ended;
+	float seconds;
+	float across;
+	float along;
+	float ended_seconds;
+	float ended_across;
+	float ended_along;
+};
+
+static inline void stick_diag_update(struct stick_diag *d, const struct stick_gesture *g, float along, float across,
+	float seconds)
+{
+	int diagonal = !g->held && along >= STICK_UP_BEGIN && along > across && along < across * STICK_UP_BEGIN_RATIO;
+
+	d->ended = 0;
+	if (seconds > STICK_UP_FRAME_MAX)
+		seconds = STICK_UP_FRAME_MAX;
+	if (g->held)
+	{
+		d->active = 0;
+		return;
+	}
+	if (diagonal)
+	{
+		if (!d->active)
+		{
+			d->active = 1;
+			d->seconds = 0.0f;
+			d->across = across;
+			d->along = along;
+		}
+		else
+		{
+			d->seconds += seconds;
+			if (across > d->across)
+				d->across = across;
+			if (along < d->along)
+				d->along = along;
+		}
+	}
+	else if (d->active && along < STICK_UP_KEEP)
+	{
+		d->active = 0;
+		d->ended = 1;
+		d->ended_seconds = d->seconds;
+		d->ended_across = d->across;
+		d->ended_along = d->along;
+	}
 }
 
 /* one frame of the stick pushed down for bullet time (flick_down): along is
