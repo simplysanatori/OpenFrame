@@ -88,6 +88,21 @@ VR_TITLES = {
     "vr_comfort": "MOVEMENT AND COMFORT", "vr_hands": "HANDS AND WEAPONS", "vr_fists": "FISTS AND GRABBING",
     "vr_gestures": "GESTURES",
 }
+class Slider(NamedTuple):
+    """a slider row's choices, in place of [(shown, value)]: its track runs
+    from least to most, left and right step it by step (holding them steps
+    on), a click on the track or the mouse dragged along it sets it, and A, or
+    a click on its number, types a value (Enter keeps it) from typed_least to
+    typed_most (a scale of 100 shows and types percents). menu_functions.c's settings_sliders has the same"""
+    least: float
+    most: float
+    step: float
+    typed_least: float
+    typed_most: float
+    # shown as percents when 100 (the setting is a fraction: 0.05 shows +5%)
+    scale: float = 1.0
+
+
 VR_SCREENS = {}
 # (OpenFrame) where the HUD's corners are placed, the wrist HUD's offsets from
 # the wrist, in meters. The wrist HUD ported from HaloCE-DecompRemix-VR by
@@ -245,20 +260,13 @@ VR_SCREENS["vr_wrist"] = {
 # (OpenFrame) the visor HUD's corners' placement, a page of HUD's, every value
 # of it read again as it changes (vr_visor.c, panel_placement): each corner's
 # own move and size, then the inset, then all of them moved and sized
-# together. Moves are fractions of the HUD's width or height, -0.3 to 0.3.
-PLACE_STEPS = (-0.3, -0.2, -0.15, -0.1, -0.08, -0.06, -0.04, -0.02, 0,
-               0.02, 0.04, 0.06, 0.08, 0.1, 0.15, 0.2, 0.3)
-
-
-def _place_offsets(less: str, more: str) -> list:
-    return [(f"{round(abs(offset) * 100)}% {more if offset > 0 else less}" if offset else "NONE",
-             f"{offset:g}") for offset in PLACE_STEPS]
-
-
-PLACE_ACROSS = _place_offsets("LEFT", "RIGHT")
-PLACE_UP = _place_offsets("DOWN", "UP")
-PLACE_SCALES = [(f"{round(scale * 100)}%", f"{scale:g}")
-                for scale in (0.5, 0.6, 0.7, 0.75, 0.8, 0.9, 1, 1.1, 1.2, 1.25, 1.3, 1.4, 1.5)]
+# together. Sliders, shown and typed as percents (a setting of 0.05 is +5%):
+# moves of -50% to +50% of the HUD's width or height, the inset 0 to 50%,
+# sizes 50% to 150%, a step of 1%.
+PLACE_ACROSS = Slider(-0.5, 0.5, 0.01, -0.5, 0.5, 100.0)
+PLACE_UP = PLACE_ACROSS
+PLACE_SCALES = Slider(0.5, 1.5, 0.01, 0.5, 1.5, 100.0)
+PLACE_INSET = Slider(0.0, 0.5, 0.01, 0.0, 0.5, 100.0)
 VR_SCREENS["vr_hud_layout"] = {
     "screen": "vr_hud_layout_screen",
     "header": ("header_vr_hud_layout", f"{PE}/vr_hud_layout/header_vr_hud_layout"),
@@ -267,31 +275,30 @@ VR_SCREENS["vr_hud_layout"] = {
     "help_top": 366,
     "rows": [
         ("HUD INSET:", "vr.hud_inset",
-         [("NONE", "0"), *((f"{round(inset * 100)}%", f"{inset:g}")
-                           for inset in (0.05, 0.1, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5))],
+         PLACE_INSET,
          "Brings ammo, shields and tracker in toward the\nmiddle (cut off? Frame with a spacer: 20%).", None),
         ("ALL LEFT/RIGHT:", "vr.hud_offset_x", PLACE_ACROSS,
-         "Moves ammo, shields and tracker together left or\nright (of the HUD's width); the reticle stays.", None),
+         "Moves ammo, shields and tracker together: - left,\n+ right (of the HUD's width); the reticle stays.", None),
         ("ALL UP/DOWN:", "vr.hud_offset_y", PLACE_UP,
-         "Moves ammo, shields and tracker together up or\ndown (of the HUD's height); the reticle stays.", None),
+         "Moves ammo, shields and tracker together: - down,\n+ up (of the HUD's height); the reticle stays.", None),
         ("ALL SIZE:", "vr.hud_scale", PLACE_SCALES,
          "The size of ammo, shields and tracker, each\ngrowing from its own corner.", None),
         ("AMMO LEFT/RIGHT:", "vr.hud_weapon_x", PLACE_ACROSS,
-         "Ammo and grenades (top left) left/right: RIGHT\nbrings them in.", None),
+         "Ammo and grenades (top left): - left, + right\n(+ brings them in).", None),
         ("AMMO UP/DOWN:", "vr.hud_weapon_y", PLACE_UP,
-         "Ammo and grenades (top left) up/down: DOWN\nbrings them in.", None),
+         "Ammo and grenades (top left): - down, + up\n(- brings them in).", None),
         ("AMMO SIZE:", "vr.hud_weapon_scale", PLACE_SCALES,
          "The size of the ammo and grenades (top left).", None),
         ("SHIELDS LEFT/RIGHT:", "vr.hud_status_x", PLACE_ACROSS,
-         "Shields and health (top right) left/right: LEFT\nbrings them in.", None),
+         "Shields and health (top right): - left, + right\n(- brings them in).", None),
         ("SHIELDS UP/DOWN:", "vr.hud_status_y", PLACE_UP,
-         "Shields and health (top right) up/down: DOWN\nbrings them in.", None),
+         "Shields and health (top right): - down, + up\n(- brings them in).", None),
         ("SHIELDS SIZE:", "vr.hud_status_scale", PLACE_SCALES,
          "The size of the shields and health (top right).", None),
         ("TRACKER LEFT/RIGHT:", "vr.hud_tracker_x", PLACE_ACROSS,
-         "Motion tracker (bottom left) left/right: RIGHT\nbrings it in.", None),
+         "Motion tracker (bottom left): - left, + right\n(+ brings it in).", None),
         ("TRACKER UP/DOWN:", "vr.hud_tracker_y", PLACE_UP,
-         "Motion tracker (bottom left) up/down: UP brings\nit in.", None),
+         "Motion tracker (bottom left): - down, + up\n(+ brings it in).", None),
         ("TRACKER SIZE:", "vr.hud_tracker_scale", PLACE_SCALES,
          "The size of the motion tracker (bottom left).", None),
     ],
@@ -523,19 +530,6 @@ FRAMES_ADDED = {
 # then python3 tools/port_settings.py writes the pages' files.)
 
 SECTION = "section"
-
-
-class Slider(NamedTuple):
-    """a slider row's choices, in place of [(shown, value)]: its track runs
-    from least to most, left and right step it by step (holding them steps
-    on), a click on the track or the mouse dragged along it sets it, and A, or
-    a click on its number, types a value (Enter keeps it) from typed_least to
-    typed_most. menu_functions.c's settings_sliders has the same"""
-    least: float
-    most: float
-    step: float
-    typed_least: float
-    typed_most: float
 
 
 # a slider's track, its thumb and its number, in the value's column
@@ -1200,14 +1194,43 @@ def _setting_screen(folder: str, spec: dict) -> list:
         # (a device's name wants the wider spinner Server Setup's co-op rows
         # have: WIDE_SETTINGS)
         wide = setting in WIDE_SETTINGS
-        extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
-                               ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
-                         [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
-                          f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 286 if wide else 320), ("y", 1)])}/>'])
+        slider = isinstance(choices, Slider)
+        if slider:
+            # (a slider in the spinner's place: its track, the thumb on it and
+            # its number, which menu_functions.c's "port slider ..." set and
+            # its list's "port settings help" places and shows)
+            run = "port slider"
+            extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                                   ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
+                             [f'<on event="left" run="{run} left"/>', f'<on event="right" run="{run} right"/>',
+                              f'<on event="a" run="{run} edit"/>', f'<on event="start" run="{run} edit"/>',
+                              '<on event="left_mouse" run="mouse emit accept event"/>',
+                              f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
+                              f'<child{attributes([("widget", f"{base}/{key}_track"), ("x", 323), ("y", 7)])}/>',
+                              f'<child{attributes([("widget", f"{base}/{key}_value"), ("x", 323 + SLIDER_VALUE_X), ("y", 4)])}/>'])
+        else:
+            extra += _widget(row, [("width", 512), ("height", 28), ("flags", "pass_unhandled_to_focused_child"),
+                                   ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF"), ("platform", platform)],
+                             [f'<child{attributes([("widget", f"{base}/{key}_label")])}/>',
+                              f'<child{attributes([("widget", f"{base}/{key}_spinner"), ("x", 286 if wide else 320), ("y", 1)])}/>'])
         extra += _widget(f"{base}/{key}_label",
                          [("type", "text"), ("controller", 1), ("width", 300), ("height", 22),
                           ("string_list", f"{base}/labels"), ("string_index", index), ("font", "ui\\large_ui"),
                           ("color", "#FF2896FF"), ("text_x", 13), ("text_y", 4)], [])
+        if slider:
+            extra += _widget(f"{base}/{key}_track", [("controller", 1), ("width", SLIDER_TRACK_WIDTH),
+                                                     ("height", SLIDER_TRACK_HEIGHT),
+                                                     ("bitmap", f"{SETTINGS}/slider_track")],
+                             [f'<child widget="{base}/{key}_thumb"/>'])
+            extra += _widget(f"{base}/{key}_thumb", [("controller", 1), ("width", SLIDER_THUMB_WIDTH),
+                                                     ("height", SLIDER_TRACK_HEIGHT),
+                                                     ("bitmap", f"{SETTINGS}/slider_thumb")], [])
+            extra += _settings_text(f"{base}/{key}_value", [("width", SLIDER_VALUE_WIDTH),
+                                                            ("height", SLIDER_VALUE_HEIGHT),
+                                                            ("bitmap", f"{SETTINGS}/slider_field"),
+                                                            ("color", SETTINGS_BLUE), ("align", "center"),
+                                                            ("text_y", 0), ("text_flags", "no_focus_test")])
+            continue
         extra += _widget(f"{base}/{key}_spinner",
                          [("type", "spinner"), ("left", None if wide else 3), ("top", 2), ("width", 206 if wide else 147),
                           ("height", 20), ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
@@ -1251,7 +1274,12 @@ def _setting_screen(folder: str, spec: dict) -> list:
     extra += _strings(f"{base}/help_strings",
                       [""] + [help_text.replace("\n", "\\n") for _, _, _, help_text, *_ in spec["rows"]] +
                       [help_text.replace("\n", "\\n") for _, _, help_text, *_ in spec.get("categories", ())])
-    return _screen(folder, spec, rows, ["port settings help"], [], extra)
+    # (sliders: the changes kept are forgotten as the page opens and closes,
+    # written at OK: menu_functions.c's "port slider init" and "close")
+    sliders = any(isinstance(row[2], Slider) for row in spec["rows"] if row[1])
+    handlers = ['<on event="created" run="port slider init"/>', '<on event="deleted" run="port slider close"/>'] \
+        if sliders else []
+    return _screen(folder, spec, rows, ["port settings help"], handlers, extra)
 
 
 def _controls_screen() -> list:

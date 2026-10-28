@@ -13,6 +13,8 @@
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help">
 		<data input="port settings help"/>
+		<on event="created" run="port slider init"/>
+		<on event="deleted" run="port slider close"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_inset" x="54" y="73"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_x" x="54" y="95"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_y" x="54" y="117"/>
@@ -34,121 +36,251 @@
 		<child widget="common_button_cancel" x="510" y="1"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_inset" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="NONE|5%|10%|15%|20%|25%|30%|40%|50%" setting="vr.hud_inset" values="0|0.05|0.1|0.15|0.2|0.25|0.3|0.4|0.5" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_x" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30% LEFT|20% LEFT|15% LEFT|10% LEFT|8% LEFT|6% LEFT|4% LEFT|2% LEFT|NONE|2% RIGHT|4% RIGHT|6% RIGHT|8% RIGHT|10% RIGHT|15% RIGHT|20% RIGHT|30% RIGHT" setting="vr.hud_offset_x" values="-0.3|-0.2|-0.15|-0.1|-0.08|-0.06|-0.04|-0.02|0|0.02|0.04|0.06|0.08|0.1|0.15|0.2|0.3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_y" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30% DOWN|20% DOWN|15% DOWN|10% DOWN|8% DOWN|6% DOWN|4% DOWN|2% DOWN|NONE|2% UP|4% UP|6% UP|8% UP|10% UP|15% UP|20% UP|30% UP" setting="vr.hud_offset_y" values="-0.3|-0.2|-0.15|-0.1|-0.08|-0.06|-0.04|-0.02|0|0.02|0.04|0.06|0.08|0.1|0.15|0.2|0.3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="50%|60%|70%|75%|80%|90%|100%|110%|120%|125%|130%|140%|150%" setting="vr.hud_scale" values="0.5|0.6|0.7|0.75|0.8|0.9|1|1.1|1.2|1.25|1.3|1.4|1.5" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_x" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30% LEFT|20% LEFT|15% LEFT|10% LEFT|8% LEFT|6% LEFT|4% LEFT|2% LEFT|NONE|2% RIGHT|4% RIGHT|6% RIGHT|8% RIGHT|10% RIGHT|15% RIGHT|20% RIGHT|30% RIGHT" setting="vr.hud_weapon_x" values="-0.3|-0.2|-0.15|-0.1|-0.08|-0.06|-0.04|-0.02|0|0.02|0.04|0.06|0.08|0.1|0.15|0.2|0.3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_y" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30% DOWN|20% DOWN|15% DOWN|10% DOWN|8% DOWN|6% DOWN|4% DOWN|2% DOWN|NONE|2% UP|4% UP|6% UP|8% UP|10% UP|15% UP|20% UP|30% UP" setting="vr.hud_weapon_y" values="-0.3|-0.2|-0.15|-0.1|-0.08|-0.06|-0.04|-0.02|0|0.02|0.04|0.06|0.08|0.1|0.15|0.2|0.3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="50%|60%|70%|75%|80%|90%|100%|110%|120%|125%|130%|140%|150%" setting="vr.hud_weapon_scale" values="0.5|0.6|0.7|0.75|0.8|0.9|1|1.1|1.2|1.25|1.3|1.4|1.5" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_x" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30% LEFT|20% LEFT|15% LEFT|10% LEFT|8% LEFT|6% LEFT|4% LEFT|2% LEFT|NONE|2% RIGHT|4% RIGHT|6% RIGHT|8% RIGHT|10% RIGHT|15% RIGHT|20% RIGHT|30% RIGHT" setting="vr.hud_status_x" values="-0.3|-0.2|-0.15|-0.1|-0.08|-0.06|-0.04|-0.02|0|0.02|0.04|0.06|0.08|0.1|0.15|0.2|0.3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_y" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30% DOWN|20% DOWN|15% DOWN|10% DOWN|8% DOWN|6% DOWN|4% DOWN|2% DOWN|NONE|2% UP|4% UP|6% UP|8% UP|10% UP|15% UP|20% UP|30% UP" setting="vr.hud_status_y" values="-0.3|-0.2|-0.15|-0.1|-0.08|-0.06|-0.04|-0.02|0|0.02|0.04|0.06|0.08|0.1|0.15|0.2|0.3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="50%|60%|70%|75%|80%|90%|100%|110%|120%|125%|130%|140%|150%" setting="vr.hud_status_scale" values="0.5|0.6|0.7|0.75|0.8|0.9|1|1.1|1.2|1.25|1.3|1.4|1.5" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_x" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30% LEFT|20% LEFT|15% LEFT|10% LEFT|8% LEFT|6% LEFT|4% LEFT|2% LEFT|NONE|2% RIGHT|4% RIGHT|6% RIGHT|8% RIGHT|10% RIGHT|15% RIGHT|20% RIGHT|30% RIGHT" setting="vr.hud_tracker_x" values="-0.3|-0.2|-0.15|-0.1|-0.08|-0.06|-0.04|-0.02|0|0.02|0.04|0.06|0.08|0.1|0.15|0.2|0.3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_y" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="11" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30% DOWN|20% DOWN|15% DOWN|10% DOWN|8% DOWN|6% DOWN|4% DOWN|2% DOWN|NONE|2% UP|4% UP|6% UP|8% UP|10% UP|15% UP|20% UP|30% UP" setting="vr.hud_tracker_y" values="-0.3|-0.2|-0.15|-0.1|-0.08|-0.06|-0.04|-0.02|0|0.02|0.04|0.06|0.08|0.1|0.15|0.2|0.3" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+		<on event="left" run="port slider left"/>
+		<on event="right" run="port slider right"/>
+		<on event="a" run="port slider edit"/>
+		<on event="start" run="port slider edit"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_track" x="323" y="7"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_value" x="417" y="4"/>
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="12" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="50%|60%|70%|75%|80%|90%|100%|110%|120%|125%|130%|140%|150%" setting="vr.hud_tracker_scale" values="0.5|0.6|0.7|0.75|0.8|0.9|1|1.1|1.2|1.25|1.3|1.4|1.5" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
-		<on event="created" run="port setting load"/>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_track" controller="1" width="92" height="14" bitmap="main_menu/settings/slider_track">
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_thumb"/>
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	</widget>
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_value" type="text" controller="1" width="46" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
 	</widget>
 	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
 		<on event="a" run="port settings defaults"/>
@@ -178,17 +310,17 @@
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help_strings">
 		<string text=""/>
 		<string text="Brings ammo, shields and tracker in toward the\nmiddle (cut off? Frame with a spacer: 20%)."/>
-		<string text="Moves ammo, shields and tracker together left or\nright (of the HUD's width); the reticle stays."/>
-		<string text="Moves ammo, shields and tracker together up or\ndown (of the HUD's height); the reticle stays."/>
+		<string text="Moves ammo, shields and tracker together: - left,\n+ right (of the HUD's width); the reticle stays."/>
+		<string text="Moves ammo, shields and tracker together: - down,\n+ up (of the HUD's height); the reticle stays."/>
 		<string text="The size of ammo, shields and tracker, each\ngrowing from its own corner."/>
-		<string text="Ammo and grenades (top left) left/right: RIGHT\nbrings them in."/>
-		<string text="Ammo and grenades (top left) up/down: DOWN\nbrings them in."/>
+		<string text="Ammo and grenades (top left): - left, + right\n(+ brings them in)."/>
+		<string text="Ammo and grenades (top left): - down, + up\n(- brings them in)."/>
 		<string text="The size of the ammo and grenades (top left)."/>
-		<string text="Shields and health (top right) left/right: LEFT\nbrings them in."/>
-		<string text="Shields and health (top right) up/down: DOWN\nbrings them in."/>
+		<string text="Shields and health (top right): - left, + right\n(- brings them in)."/>
+		<string text="Shields and health (top right): - down, + up\n(- brings them in)."/>
 		<string text="The size of the shields and health (top right)."/>
-		<string text="Motion tracker (bottom left) left/right: RIGHT\nbrings it in."/>
-		<string text="Motion tracker (bottom left) up/down: UP brings\nit in."/>
+		<string text="Motion tracker (bottom left): - left, + right\n(+ brings it in)."/>
+		<string text="Motion tracker (bottom left): - down, + up\n(+ brings it in)."/>
 		<string text="The size of the motion tracker (bottom left)."/>
 	</strings>
 </menus>

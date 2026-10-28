@@ -269,11 +269,13 @@ static boolean campaign_profile(short controller, struct player_profile *profile
 static boolean text_field_editing(struct widget_instance *row);
 static void text_field_end(boolean keep);
 static void settings_sliders_show(struct widget_instance *list);
+static void settings_sliders_screen(boolean write);
 static void settings_sliders_default(struct widget_instance *screen);
 static boolean settings_slider_function(char const *name, struct widget_instance *row);
 static short settings_slider_of(struct widget_instance const *row);
 static double settings_slider_value(short slider);
 static void settings_slider_text(double value, char *text, unsigned int size);
+static void settings_slider_shown(short slider, double value, boolean editing, char *text, unsigned int size);
 
 static boolean text_is_number(char const *text, double *number)
 {
@@ -2415,7 +2417,8 @@ static void settings_panel_show(struct widget_instance *list, short tab)
 			/* (a slider's: its number) */
 			char number[32];
 
-			settings_slider_text(settings_slider_value(settings_slider_of(row)), number, sizeof(number));
+			settings_slider_shown(settings_slider_of(row), settings_slider_value(settings_slider_of(row)), FALSE, number,
+				sizeof(number));
 			for (length = 0; number[length] && length < ROW_TEXT_LENGTH - 1; length++)
 				value[length] = (wchar_t)number[length];
 			value[length] = 0;
@@ -4043,10 +4046,33 @@ static struct
 	char const *setting;
 	double least, most, step;
 	double typed_least, typed_most;
+	double scale;
 } const settings_sliders[] =
 {
-	{ "op_mouse_sensitivity", "input.mouse_sensitivity", 0.1, 10.0, 0.05, 0.01, 100.0 },
+	{ "op_mouse_sensitivity", "input.mouse_sensitivity", 0.1, 10.0, 0.05, 0.01, 100.0, 1.0 },
+	/* (OpenFrame) the visor HUD's corners' placement (vr.hud_*): shown as
+	percents (scale 100), the moves from -50% to +50% of the HUD's width or
+	height, the inset from 0% to 50%, the sizes from 50% to 150% */
+	{ "op_hud_inset", "vr.hud_inset", 0.0, 0.5, 0.01, 0.0, 0.5, 100.0 },
+	{ "op_hud_offset_x", "vr.hud_offset_x", -0.5, 0.5, 0.01, -0.5, 0.5, 100.0 },
+	{ "op_hud_offset_y", "vr.hud_offset_y", -0.5, 0.5, 0.01, -0.5, 0.5, 100.0 },
+	{ "op_hud_scale", "vr.hud_scale", 0.5, 1.5, 0.01, 0.5, 1.5, 100.0 },
+	{ "op_hud_weapon_x", "vr.hud_weapon_x", -0.5, 0.5, 0.01, -0.5, 0.5, 100.0 },
+	{ "op_hud_weapon_y", "vr.hud_weapon_y", -0.5, 0.5, 0.01, -0.5, 0.5, 100.0 },
+	{ "op_hud_weapon_scale", "vr.hud_weapon_scale", 0.5, 1.5, 0.01, 0.5, 1.5, 100.0 },
+	{ "op_hud_status_x", "vr.hud_status_x", -0.5, 0.5, 0.01, -0.5, 0.5, 100.0 },
+	{ "op_hud_status_y", "vr.hud_status_y", -0.5, 0.5, 0.01, -0.5, 0.5, 100.0 },
+	{ "op_hud_status_scale", "vr.hud_status_scale", 0.5, 1.5, 0.01, 0.5, 1.5, 100.0 },
+	{ "op_hud_tracker_x", "vr.hud_tracker_x", -0.5, 0.5, 0.01, -0.5, 0.5, 100.0 },
+	{ "op_hud_tracker_y", "vr.hud_tracker_y", -0.5, 0.5, 0.01, -0.5, 0.5, 100.0 },
+	{ "op_hud_tracker_scale", "vr.hud_tracker_scale", 0.5, 1.5, 0.01, 0.5, 1.5, 100.0 },
 };
+
+/* a number in whole steps (to the nearest, negative ones too) */
+static long settings_slider_steps(double number)
+{
+	return number < 0.0 ? -(long)(-number + 0.5) : (long)(number + 0.5);
+}
 
 /* the track and the thumb, as tools/port_settings.py lays them out
 (SLIDER_TRACK_WIDTH, SLIDER_THUMB_WIDTH) */
@@ -4080,7 +4106,7 @@ static double settings_slider_value(short slider)
 	double value;
 
 	if (!settings_value(settings_sliders[slider].setting, text, sizeof(text)) || !text_is_number(text, &value) ||
-		!(value > 0.0))
+		value < settings_sliders[slider].typed_least || value > settings_sliders[slider].typed_most)
 	{
 		if (!setting_text(settings_sliders[slider].setting, text, sizeof(text), TRUE) || !text_is_number(text, &value))
 			value = settings_sliders[slider].least;
@@ -4097,6 +4123,27 @@ static void settings_slider_text(double value, char *text, unsigned int size)
 	length = strlen(text);
 	while (length > 3 && text[length - 1] == '0' && text[length - 2] != '.')
 		text[--length] = 0;
+}
+
+/* the value as the row shows it: a percent if the slider has a scale
+(+5%, 20%), the number typed (5, 20) while it is typed into */
+static void settings_slider_shown(short slider, double value, boolean editing, char *text, unsigned int size)
+{
+	double scale = settings_sliders[slider].scale;
+	long percent;
+
+	if (scale == 1.0)
+	{
+		settings_slider_text(value, text, size);
+		return;
+	}
+	percent = settings_slider_steps(value * scale);
+	if (editing)
+		snprintf(text, size, "%ld", percent);
+	else if (settings_sliders[slider].typed_least < 0.0 && percent)
+		snprintf(text, size, "%+ld%%", percent);
+	else
+		snprintf(text, size, "%ld%%", percent);
 }
 
 /* the value kept as a change, or none if it is the setting's */
@@ -4138,7 +4185,7 @@ static void settings_slider_place(short slider, struct widget_instance *track, s
 	double step = settings_sliders[slider].step;
 	double value = least + PIN(fraction, 0.0, 1.0) * (most - least);
 
-	settings_slider_set(slider, PIN((double)(long)(value / step + 0.5) * step, least, most));
+	settings_slider_set(slider, PIN((double)settings_slider_steps(value / step) * step, least, most));
 }
 
 /* (the number typed: kept if it is one) */
@@ -4146,8 +4193,9 @@ static void settings_slider_typed(char const *text)
 {
 	double value;
 
-	if (settings_slider.typed != NONE && text_is_number(text, &value) && value > 0.0)
-		settings_slider_set(settings_slider.typed, value);
+	if (settings_slider.typed != NONE && text_is_number(text, &value) &&
+		(value > 0.0 || settings_sliders[settings_slider.typed].typed_least <= 0.0))
+		settings_slider_set(settings_slider.typed, value / settings_sliders[settings_slider.typed].scale);
 	settings_slider.typed = NONE;
 }
 
@@ -4157,18 +4205,57 @@ static struct widget_instance *settings_slider_track(struct widget_instance *row
 
 	for (child = row ? row->child : NULL; child; child = child->next)
 	{
-		if (child->name && strstr(child->name, "_track"))
+		/* (named ..._track: not a row's ..._tracker_... label) */
+		size_t length = child->name ? strlen(child->name) : 0;
+
+		if (length >= 6 && !strcmp(child->name + length - 6, "_track"))
 			return child;
 	}
 	return NULL;
 }
 
+/* (OpenFrame) the sliders of VR Setup's pages (their settings are vr.*; the
+pages are tools/port_settings.py's setting screens, not Settings' tabs and
+pages): their changes are kept as the page's spinners' are, written at its OK
+("port settings save") and forgotten as it opens ("port slider init") and
+closes ("port slider close", which an OK has written for first) */
+static void settings_sliders_screen(boolean write)
+{
+	short slider;
+
+	if (text_field_editing(NULL))
+		text_field_end(write);
+	for (slider = 0; slider < (short)NUMBEROF(settings_sliders); slider++)
+	{
+		char const *setting = settings_sliders[slider].setting;
+		char const *pending;
+
+		if (strncmp(setting, "vr.", 3) || !(pending = settings_pending_value(setting)))
+			continue;
+		if (write)
+		{
+			if (setting_write(setting, pending))
+				platform_log("menus: %s = %s", setting, pending);
+			else
+				platform_log("menus: could not set %s", setting);
+		}
+		settings_pending_remove(setting);
+	}
+}
+
 /* "port slider <name>" (its row's) */
 static boolean settings_slider_function(char const *name, struct widget_instance *row)
 {
-	short slider = settings_slider_of(row);
-	struct widget_instance *track = settings_slider_track(row);
+	short slider;
+	struct widget_instance *track;
 
+	if (!strcmp(name, "init") || !strcmp(name, "close"))
+	{
+		settings_sliders_screen(FALSE);
+		return TRUE;
+	}
+	slider = settings_slider_of(row);
+	track = settings_slider_track(row);
 	if (slider == NONE || !track)
 		return FALSE;
 	if (!strcmp(name, "left") || !strcmp(name, "right"))
@@ -4179,7 +4266,7 @@ static boolean settings_slider_function(char const *name, struct widget_instance
 		/* (the arrow keys move nothing while the number is typed) */
 		if (text_field_editing(row))
 			return TRUE;
-		value = (double)(long)(value / step + 0.5) * step + (!strcmp(name, "left") ? -step : step);
+		value = (double)settings_slider_steps(value / step) * step + (!strcmp(name, "left") ? -step : step);
 		settings_slider_set(slider, PIN(value, settings_sliders[slider].least, settings_sliders[slider].most));
 		ui_play_audio_feedback_sound(SOUND_CURSOR);
 		return TRUE;
@@ -4205,7 +4292,7 @@ static boolean settings_slider_function(char const *name, struct widget_instance
 		if (text_field_editing(NULL))
 			text_field_end(TRUE);
 		settings_slider.typed = slider;
-		settings_slider_text(settings_slider_value(slider), text, sizeof(text));
+		settings_slider_shown(slider, settings_slider_value(slider), TRUE, text, sizeof(text));
 		text_field_begin(row, text, 7, settings_slider_typed);
 		return TRUE;
 	}
@@ -4249,7 +4336,7 @@ static void settings_sliders_show(struct widget_instance *list)
 		for (value_text = track->next; value_text && value_text->type != 1; value_text = value_text->next)
 		{
 		}
-		settings_slider_text(value, text, sizeof(text));
+		settings_slider_shown(slider, value, text_field_editing(row) != FALSE, text, sizeof(text));
 		text_field_show(value_text, text, text_field_editing(row));
 		/* (typed into: its field lit, and the caret held on, not blinking,
 		so that it is plain that the number takes what is typed) */
@@ -10042,6 +10129,7 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port settings save"))
 		{
 			settings_each(screen_of(widget), setting_changed_save);
+			settings_sliders_screen(TRUE);
 			platform_display_apply();
 		}
 		else if (!strcmp(name, "port settings defaults"))
@@ -10334,6 +10422,7 @@ void pc_menu_game_data_function_invoke(
 	else if (!strcmp(name, "port settings help"))
 	{
 		sim_rate_row_show(widget);
+		settings_sliders_show(widget);
 		settings_help(widget);
 	}
 	else if (!strcmp(name, "port settings page"))

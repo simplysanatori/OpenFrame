@@ -481,7 +481,7 @@ static char const *const port_function_names[] =
 	"port settings ok", "port settings cancel", "port settings keep", "port settings page cancel",
 	"port settings new profile",
 	/* (Settings' sliders: menu_functions.c's settings_slider_*) */
-	"port slider left", "port slider right", "port slider edit",
+	"port slider left", "port slider right", "port slider edit", "port slider init", "port slider close",
 	/* (the server browsers' favorites: menu_functions.c's browser_favorite_toggle) */
 	"port browser favorite",
 	/* (internet play's connecting box: menu_functions.c's connect_dialog) */

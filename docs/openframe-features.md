@@ -440,15 +440,17 @@ With a glasses spacer the Frame's comfortable view is narrower, and the
 visor HUD's corners (the ammunition and grenades at the top left, the motion
 tracker at the bottom left) were partly past its edge. These keys bring the
 corners in, move or resize each one (VR Setup > HUD... > **HUD
-LAYOUT...**). Every one defaults to 0
-(sizes to 1): the corners where OpenH1 puts them.
+LAYOUT...**). Every row is a slider (its number beside it is a percent:
++5% is a key of 0.05; left and right step it by 1%, a click or drag on the
+track sets it, A or a click on the number types one) and defaults to 0%
+(sizes 100%): the corners where OpenH1 puts them.
 
 | Key (`HALO_*` variable) | VR Setup row | Range | What |
 | --- | --- | --- | --- |
-| `vr.hud_inset` (`HALO_VR_HUD_INSET`) | HUD INSET | 0 to 0.5 | Every corner turned in toward the middle of your view by that fraction of its angle from it |
-| `vr.hud_offset_x`, `_y` (`HALO_VR_HUD_OFFSET_X`, `_Y`) | ALL LEFT/RIGHT, ALL UP/DOWN | -0.3 to 0.3 | The three corners moved together, right and up (less than 0: left, down), in fractions of the HUD's width and height |
-| `vr.hud_scale` (`HALO_VR_HUD_SCALE`) | ALL SIZE | 0.5 to 1.5 | The corners' size, each about its outer corner |
-| `vr.hud_weapon_x`, `_y`, `_scale` (`HALO_VR_HUD_WEAPON_X`, ...) | AMMO LEFT/RIGHT, UP/DOWN, SIZE | -0.3 to 0.3; 0.5 to 1.5 | The ammunition and grenades (top left) alone |
+| `vr.hud_inset` (`HALO_VR_HUD_INSET`) | HUD INSET | 0 to 0.5 (0% to 50%) | Every corner turned in toward the middle of your view by that fraction of its angle from it |
+| `vr.hud_offset_x`, `_y` (`HALO_VR_HUD_OFFSET_X`, `_Y`) | ALL LEFT/RIGHT, ALL UP/DOWN | -0.5 to 0.5 (-50% to +50%) | The three corners moved together, right and up (less than 0: left, down), in fractions of the HUD's width and height |
+| `vr.hud_scale` (`HALO_VR_HUD_SCALE`) | ALL SIZE | 0.5 to 1.5 (50% to 150%) | The corners' size, each about its outer corner |
+| `vr.hud_weapon_x`, `_y`, `_scale` (`HALO_VR_HUD_WEAPON_X`, ...) | AMMO LEFT/RIGHT, UP/DOWN, SIZE | -0.5 to 0.5; 0.5 to 1.5 (-50% to +50%; 50% to 150%) | The ammunition and grenades (top left) alone |
 | `vr.hud_status_x`, `_y`, `_scale` (`HALO_VR_HUD_STATUS_X`, ...) | SHIELDS LEFT/RIGHT, UP/DOWN, SIZE | the same | The shields and health (top right) alone |
 | `vr.hud_tracker_x`, `_y`, `_scale` (`HALO_VR_HUD_TRACKER_X`, ...) | TRACKER LEFT/RIGHT, UP/DOWN, SIZE | the same | The motion tracker (bottom left) alone |
 
@@ -456,7 +458,7 @@ LAYOUT...**). Every one defaults to 0
   move too), then the move of all three; sizes multiply (`vr.hud_scale`
   times the corner's own). The inset alone, or each corner's own move
   alone, is enough; they add up if both are set.
-- Moves are angles: 0.1 of the width is 6 degrees at `vr.hud_size` 60, the
+- Moves are angles: 10% of the width is 6 degrees at `vr.hud_size` 60, the
   same at any `vr.hud_distance`. Sizes grow or shrink each corner about its
   outer corner (where the game anchors its elements), so they stay put.
 - The reticle and the messages (the HUD's middle group, on the HUD's own
@@ -467,7 +469,10 @@ LAYOUT...**). Every one defaults to 0
   wrist are not moved (they are where they go back to the visor, as in a
   vehicle's seat). With `vr.hud = "flat"` none of this applies.
 - Live: every value is read again as it changes (no restart), and the
-  corners are at their new place the moment the menu closes. While a menu
+  corners are at their new place the moment the page's OK writes them (a
+  slider's change is kept like a spinner's: Cancel or B forgets it). The
+  keys before the sliders (2026-10-28) went -0.3 to 0.3 in spinner steps;
+  a `config.toml` value outside the new ranges is clamped. While a menu
   is open OpenH1 shows no corner panels (`vr_visor_panels` gives none with
   the menus up), so they cannot be watched moving from the menu itself.
 - How: `port/linux/src/vr_visor.c`, `panel_placement`: each corner's quad
@@ -477,7 +482,7 @@ LAYOUT...**). Every one defaults to 0
   corners are drawn on panels of their own (at the HUD's distance) while
   they are moved, as the wrist HUD has them.
 - `docs/steam-frame-defaults.md` has suggested values for a Frame with a
-  spacer (`vr.hud_inset` 0.15 to 0.25, or the ammo's and tracker's own moves).
+  spacer (`vr.hud_inset` 15% to 25%, or the ammo's and tracker's own moves).
 
 ## Left-handed
 

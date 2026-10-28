@@ -220,7 +220,7 @@ vr.hud_<group>_*, docs/openframe-features.md "HUD placement"): the most of
 the inset, of each move (fractions of the HUD's width or height), and the
 least and most of each size */
 #define PLACE_INSET_MOST 0.5f
-#define PLACE_OFFSET_MOST 0.3f
+#define PLACE_OFFSET_MOST 0.5f
 #define PLACE_SCALE_LEAST 0.5f
 #define PLACE_SCALE_MOST 1.5f
 
