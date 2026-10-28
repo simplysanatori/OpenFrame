@@ -240,7 +240,18 @@ turns it off. It eases in and out over about a sixth of a second.
   world's speed, 0.2 to 0.8, default `0.4`).
 - Input: hold the turning stick (the right, or the left with
   `vr.swap_sticks`) pushed up for 0.8 s; a flick up (or another hold) ends
-  it. The player's own body is of the world and slows with it (the run at
+  it. "Up" is a wide cone (`vr_stick_gesture.h`): the push begins past 0.6
+  and more up than sideways (within 45 degrees of straight up), and is kept
+  while past 0.4 and within 54 degrees; a thumb's drift, or a dip out of the
+  cone shorter than 0.15 s, or a game frame or two that did not say you are
+  on foot (0.3 s), does not end the push. The snap or smooth turn is off
+  while the stick is in the cone. Each push is logged once when it is over
+  (stdout.log): `vr: stick up: held 0.93 s -> hold (bullet time on; sideways
+  at most 0.41, up at least 0.62)`, or `flick`, or `nothing (spent, off foot;
+  menus ...)`. (Headset trial 7: no hold was ever seen in a session of
+  attempts; the old gesture needed 0.75 up and under 0.6 sideways for the
+  whole 0.8 s, one frame of not being on foot spent the push silently, and a
+  drift ended it as a flick.) The player's own body is of the world and slows with it (the run at
   40%, jumps floating): in headset trial 3 a push held a little long (the
   hold was half a second then) took bullet time, which was felt as a slow,
   floaty sprint that no flick turned off. The stick's up is no game control

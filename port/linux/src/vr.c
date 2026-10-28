@@ -732,6 +732,7 @@ static struct
 	float comfort_snap;
 	int comfort_snapped;
 	struct stick_gesture stick_up;
+	const char *stick_up_note;
 	int sprint_on;
 	float sprint_off_foot;
 	float arm_swing;
@@ -4183,6 +4184,7 @@ static void comfort_update(float seconds, float turn)
 		hand_haptic(1, vr.bullet_time_on ? 0.45f : 0.25f, 0.06f);
 		platform_log("vr: bullet time %s (the stick %s)", vr.bullet_time_on ? "on" : "off",
 			gesture == STICK_GESTURE_HOLD ? "held up" : "flicked up");
+		vr.stick_up_note = vr.bullet_time_on ? "bullet time on" : "bullet time off";
 	}
 	else if (gesture == STICK_GESTURE_FLICK && settings.sprint_mode == SPRINT_TOGGLE)
 	{
@@ -4190,6 +4192,27 @@ static void comfort_update(float seconds, float turn)
 		vr.sprint_off_foot = 0.0f;
 		hand_haptic(0, vr.sprint_on ? 0.3f : 0.2f, 0.04f);
 		platform_log("vr: sprint %s (the stick flicked up)", vr.sprint_on ? "on" : "off");
+		vr.stick_up_note = vr.sprint_on ? "sprint on" : "sprint off";
+	}
+	else if (gesture == STICK_GESTURE_FLICK)
+	{
+		vr.stick_up_note = "no sprint toggle (vr.sprint_mode)";
+	}
+	/* each push once, as it is over: how long, what it came to, and how far
+	the stick strayed (headset trial 7: a hold that never was) */
+	if (vr.stick_up.ended)
+	{
+		const struct stick_gesture *g = &vr.stick_up;
+		const char *kind = g->ended_result == STICK_GESTURE_HOLD ? "hold" :
+			g->ended_result == STICK_GESTURE_FLICK ? "flick" : "nothing";
+		const char *what = g->ended_result == STICK_GESTURE_NONE ? "spent, off foot" :
+			vr.stick_up_note ? vr.stick_up_note : "";
+
+		platform_log("vr: stick up: held %.2f s -> %s (%s; sideways at most %.2f, up at least %.2f%s)",
+			g->ended_seconds, kind, what, g->ended_across, g->ended_along,
+			g->ended_result == STICK_GESTURE_NONE ? (vr.menus ? "; menus" : !vr.aimed ? "; not aimed" :
+			!vr.crouch_able_frame ? "; not on a biped" : !vr.views.focused ? "; not focused" : "") : "");
+		vr.stick_up_note = NULL;
 	}
 	if (!settings.bullet_time)
 		vr.bullet_time_on = 0;
@@ -4733,6 +4756,13 @@ static void input_update(void)
 	/* (on a vehicle's handlebars the view turns with the vehicle: the stick
 	turns nothing, and both grips held are the bars, not a recentring) */
 	if (handlebars_active())
+		x = 0.0f;
+	/* (OpenFrame: the stick pushed up, within the gesture's cone, is sprint's
+	or bullet time's push and turns nothing, snap or smooth: a thumb that
+	holds it up drifts sideways, and a snap turn there (or a drifting view)
+	is no hold; headset trial 7) */
+	if ((settings.bullet_time || settings.sprint_mode == SPRINT_TOGGLE) && comfort_on_foot() &&
+		stick_gesture_inside(&vr.stick_up, vr.input.right_stick[1], fabsf(vr.input.right_stick[0])))
 		x = 0.0f;
 	/* (driving a vehicle steered toward the aim: the left stick's sideways
 	push turns smoothly too, STICK_DRIVE_FASTEST) */
