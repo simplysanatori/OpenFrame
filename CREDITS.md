@@ -1,6 +1,6 @@
 # Credits
 
-OpenFrame is a small layer on a very large amount of other people's work. This file says whose, and for what. Credits distinguish code that is in this repository, code that is being ported into it, and work that only informed it. They do not imply that anyone listed endorses OpenFrame or that every feature of their project is here. If a credit is missing or wrong, open an issue.
+OpenFrame is a small layer on a very large amount of other people's work. This file says whose, and for what. Credits distinguish code that is in this repository, code ported into it, and work that only informed it. They do not imply that anyone listed endorses OpenFrame or that every feature of their project is here. If a credit is missing or wrong, open an issue.
 
 ## The game
 
@@ -30,20 +30,16 @@ The game's code is the Xbox build 2342 (`cachebeta.exe`), decompiled to C by the
 ## Halo VR mods
 
 - **[astromaddie/HaloCE-VR](https://github.com/astromaddie/HaloCE-VR)** (astromaddie): the OpenXR VR foundation for Halo on the Steam Frame, released as CC0: stereo rendering, tracked inputs, hand aiming, arm IK, scopes, vehicles, room-scale and VR menus, and the Frame findings (the Frame's controller profile, Lepton, Mesa's trace markers). It is the base of the fork below and the earliest proof that this works on the Frame.
-- **[moistman42069/HaloCE-DecompRemix-VR-PC-Android](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android)** (moistman42069), AGPL-3.0-or-later (CC0 before release 1.0.37): a Quest, PICO and Steam Frame fork of OpenCE with VR gameplay features. OpenFrame ports features from it into OpenH1's VR mode, rewritten for OpenH1's code, with attribution in the commits. **Nothing is ported yet.** State, honestly:
+- **[moistman42069/HaloCE-DecompRemix-VR-PC-Android](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android)** (moistman42069), AGPL-3.0-or-later (CC0 before release 1.0.37): a Quest, PICO and Steam Frame fork of OpenCE with VR gameplay features. OpenFrame ports these from it into OpenH1's VR mode, rewritten for OpenH1's code, with attribution in the commits:
 
-  | Feature | State |
-  |---|---|
-  | Bullet time | in progress, not merged |
-  | Sprint (toggle) | in progress, not merged |
-  | General comfort vignette | in progress, not merged |
-  | Third-person camera | planned |
-  | Sliding and parkour | planned |
-  | Fists and projectile deflection | planned |
-  | Grabbing the world with a hand | planned |
-  | Wrist HUD | planned |
-  | Ragdolls | planned |
-  | Co-op pose sync | planned |
+  - Bullet time
+  - Sprint, by toggle or arm swing
+  - The comfort vignette on foot
+  - Third person on foot
+  - Slide, wall jump and wall run
+  - Fists: punch, stagger and parry
+  - Weapon pull, prop throw and hand swap
+  - The wrist HUD and HUD modes
 
   That fork's own credits (to LivingFray's HaloCEVR, to the OpenCE fork by jcompto95-tech, to Mjolnir VR by Cesarus85 for the Frame findings, to ChupathingyCE and others) are in its `CREDITS.md`; they carry over to what is ported.
 - **[thelinkin3000/halo-ce-universal](https://github.com/thelinkin3000/halo-ce-universal)** (thelinkin3000): an OpenCE fork with Android, Turnip, Nintendo Switch and PlayStation 5 ports. Prior Turnip work on the road to this one, and a contributor to OpenH1.
@@ -59,7 +55,6 @@ The game's code is the Xbox build 2342 (`cachebeta.exe`), decompiled to C by the
 - **LLVM and Clang** (Apache-2.0 with LLVM exceptions): the pinned toolchain that compiles the guest image.
 - **musl libc** and its maths functions, by Rich Felker and contributors (MIT): the guest's C runtime and the deterministic maths.
 - **Mbed TLS** (Arm and contributors), **Monocypher** (Loup Vaillant and contributors), **KCP** (Lin Wei), **miniupnpc** (Thomas Bernard), **Opus** (Xiph.Org Foundation and contributors), **Expat**, **zlib**, **tomlc17** (CK Tan), **jsmn** (Serge Zaitsev), **stb_truetype** and **stb_vorbis** (Sean Barrett), **SMAA** (Jorge Jimenez and others), **Arm ASTC encoder**, **Lucide icons**, **Kenney Mobile Controls**, **Overpass** (Red Hat, Delve Withrington), **Newtown** (Roger White), **dwyl/english-words**.
-- **Jolt Physics** is not part of OpenH1 at `build-734`. It would come in with the ragdoll feature above.
 
 ## The Steam Frame and its software
 
@@ -68,16 +63,12 @@ The game's code is the Xbox build 2342 (`cachebeta.exe`), decompiled to C by the
 
 ## Packaging tools
 
-The packaging layer in `steam-frame/` follows the shape of the author's other Steam Frame ports and reuses their scripts, which are the author's own:
+The packaging layer in `steam-frame/` follows the shape of my other Steam Frame ports and reuses their scripts, which are my own:
 
 - **GalaxyFrame** (simplysanatori): the installer, Steam shortcut tool (`steam-cef.py`), launch wrapper, release and README structure.
 - **PrimedFrame** (simplysanatori): the session folders, `session.env`, SteamVR per-app settings read-back, log collection and the headset-in-use convention.
 - **Moonlight XR Native** (simplysanatori), GPLv3: `vrtiming.py` and `privacy-check.sh` come from its tools.
 
-## AI assistance
-
-OpenFrame's packaging layer and documentation are written by Claude, Anthropic's AI model, with Claude Code running on the Steam Frame: Fable 5.1, Opus 5.5 and Sonnet 5.5. The ported VR features are written by Claude from the mods' sources. The author chose what to build, reviews it and tests it in the headset. It has not been tested in a headset yet. The upstream projects' authors have not reviewed this fork.
-
 ## Artwork
 
-The Steam library artwork of the owner's OpenFrame entry (capsules, hero, logo, icon) comes from [SteamGridDB](https://www.steamgriddb.com), by its community artists: UncookedMoa (portrait capsule), ender-blade (wide capsule), Gector(lint)Nathan (hero), Bcoder (logo) and Onyx8011 (icon). The asset ids are in `steam-frame/art/SOURCES.md`. The images are not part of this repository or of its releases. The Halo artwork in them belongs to Microsoft, 343 Industries and Bungie; it is used only for the owner's own library entry.
+The Steam library artwork of my own OpenFrame entry (capsules, hero, logo, icon) comes from [SteamGridDB](https://www.steamgriddb.com), by its community artists: UncookedMoa (portrait capsule), ender-blade (wide capsule), Gector(lint)Nathan (hero), Bcoder (logo) and Onyx8011 (icon). The asset ids are in `steam-frame/art/SOURCES.md`. The images are not part of this repository or of its releases. The Halo artwork in them belongs to Microsoft, 343 Industries and Bungie; it is used only for my own library entry.

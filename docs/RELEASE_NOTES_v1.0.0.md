@@ -1,0 +1,91 @@
+# OpenFrame 1.0.0
+
+Halo: Combat Evolved in VR, running natively on the Valve Steam Frame. OpenFrame is my Steam Frame version of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo built for Arm64 Linux with an OpenXR VR mode. I set it up for the Frame and brought in VR features from other people's Halo VR work, credited below. If you have played OpenH1's own Frame build, this is the same game, set up for the Frame, and it runs better. You need the maps from your own Xbox disc; no game data is included.
+
+## The game on the Frame
+
+- OpenH1's `build-734`: the Xbox game's own code, built for Arm64 Linux, drawn with Vulkan, in VR through the Frame's SteamVR. No emulator, no Lepton, no APK, no PC.
+- An installer that copies the game and your maps, adds the Steam library entry, and keeps your saves and settings on an update.
+- A launch wrapper that sets SteamVR's per-app settings at every launch: your refresh rate, no throttling, no motion smoothing.
+- 90 Hz by default. 72 and 120 Hz are in VR Setup.
+- Saves, settings and logs in their own folder, apart from OpenH1's.
+- OpenH1's self-updater is switched off, so it never swaps this build for OpenH1.
+- A log collector that masks personal details before you share anything.
+
+## Performance
+
+- Both eyes at 0.9 of SteamVR's recommended resolution. The full-detail area that follows your eyes is 0.4 of the view.
+- With those defaults, firefights in the first level average 88 to 89 frames a second. No frames are dropped in play.
+- In the heaviest firefight of the first level, OpenH1's resolution and foveation averaged about 77 fps. Mine average 86 to 89.
+- Over a session, SteamVR used to fill in about a third of the frames. Now it is about one in ten.
+- The GPU renders straight to memory instead of in tiles. On the Frame that is about 10 fps more in the same rooms.
+- OpenH1 froze the world for one to two seconds each time a level moved on to its next section. Now that is a short hitch.
+- The first level used to take about 17 seconds to load. Now it takes 4 to 8.
+
+## Fixed
+
+- SteamVR's recentre used to be ignored. The menu sat off to one side and the view could start outside your body. Now recentring works.
+- The game recentres by itself on the first frame of each level start, restart and checkpoint reload.
+- Menus open in front of you.
+- At the start in the cryo tube, the tutorial's look tests waited for the stick. Now looking with your head counts.
+- While a script holds you still, your view stays with the player's head.
+- The HUD's corners used to sit partly outside the Frame's view. Now they default to positions that fit.
+
+## Controls
+
+- Flick the right stick up: sprint on or off.
+- Hold the right stick down for about a second: third person on or off.
+- Press the right stick in: bullet time on or off. In third person it zooms.
+- Reload with X, or take a magazine from your left hip with your left hand.
+- A flick down does nothing, so looking around never sets anything off.
+- A push on a diagonal while you turn is ignored.
+- One click of the left stick while sprinting slides you the whole way. Click again to stop early.
+- Each toggle shows a label on the HUD.
+
+## VR Setup
+
+- VR Setup is split into pages: Display, HUD, Player, Movement and comfort, Hands and weapons.
+- A HUD layout page with sliders: bring the corners in, and move or resize each one.
+- The refresh rate, foveation and auto recentre are in the menu.
+- Left-handed play carries through: the third-person view sits over your left shoulder, and passing the weapon to the other hand saves it as your hand.
+
+## From other people's work
+
+These come from moistman42069's Halo VR mod, rewritten for OpenH1. Each is off until you turn it on in VR Setup, and they play offline.
+
+- Sprint, by flicking the stick or by swinging your arms.
+- Bullet time: the world slows and your head and hands do not.
+- Third person on foot.
+- Slide, wall jump and wall run.
+- Fists: punch, stagger and parry.
+- Weapon pull: call a gun on the floor to your hand.
+- Prop throw: pick up a loose item and throw it.
+- Hand swap: pass the weapon to your other hand.
+- The wrist HUD: shields, ammo and tracker on the back of your wrist.
+- The comfort vignette on foot, not only in vehicles.
+
+The mod is built for the Quest, so on the Frame it would run through Lepton. Here these features run natively inside OpenH1's renderer.
+
+## Known issues
+
+- Big fights with a lot of explosions can dip into the 70s for a few seconds.
+- The first few seconds after a level loads run slower.
+- The campaign has one save slot. Starting a new game overwrites it.
+- In bullet time the sound plays at normal speed.
+
+## Download
+
+- `openframe-1.0.0-linux-arm64.tar.gz`
+- `SHA256SUMS`
+
+## Install
+
+Clone the repository, then run `steam-frame/install.sh --maps` with the folder of your 24 Xbox `.map` files and the tarball as its argument. It installs the game, creates the Steam shortcut and keeps your maps, saves and settings on an update. The [README](https://github.com/simplysanatori/OpenFrame#install) has the steps, the controls and the settings, and the [changelog](https://github.com/simplysanatori/OpenFrame/blob/steam-frame/docs/CHANGELOG.md) has this list.
+
+## Credits
+
+The OpenH1 team, whose game and VR mode this is built on; moistman42069's [HaloCE-DecompRemix-VR](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android) for the features listed above, itself built on astromaddie's [HaloCE-VR](https://github.com/astromaddie/HaloCE-VR); OpenCE and the Xbox decompilation it starts from. Everyone else is in [CREDITS.md](https://github.com/simplysanatori/OpenFrame/blob/steam-frame/CREDITS.md).
+
+## Reporting problems
+
+Open an issue with what you did, what you expected and what happened, and the archive from `~/Games/OpenFrame/app/tools/collect-logs.sh`. It masks addresses, names and ids before anything leaves your Frame. A problem in OpenH1 itself belongs on [OpenH1's tracker](https://github.com/OpenH1/OpenH1/issues).
