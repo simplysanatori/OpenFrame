@@ -6,7 +6,7 @@ the Frame's own SteamVR. This folder (`steam-frame/`) is the Frame packaging lay
 launch wrapper, logs, release. It touches nothing under `source/`, `port/`, `tools/` or
 `configure.py`. The branch `steam-frame` began at OpenH1's release tag `build-734`; its current base is `build-769`.
 
-Everything below is what the scripts do. Nothing here has been run in a headset yet: see
+Everything below is what the scripts do. What has been run and measured on a Frame is in
 [What is confirmed](#what-is-confirmed).
 
 ## Layout
@@ -115,7 +115,7 @@ other Frame ports read. Commits must be authored and committed by a GitHub no-re
 ## Left out on purpose
 
 - **Turning-stick magazine eject.** OpenH1's right stick pushed down ejected the magazine
-  (`vr.manual_reload`). OpenFrame removed it entirely (headset trial 10, 2026-10-28): in play it left
+  (`vr.manual_reload`). OpenFrame removed it entirely: in play it left
   the HUD showing rounds (e.g. 29) while the gun could not fire, which was confusing. A flick down
   does nothing (the log says `vr: stick down: held ... -> nothing`); the hand eject (the left grip at
   the left hip takes a new magazine and the old one ejects itself) and X reload stay. There is no
@@ -123,8 +123,25 @@ other Frame ports read. Commits must be authored and committed by a GitHub no-re
 
 ## What is confirmed
 
-Nothing in a headset yet. Not run: the installer on a clean Frame (only a dry run against scratch
-folders), the wrapper under Steam, the timing logger under SteamVR, the shortcut flags
-(`OpenVR=1`, `AllowOverlay=1`, `AllowDesktopConfig=1`), the refresh rate at 72, 90 or 120 Hz, the game
-itself with OpenFrame's config. Fill this section with measured facts only, one line each, as they
-are tested.
+Run on a Steam Frame (SteamOS, SteamVR, the Frame's controllers and eye tracking), version 1.0.0, at the
+shipped defaults, in the first campaign level:
+
+- The installer on a Frame with Steam running: the program folder, `config.toml`, the maps and the
+  "OpenFrame" Steam shortcut (OpenVR on) are made, and an update keeps maps, saves and settings.
+- The wrapper under Steam: SteamVR takes the per-app settings (refresh rate, no throttling, no motion
+  smoothing) and `launch.log` reads them back; the timing logger writes `vrtiming.log` each session.
+- 90 Hz, eyes at 0.9 of the recommended 1728 (1554x1554), eye-tracked foveation with an inset of 0.4,
+  `TU_DEBUG=sysmem`: firefights average 88.5 fps over two rooms, none below 70; the heaviest firefight
+  averages 86 to 89 fps (OpenH1's 1.0 and 0.5: about 77); GPU time is 7.2 ms median of the 11.1 ms frame;
+  no dropped frames in play.
+- SteamVR fills in about one frame in ten over a session (OpenH1's resolution and foveation: about one in
+  three). Tiled rendering instead of `sysmem` was about 10 fps slower in the same rooms.
+- A level loads in 4 to 8 seconds (OpenH1: about 17 for the first level); a section change is a hitch of
+  about 0.4 s of preparation (OpenH1: a freeze of one to two seconds).
+- Recentring (both grips, SteamVR's own, and the automatic one at each level start), the menus in front of
+  you, and the HUD layout defaults.
+- The controls in the README: the right stick press (bullet time once enabled, else zoom), flick up
+  (sprint), hold down for 0.8 s (third person), the left stick click while sprinting (slide), reload by
+  X or the left-hip magazine, and no stick eject.
+
+The figures are for 90 Hz in the first level; other refresh rates and levels are not measured here.

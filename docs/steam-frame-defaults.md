@@ -20,14 +20,14 @@ default.
 | Setting | OpenH1 default | OpenFrame default | Why | Risk of changing it |
 | --- | --- | --- | --- | --- |
 | `vr.refresh_rate` | `90` | `90` (the installer writes it when `config.toml` lacks it; the wrapper's `OPENFRAME_REFRESH_HZ`, when given, wins at run time) | 11.1 ms a frame leaves the GPU room at 1728x1728 (OpenH1 measured about 8 ms GPU there with its older renderer); 72 Hz for heavy levels | 120 Hz needs the GPU under about 7 ms: unmeasured with the Vulkan renderer, SteamVR halves the rate when it is missed |
-| `vr.resolution_scale` | `1.0` (1728x1728) | `0.9` | A little under the runtime's recommended size; trials on the Frame settled it (OpenH1's numbers: 1.25 was at the edge of 72 Hz, 1.5 dropped to 36 Hz) | Above 1.0 at 90 Hz drops frames |
+| `vr.resolution_scale` | `1.0` (1728x1728) | `0.9` | A little under the runtime's recommended size; chosen for 90 Hz on the Frame (OpenH1's numbers: 1.25 was at the edge of 72 Hz, 1.5 dropped to 36 Hz) | Above 1.0 at 90 Hz drops frames |
 | `vr.foveation` | `"eye"` | `"eye"` | SteamVR on the Frame offers `XR_EXT_eye_gaze_interaction` (its client logs list it); about a third of the eyes' pixels drawn; without tracking it falls back to `"fixed"` | `"off"` doubles the eye pass's pixels |
-| `vr.foveation_inset` | `0.5` | `0.4` | Trials on the Frame settled it; the blend hides the inset's edge | Smaller is faster but its edge may show where the eye tracker lags |
+| `vr.foveation_inset` | `0.5` | `0.4` | Chosen for 90 Hz on the Frame; the blend hides the inset's edge | Smaller is faster but its edge may show where the eye tracker lags |
 | `vr.depth` | `false` | `false` | SteamVR on the Frame cannot take the eyes' depth, and it is never sent while foveated | none (true does nothing useful there) |
-| `vr.late_latch` | `true` | `true` | Pacing: not touched by this review | n/a |
+| `vr.late_latch` | `true` | `true` | Pacing: unchanged from OpenH1 | n/a |
 | Eye anti-aliasing | none (the VR eyes have no FXAA/SMAA pass; MSAA cost 15 ms at 2x on the old renderer) | none | No budget at 90 Hz | Alpha-tested foliage and grates crawl; MSAA on the Vulkan eyes is unmeasured on the Frame |
 | `display.graphics` | `"enhanced"` (per-pixel lighting, sharper shadows, anisotropic filtering, enhanced dynamic lights) | `"enhanced"` | OpenH1's look; its cost on the Frame's GPU is unmeasured ("to be measured" in OpenH1's README) | If `HALO_GPU_STATS=1 HALO_VR_GPU_TIME=1` shows the GPU over budget, `"classic"` is the first thing to try |
-| `vr.hud_inset`, `vr.hud_offset_*`, `vr.hud_scale`, `vr.hud_<group>_*` | none (OpenFrame's keys) | `hud_inset` `0.05`, `hud_weapon_x` `0.2`, `hud_weapon_y` `-0.1`, `hud_status_x` `-0.08`, `hud_status_y` `-0.1`, `hud_tracker_x` `0.1`, `hud_tracker_y` `0`, sizes `1` | The Frame's view puts OpenH1's corners too far out; these bring them in (headset trials); with a glasses spacer the view is narrower still and the corners may be cut off (see below) | Inset pulls the shields in too; above about 30% (0.3) the corners crowd the reticle |
+| `vr.hud_inset`, `vr.hud_offset_*`, `vr.hud_scale`, `vr.hud_<group>_*` | none (OpenFrame's keys) | `hud_inset` `0.05`, `hud_weapon_x` `0.2`, `hud_weapon_y` `-0.1`, `hud_status_x` `-0.08`, `hud_status_y` `-0.1`, `hud_tracker_x` `0.1`, `hud_tracker_y` `0`, sizes `1` | The Frame's view puts OpenH1's corners too far out; these bring them in; with a glasses spacer the view is narrower still and the corners may be cut off (see below) | Inset pulls the shields in too; above about 30% (0.3) the corners crowd the reticle |
 | `vr.hud_lag` | `0.03` s | `0.03` | A slight trail reads as a helmet's HUD; the layer is composited by SteamVR either way | `0` locks the HUD to the head (view space) |
 | `vr.turn`, `vr.snap_turn_angle` | snap, 30 degrees | snap, 30 | Comfort first; VR Setup changes it | none |
 | `vr.world_scale` | `1.0` | `1.0` | 1:1 | none |
@@ -38,9 +38,9 @@ default.
 | `vr.hrtf` | `true` | `true` | Directional sound in the headset's speakers | Its CPU cost on the Frame's 5 usable cores is unmeasured |
 | `vr.dominant_hand`, `vr.swap_sticks` | right, as the hand | right, as the hand | VR Setup > PLAYER... > DOMINANT HAND; `docs/openframe-features.md` "Left-handed" | none |
 | `update.auto` | `true` | `false` (installer) | OpenH1's updater would replace this fork | none |
-| `TU_DEBUG` | unset | `sysmem` (wrapper; `OPENFRAME_SYSMEM=0` leaves it unset) | As the sibling Frame ports render | Not touched by this review |
+| `TU_DEBUG` | unset | `sysmem` (wrapper; `OPENFRAME_SYSMEM=0` leaves it unset) | The GPU renders straight to memory instead of in tiles: about 10 fps more in the same rooms | Left as the sibling Frame ports have it |
 
-If the HUD's corners are cut off (second headset trial: with a glasses
+If the HUD's corners are cut off (with a glasses
 spacer the Frame's comfortable view is narrower, and the ammunition and
 grenades at the top left and the motion tracker at the bottom left sat
 partly past its edge; the shields at the top right were fine): VR Setup >
