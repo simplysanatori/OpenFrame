@@ -116,7 +116,7 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Either hand pushed into a control | Press it |
 | Both grips on a Ghost's handles or a Warthog's wheel | Steer it |
 
-The features that come from moistman42069's mod (below) are each off until you turn them on in VR Setup: sprint, bullet time, third person, slide, wall jump and wall run, fists, weapon pull, prop throw, hand swap, the wrist HUD and the comfort vignette. Until bullet time is on, pressing the right stick in is plain zoom. The right stick has no magazine eject: reload with **X**, or take a magazine from your left hip. A flick down does nothing, and a push on a diagonal while you turn is ignored, so looking around never sets anything off. Each toggle shows a label on the HUD.
+The features that come from moistman42069's mod (below) are each off until you turn them on in VR Setup: sprint, bullet time, slide, wall jump and wall run, fists, weapon pull, prop throw, hand swap, the wrist HUD and the comfort vignette. Holding the right stick down for 0.8 seconds turns the third-person view on or off, and needs no setting. Until bullet time is on, pressing the right stick in is plain zoom. The right stick has no magazine eject: reload with **X**, or take a magazine from your left hip. A flick down does nothing, and a push on a diagonal while you turn is ignored, so looking around never sets anything off. Each toggle shows a label on the HUD.
 
 ### The added features
 
@@ -124,7 +124,7 @@ These come from moistman42069's Halo VR mod, rewritten for OpenH1. Each is off u
 
 - **Sprint** (SPRINT in MOVEMENT AND COMFORT...). Flick the right stick up to start and again to stop. Or set it to arm swing and swing your arms as you run. Crouching pauses it.
 - **Bullet time** (BULLET TIME on, in MOVEMENT AND COMFORT...). Press the right stick in. The world slows to 40 % and your head and hands keep full speed. Your own body slows with the world, so jumps float.
-- **Third person.** Hold the right stick down for 0.8 seconds. The view moves behind your body; you still aim with the controller. Not in vehicles or multiplayer.
+- **Third person.** Hold the right stick down for 0.8 seconds, with no setting turned on first. The view moves behind your body; you still aim with the controller. Not in vehicles or multiplayer.
 - **Slide** (PARKOUR on). While sprinting, click the left stick once and you slide about a second. Click again to stop early.
 - **Wall jump** (PARKOUR on). In the air beside a wall, press A again.
 - **Wall run** (PARKOUR on). Jump at a wall with the left stick pushed along it. Steer away to drop off.
@@ -238,7 +238,7 @@ It gathers the newest session's logs into one archive and masks IP and MAC addre
 
 OpenFrame exists because of [OpenH1](https://github.com/OpenH1/OpenH1), [OpenCE](https://github.com/OpenCommunityEdition/OpenCE) and the Xbox decompilation they start from, and because of moistman42069's [Halo VR mod](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android). If you want to support someone, support them first: star and follow them, report what you find there, and send fixes that are not Frame-specific upstream.
 
-If you would like more Steam Frame ports, you can also [buy me a coffee](https://ko-fi.com/sana748653). It pays for the Claude API credits these ports are built with, spent as carefully as I can.
+If you would like more Steam Frame ports, you can also [buy me a coffee](https://ko-fi.com/sana748653). Thank you.
 
 ## Credits
 
@@ -265,6 +265,6 @@ OpenH1's own README is kept as [README.upstream.md](README.upstream.md).
 
 I wanted Halo in VR on my Frame without an emulator or a PC. OpenH1 already had a native Arm64 build with an OpenXR VR mode, so I forked it and set it up for the Frame: the install and launch, recentring, the HUD, faster loads and section changes, resolution and foveation for 90 Hz, and controls made for the Frame controllers. Then I brought in the VR features from moistman42069's mod that I wanted to play with.
 
-This is vibe coded, with manual review throughout. I wrote it with Claude Code running on the Frame itself.
+This is vibe coded, with manual review throughout. I wrote it with Claude Code running on the Frame itself. If you buy me a coffee, it pays for the Claude API credits these ports are built with, spent as carefully as I can.
 
 Developer notes are in [steam-frame/dev/DEV.md](steam-frame/dev/DEV.md).

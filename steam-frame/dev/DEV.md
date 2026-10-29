@@ -131,13 +131,12 @@ shipped defaults, in the first campaign level:
 - The wrapper under Steam: SteamVR takes the per-app settings (refresh rate, no throttling, no motion
   smoothing) and `launch.log` reads them back; the timing logger writes `vrtiming.log` each session.
 - 90 Hz, eyes at 0.9 of the recommended 1728 (1554x1554), eye-tracked foveation with an inset of 0.4,
-  `TU_DEBUG=sysmem`: firefights average 88.5 fps over two rooms, none below 70; the heaviest firefight
-  averages 86 to 89 fps (OpenH1's 1.0 and 0.5: about 77); GPU time is 7.2 ms median of the 11.1 ms frame;
-  no dropped frames in play.
+  `TU_DEBUG=sysmem`: firefights average 88 to 89 fps; the heaviest firefight of the first level averages
+  86 to 89 fps (OpenH1's 1.0 and 0.5: about 77); no dropped frames in play.
 - SteamVR fills in about one frame in ten over a session (OpenH1's resolution and foveation: about one in
   three). Tiled rendering instead of `sysmem` was about 10 fps slower in the same rooms.
-- A level loads in 4 to 8 seconds (OpenH1: about 17 for the first level); a section change is a hitch of
-  about 0.4 s of preparation (OpenH1: a freeze of one to two seconds).
+- A level loads in 4 to 8 seconds (OpenH1: about 17 for the first level); a section change is a short
+  hitch (OpenH1: a freeze of one to two seconds).
 - Recentring (both grips, SteamVR's own, and the automatic one at each level start), the menus in front of
   you, and the HUD layout defaults.
 - The controls in the README: the right stick press (bullet time once enabled, else zoom), flick up

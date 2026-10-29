@@ -5,7 +5,8 @@ where each came from, and how to turn it on. Each is set in `config.toml`
 (the `vr.*` keys below) or in VR Setup: MOVEMENT AND COMFORT..., HANDS AND
 WEAPONS... (and its FISTS AND GRABBING...), HUD... (WRIST HUD..., HUD
 LAYOUT...) and PLAYER....
-Every one is off, or as OpenH1 had it, until you choose it.
+Every one is off, or as OpenH1 had it, until you choose it, except the third
+person's switch: holding the right stick down for 0.8 seconds turns the third-person view on or off, and needs no setting.
 
 The VR Setup menu (Settings > Controls tab > VR SETUP, also at the foot of the
 player profile menu) is a tree of pages of one purpose each:

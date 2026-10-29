@@ -63,11 +63,11 @@ OpenH1's own fixes between `build-734` and `build-769` are in this release:
 
 ### From other people's work
 
-These come from moistman42069's Halo VR mod, rewritten for OpenH1. Each is off until you turn it on in VR Setup (sprint, bullet time, third person, slide and the wall moves, fists, weapon pull, prop throw, hand swap, the wrist HUD and the vignette), and they play offline.
+These come from moistman42069's Halo VR mod, rewritten for OpenH1. Each is off until you turn it on in VR Setup (sprint, bullet time, slide and the wall moves, fists, weapon pull, prop throw, hand swap, the wrist HUD and the vignette), and they play offline. Holding the right stick down for 0.8 seconds turns the third-person view on or off, and needs no setting.
 
 - Sprint, by flicking the stick or by swinging your arms.
 - Bullet time: the world slows and your head and hands do not.
-- Third person on foot.
+- Third person on foot (the hold on the right stick needs no setting).
 - Slide, wall jump and wall run.
 - Fists: punch, stagger and parry.
 - Weapon pull: call a gun on the floor to your hand.
