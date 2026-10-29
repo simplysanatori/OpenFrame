@@ -23,6 +23,17 @@ vehicle's seat, from where the game's camera aims the seat's weapon from
 Only the facing changes, which the netcode sends as it always has: a
 network game's host fires the client's weapon from its own copy of the same
 eye, along the same facing.
+
+So the shots leave from the unit's camera, as a flat player's do, and this
+build registers no fire origin (network_damage_set_fire_origin_source,
+distributed message 93, network.fire_origins): a host's line of sight check
+of its hits, from that camera (network_damage.c), is the right one. The hand
+past a corner the eye is behind gives only the reticle: the shot from the
+eye meets the corner, here as on the host, so there is no hit to refuse,
+and telling the host of the hand would claim shots that did not leave from
+it. The grenade thrown with the left hand leaves from the hand
+(vr_grenade.c), but what it deals is an explosion's, or a stuck grenade's,
+which the host checks without a line of sight.
 */
 
 #ifdef HALO_VR
