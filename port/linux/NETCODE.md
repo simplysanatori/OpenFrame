@@ -287,6 +287,21 @@ browser shows. The listing's flag is its host's word, which any host can
 set, so a browser counts a game a dedicated server's on a master server's
 word alone, not on that flag.
 
+Version 39 also carries, as OpenCE's does (its pull request #467), three
+gametype options in space the earlier builds sent empty, so it was not
+raised: Capture the Flag's Kills Score and a capture's points in its
+variant's union (`struct ctf_variant`), King of the Hill's Multi-Hill in
+its (`struct king_variant`), and Force Team Spawns in the PC options (a
+reserved byte of `struct game_variant_options`, still 0x2C bytes). Only the
+host spawns players and scores, and a client takes Capture the Flag's team
+scores from the game type's state as before. With Multi-Hill on, the host's
+King of the Hill state is followed by the other hills
+(`struct king_extra_hills_network_state`: their count and their ids, whose
+points each machine finds on its map); a game of one hill sends the state
+alone, as before. A build without them plays a game of one hill and plain
+Capture the Flag with these; a Multi-Hill game's state, longer than it
+takes, it does not take.
+
 OpenH1's own games ("OpenH1 60 Tick" and the like, below; Standard games in
 the code) have a protocol version of their own,
 `HALO_PORT_STANDARD_NETWORK_VERSION` (`halo_port_limits.h`), separate from
@@ -324,6 +339,20 @@ in the load order); the host keeps it printable and logs it once, and a
 dedicated server shows it in `/api/players` (`client`). A host without the
 message drops it as a kind it does not know. It is below 120, so an OpenH1
 host takes it from OpenCE's clients in a mixed game too.
+Distributed message 93 (`network_damage.c`) needs no new version either,
+as a host that does not know it drops it: a client whose players' shots
+leave from elsewhere than their units' cameras (a VR build, whose weapon
+fires from the player's hand) sends the host where from, unreliably when it
+changes and every eighth tick: an offset from the camera of no more than 0.4
+world units (a player leaning out and an arm). The host keeps it a second,
+for that machine's own players only. When none of the shooter's eyes (nor a
+vehicle's gun) had a line to a reported hit's target, the host's line of
+sight check then also looks from the hand, with the line from the eye to it
+clear (a hand through a wall does not hit) and the hand where one firing at
+the target can be: no more than 0.05 world units behind the eye along the
+line to the target, 0.2 to its side and 0.1 above it (a client cannot claim
+a hand far past a corner). Such hits are counted in the host's log, and the
+host's `network.fire_origins` (true by default) turns the hand off.
 
 `port/linux/network_format.txt` records the wire format of the current
 version (`tools/network_format.py`): `test_linux_port.py` fails when the
@@ -442,21 +471,16 @@ machine's voice either (`network_voice.c`'s `voice_host_relay`, by the
 names of the network game's players, which the lobby has too). A
 machine's own scoreboard mute stays its own: it plays none of that
 machine's voice and shows none of its players' lines, and tells no one.
-The host's chat settings (`network.text_chat`: on, links allowed, or off;
-always off while a player's game is listed in the server browser,
-`p2p_hosting_listed`, but a dedicated server's own, `chat_listing_allows`)
-go to every client in
+The host's chat settings (`network.text_chat`: on, links allowed, or off,
+listed in the server browser or not) go to every client in
 `_distributed_message_chat_config` (one byte of flags), reliably, as they
 change and every 3 seconds. A client without them (from a host without the
-chat, or before they come) has the chat off, and so does a client in a
-public game it joined from the server browser, whatever its host sends (a
-changed host could turn the chat on): while the tunnel reaches the host of
-the listing it joined (`p2p_join_listing`, `p2p_joined_listed_host`; any
-other invite joined since forgets it), it takes no chat line or notice and
-sends none, unless the listing was a dedicated server's that a master
-server lists (`p2p_joined_listed_dedicated`: the master's word, from an
-approved operator's key; a listing's own dedicated flag, which any host can
-set, does not count), whose settings it follows. A client refuses a line the
+chat, or before they come) has the chat off. A public game a player hosts
+has the chat as its host's settings say, as a private or LAN game does;
+OpenCE, and OpenH1 before it, kept the chat off in any game listed in the
+server browser, on the host and on a client that joined it from the browser,
+so such a client still shows none (nothing between the machines changed). A
+client refuses a line the
 settings refuse before sending it, and the host refuses it again whatever
 the client knew, telling its machine why: a changed build gets no further.
 Links are found in the line's text (`chat_text_has_link`): a scheme, `www.`,
@@ -881,6 +905,22 @@ machine:
   presses the scores' A for the host (every machine to the lobby, as
   `network_game_server_reset_to_pregame` sends it) and starts the lobby's
   countdown on the same map and gametype.
+- A change of map and gametype, the host's playlist (`network_host_game.c`)
+  and the score and time limits are the lobby's own messages (the game's
+  record with its map and variant, as Server Setup sends them): a change
+  asked for now ends the game as Restart round does and sets the new one in
+  the lobby; one after this game, or the playlist's next, waits for the
+  scores and the host's A, then is set in the lobby and its countdown
+  started. The limits change only in the lobby (no machine of the Xbox's
+  game changes them in a game), so during a game they wait for the next.
+  The lobby's team changes (Host Controls in the lobby, Shuffle and Balance
+  teams there) are the host's game record sent again, which every machine
+  takes, OpenCE's too; in a game, Shuffle and Balance are team moves (below)
+  and offered only where those are. The host's announcements and the next
+  game are the notice (`_distributed_message_notice`) the dedicated server's
+  `say` sends, which OpenCE machines show; in the lobby no machine hears a
+  notice, so there are none. None of it needed a new message or a new
+  network version.
 - Lock teams refuses, on the host, a client's change of its players' team in
   the lobby (the player settings it sends): the client sees its team stay. Max
   players, the listing and Allow OpenCE players change only what the host

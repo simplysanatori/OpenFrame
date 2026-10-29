@@ -99,6 +99,7 @@ their handlers open opens.
 #include "network_voice.h"
 #include "network_chat.h"
 #include "network_host_controls.h"
+#include "network_host_game.h"
 #include "sim_rate.h"
 #include "network_standard.h"
 #include "bots.h"
@@ -4299,6 +4300,32 @@ static boolean settings_slider_function(char const *name, struct widget_instance
 	return FALSE;
 }
 
+/* ui_widget.c's: a finger that went down on an item at x and then moved
+sideways, taken when the item is a slider's row (or in one) and x is on its
+track: the value goes there and the finger, held, drags it
+(settings_sliders_show), as the mouse's button does; its drag then steps no
+list. The row, which ui_widget.c chooses, or NULL */
+struct widget_instance *menu_functions_finger_down(struct widget_instance *item, short x)
+{
+	struct widget_instance *row = item;
+	struct widget_instance *track;
+	short slider = NONE;
+	short depth;
+
+	for (depth = 0; row && depth < 3 && (slider = settings_slider_of(row)) == NONE; depth++)
+		row = row->parent;
+	track = slider != NONE ? settings_slider_track(row) : NULL;
+	if (!track || x < settings_slider_track_x(track) - 4 || x >= settings_slider_track_x(track) + SLIDER_TRACK_WIDTH + 4)
+		return NULL;
+	/* (a number being typed is kept, and the finger places the value
+	too, where the mouse's click would only end the typing) */
+	if (text_field_editing(NULL))
+		text_field_end(TRUE);
+	settings_slider_place(slider, track, x);
+	settings_slider.dragged = row;
+	return row;
+}
+
 /* (each frame of a page) the sliders' thumbs at their values and their
 numbers shown (typed into, the text typed); the one dragged follows the
 mouse while its button is held; one typed into whose row lost the focus
@@ -6087,7 +6114,10 @@ static boolean browser_sort_before(struct browser_sort_entry const *a, struct br
 {
 	int difference = 0;
 
-	/* (the order the lists open in: the dedicated servers first) */
+	/* (the order the lists open in: the OpenH1 games first, the better
+	game and the fewer, then the dedicated servers first in each) */
+	if (browser_sort_column == _browser_sort_players && browser_sort_descending && a->openh1 != b->openh1)
+		return a->openh1;
 	if (browser_sort_column == _browser_sort_players && browser_sort_descending && a->dedicated != b->dedicated)
 		return a->dedicated;
 	switch (browser_sort_column)
@@ -6312,8 +6342,8 @@ static void browser_empty_text(short mode, short tab, boolean online, boolean pu
 	else if (newer)
 	{
 		/* (an old build sees none of the games: it says why) */
-		usnprintf(text, size - 1, L"%d %s on a newer version:\r\nupdate the game to join.", newer,
-			newer == 1 ? L"game is" : L"games are");
+		usnprintf(text, size - 1, L"%d %s on a newer version.\r\nUpdate OpenH1 to join %s.", newer,
+			newer == 1 ? L"game is" : L"games are", newer == 1 ? L"it" : L"them");
 	}
 	else
 		usnprintf(text, size - 1, L"No public games found.");
@@ -6731,7 +6761,7 @@ static void browser_status_text(struct browser_row const *row, wchar_t *text, sh
 		usnprintf(party, NUMBEROF(party) - 1, L"Room for your party (%d). ", row->party_size);
 		break;
 	case _browser_party_unheld:
-		usnprintf(party, NUMBEROF(party) - 1, L"Room for your party (%d). No room guarantee: some may not get in. ",
+		usnprintf(party, NUMBEROF(party) - 1, L"Room for your party (%d), but places aren't held. ",
 			row->party_size);
 		break;
 	case _browser_party_no_room:
@@ -6859,9 +6889,8 @@ static struct
 	char failed_name[P2P_LISTING_NAME_SIZE + 1];
 	unsigned long failed_time;
 	boolean failed_nat_strict;
-	/* why (connect_failure_text) */
-	wchar_t failed_headline[32];
-	wchar_t failed_detail[160];
+	/* why, in a sentence (connect_failure_text's line: CONNECT_LINE_LENGTH) */
+	wchar_t failed_line[64];
 	/* a game with a password chosen: the password screen's (its own copy:
 	the rows' are read again each frame), and a join it began, which the
 	browser takes up again as it comes back */
@@ -6890,6 +6919,14 @@ gives the join up */
 #define CONNECT_TIMEOUT 10000
 #define CONNECT_HEADLINE_LENGTH 32
 #define CONNECT_DETAIL_LENGTH 160
+#define CONNECT_LINE_LENGTH 64
+/* a phone's or a tablet's: what it is told to try when a network blocks a
+join (connect_failure_text) */
+#if defined(HALO_ANDROID) || defined(HALO_IOS)
+#define CONNECT_ON_PHONE TRUE
+#else
+#define CONNECT_ON_PHONE FALSE
+#endif
 
 static struct
 {
@@ -6920,45 +6957,63 @@ static void connect_stage_text(struct p2p_join_status const *status, wchar_t *te
 }
 
 /* why a join gave up, as far as internet play can tell, and what would
-help */
-static void connect_failure_text(struct p2p_join_status const *status, wchar_t *headline, wchar_t *detail)
+help, in words for anyone (the cause in the log: connect_failure_log): the
+box's headline and its lines (broken for it), and the server browser's
+panel's sentence. Where the cause is known, the advice is for it: internet
+play off, no internet (no signalling broker), no answer (the game ended, or
+its host offline: a server browser's game, or an invite's), this network
+(its NAT gives each destination its own port, and no router forwards one),
+the host's, or one between them. A phone (on_phone) is told to try Wi-Fi
+rather than mobile data, where such networks mostly are; no one is told of
+ports, only of the setting that asks the router for one */
+static void connect_failure_text(struct p2p_join_status const *status, boolean listing, boolean on_phone,
+	wchar_t *headline, wchar_t *detail, wchar_t *line)
 {
 	if (!status->online)
 	{
 		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"INTERNET PLAY IS OFF");
 		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1, L"Turn it on in Settings,\r\nOnline.");
+		usnprintf(line, CONNECT_LINE_LENGTH - 1, L"Internet play is off.");
 	}
 	else if (!status->brokers)
 	{
-		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"NO CONNECTION");
-		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1,
-			L"Could not reach internet\r\nplay's servers. Check your\r\nconnection.");
+		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"CAN'T GET ONLINE");
+		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1, L"Check your internet\r\nconnection, then RETRY.");
+		usnprintf(line, CONNECT_LINE_LENGTH - 1, L"Check your internet connection.");
 	}
 	else if (status->stage != _p2p_join_opening)
 	{
-		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"NO ANSWER");
-		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1,
-			L"The game may have ended,\r\nor the host may be offline.");
+		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"GAME NOT FOUND");
+		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1, listing ?
+			L"The game may have ended,\r\nor its host is offline.\r\nTry another game." :
+			L"The game may have ended,\r\nor its host is offline.\r\nAsk the host for a new\r\ninvite link.");
+		usnprintf(line, CONNECT_LINE_LENGTH - 1, L"The game may have ended.");
 	}
 	else if (status->nat_strict)
 	{
-		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"STRICT NETWORK");
-		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1, config_boolean("network.allow_upnp") ?
-			L"Your router opened no port.\r\nAsk the host to turn on\r\nOPEN ROUTER PORT." :
-			L"Turn on OPEN ROUTER PORT\r\nin Network Setup, or ask\r\nthe host to.");
+		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"NETWORK BLOCKED");
+		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1, !config_boolean("network.allow_upnp") ?
+			L"Your network is blocking\r\nthe connection. Turn on\r\nOPEN ROUTER PORT in\r\nSettings, Online." : on_phone ?
+			L"Your network is blocking\r\nthe connection. Try\r\nanother network (Wi-Fi\r\ninstead of mobile data)." :
+			L"Your network is blocking\r\nthe connection. Try\r\nanother network, or ask\r\nsomeone else to host.");
+		usnprintf(line, CONNECT_LINE_LENGTH - 1, L"Your network is blocking it.");
 	}
 	else if (status->host_strict)
 	{
-		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"HOST'S NETWORK STRICT");
-		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1, L"Ask the host to turn on\r\nOPEN ROUTER PORT in\r\nNetwork Setup.");
+		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"CAN'T REACH THE HOST");
+		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1,
+			L"The host's network is\r\nblocking the connection.\r\nAsk the host to turn on\r\nOPEN ROUTER PORT.");
+		usnprintf(line, CONNECT_LINE_LENGTH - 1, L"The host's network is blocking it.");
 	}
 	else
 	{
-		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"NO PATH TO HOST");
-		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1,
-			L"A network between you is\r\nstrict. Ask the host to turn\r\non OPEN ROUTER PORT.");
+		usnprintf(headline, CONNECT_HEADLINE_LENGTH - 1, L"CAN'T REACH THE HOST");
+		usnprintf(detail, CONNECT_DETAIL_LENGTH - 1, on_phone ?
+			L"A network is blocking the\r\nconnection. Try Wi-Fi\r\ninstead of mobile data,\r\nthen RETRY." :
+			L"A network is blocking the\r\nconnection. RETRY, or ask\r\nthe host to turn on\r\nOPEN ROUTER PORT.");
+		usnprintf(line, CONNECT_LINE_LENGTH - 1, L"A network is blocking it.");
 	}
-	headline[CONNECT_HEADLINE_LENGTH - 1] = detail[CONNECT_DETAIL_LENGTH - 1] = 0;
+	headline[CONNECT_HEADLINE_LENGTH - 1] = detail[CONNECT_DETAIL_LENGTH - 1] = line[CONNECT_LINE_LENGTH - 1] = 0;
 }
 
 /* the log's line of a join given up */
@@ -7006,8 +7061,10 @@ static void connect_update(struct widget_instance *screen)
 		else if (status.stage == _p2p_join_idle || now - connect_dialog.start_time > CONNECT_TIMEOUT)
 		{
 			char name[P2P_LISTING_NAME_SIZE + 1];
+			wchar_t line[CONNECT_LINE_LENGTH];
 
-			connect_failure_text(&status, connect_dialog.headline, connect_dialog.detail);
+			connect_failure_text(&status, connect_dialog.listing, CONNECT_ON_PHONE, connect_dialog.headline,
+				connect_dialog.detail, line);
 			snprintf(name, sizeof(name), "%s", connect_dialog.listing ? connect_dialog.game.name : "the invite's host");
 			connect_failure_log(name, &status);
 			p2p_join_cancel();
@@ -7355,10 +7412,11 @@ static void lobby_browser_update(struct widget_instance *list)
 		else if (now - lobby_browser.join_time > CONNECT_TIMEOUT)
 		{
 			struct p2p_join_status status;
+			wchar_t headline[CONNECT_HEADLINE_LENGTH], detail[CONNECT_DETAIL_LENGTH];
 
 			p2p_join_status(&status);
 			connect_failure_log(lobby_browser.name, &status);
-			connect_failure_text(&status, lobby_browser.failed_headline, lobby_browser.failed_detail);
+			connect_failure_text(&status, TRUE, CONNECT_ON_PHONE, headline, detail, lobby_browser.failed_line);
 			p2p_join_cancel();
 			p2p_lobby_mark_failed(lobby_browser.identifier);
 			csmemcpy(lobby_browser.failed_name, lobby_browser.name, sizeof(lobby_browser.failed_name));
@@ -7400,10 +7458,16 @@ static void lobby_browser_update(struct widget_instance *list)
 		else if (lobby_browser.failed_time && now - lobby_browser.failed_time < LOBBY_BROWSER_FAILED_TIME)
 		{
 			text_to_wide(lobby_browser.failed_name, name, NUMBEROF(name));
-			/* (and why, when this network's NAT is what stops it: the router's
-			UPnP, or a forwarded network.tunnel_port, lets it through) */
-			usnprintf(text, NUMBEROF(text) - 1, lobby_browser.failed_detail[0] ? L"Could not reach %s: %s" :
-				L"Could not reach %s.", name, lobby_browser.failed_headline);
+			/* (and why, in words for anyone: connect_failure_text; the game
+			named only when it is not the one the panel shows, for the
+			panel's three lines) */
+			if (chosen < lobby_browser.count &&
+				!memcmp(lobby_browser.games[chosen].identifier, lobby_browser.identifier, 6))
+			{
+				usnprintf(text, NUMBEROF(text) - 1, L"Couldn't join. %s", lobby_browser.failed_line);
+			}
+			else
+				usnprintf(text, NUMBEROF(text) - 1, L"Couldn't reach %s. %s", name, lobby_browser.failed_line);
 		}
 		else if (chosen >= lobby_browser.count && chosen < rows)
 		{
@@ -8191,9 +8255,13 @@ static void multiplayer_status_update(struct widget_instance *list)
 		}
 		else if (p2p_nat_strict())
 		{
-			usnprintf(headline, NUMBEROF(headline) - 1, L"YOUR NETWORK IS STRICT");
+			/* (this network's NAT gives each destination its own port, and no
+			router forwards one: players behind strict networks too cannot
+			reach the game) */
+			usnprintf(headline, NUMBEROF(headline) - 1, L"NOT EVERYONE CAN JOIN");
 			usnprintf(detail, NUMBEROF(detail) - 1, config_boolean("network.allow_upnp") ?
-				L"Some players may not reach\r\nyour game." : L"Turn on OPEN ROUTER PORT\r\nin Network Setup.");
+				L"Some players can't reach\r\nyou. Hosting on another\r\nnetwork may help." :
+				L"Some players can't reach\r\nyou. Turn on OPEN ROUTER\r\nPORT in Settings, Online.");
 		}
 		else if (item == _multiplayer_item_online_coop && multiplayer_status_next_level() != NONE)
 		{
@@ -8296,7 +8364,11 @@ static boolean direct_link_from_clipboard(void)
 		link[length - 1] = 0;
 	if (!*link || !p2p_join_invite(link))
 	{
-		platform_log("menus: the clipboard has no invite link");
+		/* (an older version's invite is logged as such: p2p.c) */
+		platform_log("menus: the clipboard has no invite link this version joins");
+		display_error_text_deferred(!*link ?
+			L"No link is copied. Copy\r\nthe invite link you were\r\nsent, then PASTE LINK." :
+			L"That link can't be joined.\r\nCopy the whole invite link\r\nagain, or ask the host for\r\na new one.", NONE);
 		return campaign_fail();
 	}
 	connect_dialog.listing = FALSE;
@@ -8587,7 +8659,7 @@ static boolean lobby_join_start(struct widget_instance *widget, short controller
 		return campaign_fail();
 	if (lobby_player_count >= game->maximum_players)
 	{
-		display_error_text_deferred(L"The game is full.", NONE);
+		display_error_text_deferred(L"The game is full: there's\r\nno room for another\r\nplayer.", NONE);
 		return campaign_fail();
 	}
 	lobby_join.controller = controller;
@@ -8868,7 +8940,7 @@ static boolean preview_add(struct widget_instance *widget, short controller, boo
 		return campaign_fail();
 	if (game->player_count + count >= game->maximum_player_count)
 	{
-		display_error_text_deferred(L"The game is full.", NONE);
+		display_error_text_deferred(L"The game is full: there's\r\nno room for another\r\nplayer.", NONE);
 		return campaign_fail();
 	}
 	lobby_join.controller = controller;
@@ -8961,7 +9033,8 @@ enum
 	_option_short,		/* a short of the options */
 	_option_option_byte,	/* a byte of the options */
 	_option_radar,		/* the options' radar players, and the variant's flag */
-	_option_setting		/* the host's own (config.toml): Server Setup's copy only */
+	_option_setting,	/* the host's own (config.toml): Server Setup's copy only */
+	_option_byte_value	/* a byte of the variant, its number (not on or off) */
 };
 
 struct gametype_option
@@ -9039,9 +9112,16 @@ static struct gametype_option const gametype_options[] =
 		{ 1, 0 } },
 	{ "captures_to_win_spinner", _option_long, VARIANT_FIELD(universal_variant.score_to_win), 0, 5,
 		{ 1, 3, 5, 10, 15 } },
+	/* (port: kills score too, and a capture is worth its points: game_engine_ctf.c) */
+	{ "kills_score_spinner", _option_long, VARIANT_FIELD(game_engine_variant.ctf.kills_score), 0, 2, { 1, 0 } },
+	{ "kills_per_capture_spinner", _option_long, VARIANT_FIELD(game_engine_variant.ctf.points_per_capture), 0, 10,
+		{ 5, 10, 15, 20, 25, 30, 40, 50, 75, 100 } },
 	{ "time_limit_spinner", _option_short, OPTIONS_FIELD(time_limit), 0, 7, TIME_LIMITS },
 	/* king of the hill */
 	{ "koth_moving_hill_spinner", _option_byte, VARIANT_FIELD(game_engine_variant.king.moving_hill), 0, 2, { 1, 0 } },
+	/* (port: Multi-Hill's hills at once, game_engine_king.c) */
+	{ "koth_multi_hill_spinner", _option_byte_value, VARIANT_FIELD(game_engine_variant.king.multi_hill), 0, 5,
+		{ 0, 2, 3, 4, 5 } },
 	{ "koth_score_to_win_spinner", _option_long, VARIANT_FIELD(universal_variant.score_to_win), 0, 5,
 		{ 1, 2, 5, 10, 15 } },
 	{ "koth_team_play_spinner", _option_byte, VARIANT_FIELD(universal_variant.teams), 0, 2, { 1, 0 } },
@@ -9080,6 +9160,9 @@ static struct gametype_option const gametype_options[] =
 		{ _friendly_fire_off, _friendly_fire_on, _friendly_fire_shields_only, _friendly_fire_explosives_only } },
 	{ "friendly_fire_penalty_spinner", _option_short, OPTIONS_FIELD(friendly_fire_penalty), 0, 4, { 0, 5, 10, 15 } },
 	{ "autobalance_spinner", _option_option_byte, OPTIONS_FIELD(auto_team_balance), 0, 2, { 0, 1 } },
+	/* (port: spawns as CTF's, game_engine.c; the first of
+	tools/port_settings.py's TEAMPLAY_ROWS, the gametype's own) */
+	{ "force_team_spawns_spinner", _option_option_byte, OPTIONS_FIELD(force_team_spawns), 0, 2, { 0, 1 } },
 	/* (the host's voice chat, below them: port/linux/game/network_voice.c;
 	tools/port_settings.py's TEAMPLAY_ROWS) */
 	{ "voice_mode_spinner", _option_setting, 0, 0, 5, { 0 }, "network.voice_mode",
@@ -9134,18 +9217,6 @@ static struct gametype_option const gametype_options[] =
 		{ 0, 30, 60, 90, 120, 180, 300 } },
 };
 
-/* TEXT CHAT's (network.text_chat) OFF, which it shows while the game is
-listed in the server browser, and its host cannot change: a listed game has
-no text chat whatever the setting (network_chat.c), which is kept for a
-private game or a LAN one */
-#define TEXT_CHAT_SPINNER "text_chat_spinner"
-#define TEXT_CHAT_OFF 2
-
-static boolean text_chat_locked(struct gametype_option const *option)
-{
-	return !strcmp(option->spinner, TEXT_CHAT_SPINNER) && p2p_hosting_listed();
-}
-
 /* an option of the host's own setting: the value shown for it (the one
 set, else the nearest) */
 static short gametype_option_setting_index(struct gametype_option const *option)
@@ -9194,6 +9265,7 @@ static long gametype_option_value(struct gametype_option const *option, struct g
 	case _option_health: return (long)(variant->universal_variant.health * 10.0f + 0.5f);
 	case _option_short: return *(short *)(o + option->offset);
 	case _option_option_byte: return o[option->offset];
+	case _option_byte_value: return v[option->offset];
 	case _option_radar: return options->radar_players;
 	}
 	return 0;
@@ -9218,6 +9290,7 @@ static void gametype_option_value_set(struct gametype_option const *option, long
 	case _option_health: variant->universal_variant.health = (real)value / 10.0f; break;
 	case _option_short: *(short *)(o + option->offset) = (short)value; break;
 	case _option_option_byte: o[option->offset] = (byte)value; break;
+	case _option_byte_value: v[option->offset] = (byte)value; break;
 	case _option_radar:
 		/* (and the Xbox's flag: other players on the tracker or not) */
 		options->radar_players = (byte)value;
@@ -9281,10 +9354,9 @@ static void gametype_options_each(struct widget_instance *list, boolean save)
 					continue;
 				if (!save)
 				{
-					spinner->parameters.list.selected_index = text_chat_locked(option) ? TEXT_CHAT_OFF :
-						gametype_option_setting_index(option);
+					spinner->parameters.list.selected_index = gametype_option_setting_index(option);
 				}
-				else if (!text_chat_locked(option) && index != gametype_option_setting_index(option) &&
+				else if (index != gametype_option_setting_index(option) &&
 					!setting_write(option->setting, option->setting_values[index]))
 				{
 					platform_log("menus: could not set %s", option->setting);
@@ -9325,10 +9397,9 @@ static void setting_options_each(struct widget_instance *list, boolean save)
 			index = (short)PIN(spinner->parameters.list.selected_index, 0, option->count - 1);
 			if (!save)
 			{
-				spinner->parameters.list.selected_index = text_chat_locked(option) ? TEXT_CHAT_OFF :
-					gametype_option_setting_index(option);
+				spinner->parameters.list.selected_index = gametype_option_setting_index(option);
 			}
-			else if (!text_chat_locked(option) && index != gametype_option_setting_index(option) &&
+			else if (index != gametype_option_setting_index(option) &&
 				!setting_write(option->setting, option->setting_values[index]))
 			{
 				platform_log("menus: could not set %s", option->setting);
@@ -9726,9 +9797,6 @@ static void gametype_option_help(struct widget_instance *list)
 		visible_set(named(list, "op_bot_fill_to", 0),
 			named(list, "bot_make_room_spinner", 0)->parameters.list.selected_index == 0);
 	}
-	/* (TEXT CHAT held at OFF while the game is listed: text_chat_locked) */
-	if (named(list, TEXT_CHAT_SPINNER, 0) && p2p_hosting_listed())
-		named(list, TEXT_CHAT_SPINNER, 0)->parameters.list.selected_index = TEXT_CHAT_OFF;
 	/* CO-OP OPTIONS: enemies, pickups and vehicles share the amount rows.
 	Mixed modes may need both rows at once. */
 	if (named(list, "coop_extra_enemies_spinner", 0))
@@ -9853,6 +9921,12 @@ static void gametype_engine_name(struct widget_instance *text_box)
 
 /* ---------- public code */
 
+/* (network_host_game.c's) a map's name as the lobby shows it */
+void menu_map_shown(char const *level, wchar_t *text, short size)
+{
+	lobby_board_map_text(level, text, size);
+}
+
 boolean pc_menu_event_function_invoke(
 	struct widget_instance *widget,
 	struct event_record *event,
@@ -9930,7 +10004,7 @@ boolean pc_menu_event_function_invoke(
 				/* (said on the screen too: not a silent dead end) */
 				display_error_text_deferred(player_ui_get_active_player_profile_index(0) == NONE ?
 					L"Choose a player profile\r\nfirst (Profiles, on the\r\nmain menu)." :
-					L"The game could not be\r\nstarted: another program\r\nmay be using its network\r\nport.",
+					L"Couldn't start the game.\r\nClose any other copy of\r\nOpenH1 or Halo, then try\r\nagain.",
 					NONE);
 				return campaign_fail();
 			}
@@ -10224,6 +10298,10 @@ boolean pc_menu_event_function_invoke(
 		else if (!strcmp(name, "port host action"))
 		{
 			return host_controls_action(widget);
+		}
+		else if (!strcmp(name, "port host back"))
+		{
+			return host_controls_back();
 		}
 		/* (the computer's lobby: lobby_menu.inc) */
 		else if (!strcmp(name, "port lobby team red") || !strcmp(name, "port lobby team blue") ||

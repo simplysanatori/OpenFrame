@@ -2693,12 +2693,48 @@ static struct widget_instance *widget_instance_find_by_tag_index_recursive(
 	return result;
 }
 
+/* port: giving the focus clears focused_child all along the old focus's path,
+then links only the new focus's parents. Backing out of a screen does that: it
+loads the screen, focused on its first row, then focuses the row you left it
+from, so the first row is left with no focused child. A row that only passes
+events on (a setting's row and its spinner, a lobby row) then passes the d-pad,
+keys and buttons to nothing when it has the focus again, and only the mouse,
+which focuses the spinner itself, could change it. Such a row gets its first
+child that takes events back, as it had when its screen was loaded, whenever
+it takes the focus (here, and the d-pad's widget_instance_tab_to_*) */
+static void widget_instance_refocus_passthrough(
+	struct widget_instance *widget)
+{
+	struct widget_instance *child;
+	long flags;
+
+	if (!widget || widget->focused_child || widget_instance_can_handle_events(widget))
+		return;
+	flags = ui_widget_definition_get(widget->definition_tag_index)->flags;
+	if (!TEST_FLAG(flags, _widget_pass_unhandled_events_to_children_bit) ||
+		TEST_FLAG(flags, _widget_dont_focus_a_specific_child_bit))
+	{
+		return;
+	}
+	for (child = widget->child; child; child = child->next)
+	{
+		if (widget_instance_can_handle_events(child))
+		{
+			widget->focused_child = child;
+			break;
+		}
+	}
+
+	return;
+}
+
 static void widget_instance_give_focus_directly(
 	struct widget_instance *widget,
 	struct widget_instance *new_focus)
 {
 	struct widget_instance *focused_child =
 		widget_instance_get_topmost_parent(widget)->focused_child;
+	struct widget_instance *leaf;
 
 	if (new_focus->disabled == TRUE)
 	{
@@ -2728,6 +2764,7 @@ static void widget_instance_give_focus_directly(
 		if (substitute)
 			new_focus = substitute;
 	}
+	leaf = new_focus;
 	if (focused_child)
 	{
 		if (new_focus &&
@@ -2735,6 +2772,7 @@ static void widget_instance_give_focus_directly(
 			focused_child->parent)
 		{
 			new_focus->parent->focused_child = new_focus;
+			widget_instance_refocus_passthrough(leaf);
 
 			return;
 		}
@@ -2749,6 +2787,7 @@ static void widget_instance_give_focus_directly(
 		new_focus->parent->focused_child = new_focus;
 		new_focus = new_focus->parent;
 	}
+	widget_instance_refocus_passthrough(leaf);
 
 	return;
 }
@@ -5914,6 +5953,10 @@ static void widget_instance_render_spinner_list(
 /* port/linux/game/menu_functions.c's: a text box drawn, at the bounds its
 text was drawn in (the lobby's speaker icons) */
 void menu_functions_text_box_drawn(struct widget_instance *widget, rectangle2d const *bounds);
+/* port/linux/game/menu_functions.c's: a finger that went down on the item
+at x and then sideways taken by it (a settings slider's track: the finger,
+held, drags it), the item's row to choose, or NULL */
+struct widget_instance *menu_functions_finger_down(struct widget_instance *item, short x);
 
 /* ---------- the mouse (desktop builds)
 
@@ -7084,6 +7127,12 @@ static short ui_widget_port_pointer_x;
 static short ui_widget_port_click_x, ui_widget_port_click_y;
 static unsigned long ui_widget_port_click_time;
 static boolean ui_widget_port_click_taken = TRUE;
+/* port: the finger is a slider's (menu_functions_finger_down): its drag
+steps no list until it lifts and its steps have all come. A finger is the
+slider's only once its first move is sideways (touch_menu.h's held), so
+that one on the track that goes up or down scrolls the list and changes
+no value; a tap is a click, which chooses the row first */
+static boolean ui_widget_port_finger_taken;
 
 boolean ui_widget_port_pointer(
 	short *x)
@@ -7154,6 +7203,7 @@ static void ui_widgets_process_mouse(
 	short controller_index = 0;
 	boolean pointer_active;
 	boolean keyboard_active;
+	boolean was_held = ui_widget_port_pointer_held;
 
 	ui_debug_frame++;
 	pointer_active = halo_ui_pointer_update(ui_mouse_menus_active(), &pointer) != 0;
@@ -7209,6 +7259,25 @@ static void ui_widgets_process_mouse(
 		}
 		if (pointer.right_clicks)
 			ui_mouse_press(_widget_event_b_button);
+		/* port: (ui_widget_port_finger_taken) at the finger's first move
+		sideways, by where it went down */
+		if (pointer.touch && pointer.left_held && !was_held)
+		{
+			struct widget_instance *row;
+
+			target = ui_mouse_target_at(pointer.down_x, pointer.down_y);
+			row = target && target->kind == _ui_mouse_target_item ?
+				menu_functions_finger_down(target->widget, pointer.down_x) : NULL;
+			ui_widget_port_finger_taken = row != NULL;
+			if (row)
+				ui_mouse_give_focus(row);
+		}
+		else if (!pointer.left_held && !pointer.wheel_steps)
+		{
+			ui_widget_port_finger_taken = FALSE;
+		}
+		if (pointer.touch && ui_widget_port_finger_taken)
+			pointer.wheel_steps = 0;
 		if (pointer.wheel_steps && ui_mouse_menu())
 		{
 			boolean touch = pointer.touch != 0;
@@ -8059,6 +8128,8 @@ static void widget_instance_tab_to_next_valid_widget(
 				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
+			/* port: (widget_instance_refocus_passthrough) */
+			widget_instance_refocus_passthrough(child);
 			break;
 		}
 		child = child->next;
@@ -8101,6 +8172,8 @@ static void widget_instance_tab_to_previous_valid_widget(
 				widget_instance_port_is_label(child)))
 		{
 			widget->focused_child = child;
+			/* port: (widget_instance_refocus_passthrough) */
+			widget_instance_refocus_passthrough(child);
 			break;
 		}
 		if (child->previous)

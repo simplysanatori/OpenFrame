@@ -635,6 +635,8 @@ def _page_screen(folder: str, screen: str) -> str:
 # (a <bitmap> name: TITLES), and for a tab its name
 ADVANCED = ("video_settings/advanced", "advanced_graphics_screen")
 FIRST_PERSON = ("video_settings/first_person", "first_person_screen")
+# (Android's: the picture on a tall screen, and portrait's frame)
+SCREEN_LAYOUT = ("video_settings/screen_layout", "screen_layout_screen")
 CONTROLLER = ("gamepad_setup", "gamepad_setup_screen")
 KEY_BINDINGS = ("controls_setup", "controls_settings_screen")
 STREAMER = ("interface_settings/streamer_mode", "streamer_mode_screen")
@@ -676,6 +678,13 @@ PAGES = {
             ("FIELD OF VIEW", "display.fov", FIELDS_OF_VIEW,
              "How wide you see on foot, in degrees across a 16:9 screen. Default keeps the Xbox's view; wider shows "
              "more around you.", None),
+            ("ORIENTATION", "display.orientation",
+             [("LANDSCAPE", "landscape"), ("PORTRAIT", "portrait"), ("AUTO", "auto")],
+             "Which way up you hold the device. Portrait has a strip of buttons along the top, the picture under "
+             "it and the touch controls below it. Auto turns with the device.", "android"),
+            ("SCREEN LAYOUT ›", None, _page_screen(*SCREEN_LAYOUT),
+             "Where the picture sits on a screen taller than it, its shape, and the frame around it in portrait.",
+             "android"),
             ("FIRST PERSON ›", None, _page_screen(*FIRST_PERSON),
              "Your weapon's field of view and whether it is drawn, your legs and arms, your shield's color, and the "
              "view from a vehicle's passenger seat.", None),
@@ -832,8 +841,6 @@ PAGES = {
              "menus' button artwork.", None),
             ("HIGH-RES TEXT", "display.high_res_text", ON_OFF,
              "Draws text and titles with sharp high-resolution fonts. Off draws the game's own.", None),
-            ("MATCH TIMER", "display.match_timer", ON_OFF,
-             "Draws a clock at the bottom right in multiplayer, counting up from the start of the game.", None),
             (SECTION, "MULTIPLAYER"),
             ("PLAYER NAMES", "display.player_names",
              [("ALL", "all"), ("ALLIES", "allies"), ("ENEMIES", "enemies"), ("NONE", "none")],
@@ -845,6 +852,8 @@ PAGES = {
              "A team game's scoreboard: a column for each team, or every player in order of score.", None),
             ("SCOREBOARD PANEL", "display.scoreboard_background", ON_OFF,
              "Draws a dark panel behind the scoreboard, for clearer text.", None),
+            ("MATCH TIMER", "display.match_timer", ON_OFF,
+             "Draws a clock at the bottom right in multiplayer, counting up from the start of the game.", None),
             # (the text chat's: port/linux/game/network_chat.c)
             (SECTION, "CHAT"),
             ("TEXT CHAT", "display.text_chat", [("SHOW", "true"), ("HIDE", "false")],
@@ -984,6 +993,29 @@ PAGES = {
             CREATE_PROFILE,
         ],
     },
+    SCREEN_LAYOUT[0]: {
+        "screen": SCREEN_LAYOUT[1], "title": "SCREEN LAYOUT",
+        "rows": [
+            (SECTION, "PICTURE"),
+            # (display.picture_position: Android's, on a screen taller than the
+            # picture; d3d8_device.c's picture_top, the backend's present)
+            ("PICTURE POSITION", "display.picture_position",
+             [("CENTER", "center"), ("TOP", "top"), ("BOTTOM", "bottom")],
+             "Where the picture sits on a screen taller than it, such as a folding phone's inner screen or a "
+             "tablet. Top puts all the black space below it, where the touch controls are; Bottom puts it all "
+             "above. Portrait always has it "
+             "near the top, under the strip of buttons.", "android"),
+            ("PICTURE SHAPE", "display.picture_shape", [("4:3", "4:3"), ("16:9", "16:9")],
+             "The picture's shape on a screen taller than it. 4:3 is the Xbox's; 16:9 sees more to the sides and "
+             "leaves more of the screen to the touch controls.", "android"),
+            (SECTION, "PORTRAIT"),
+            # (display.frame_style: Android's, around the picture in portrait;
+            # TouchControls.java's drawFrame)
+            ("PORTRAIT FRAME", "display.frame_style", [("PLAIN", "plain"), ("HALO", "halo"), ("XBOX", "xbox")],
+             "The look of the screen around the picture when you play in portrait: plain black, Halo's blue lines "
+             "and rings, or Xbox green. It is never drawn over the picture.", "android"),
+        ],
+    },
     STREAMER[0]: {
         "screen": STREAMER[1], "title": "STREAMER MODE",
         "rows": [
@@ -1028,12 +1060,24 @@ CONTROL_ROWS = 7
 WIDE_SETTINGS = {"audio.output_device", "audio.input_device", "streamer.slurs", "streamer.swearing",
                  "streamer.insults"}
 
-# the host's voice chat and vote kicks, on Teamplay Options
-# (_teamplay_options_extras): each row's key, its label, its choices' words
-# (menu_functions.c's gametype_options give their settings' values) and
-# their helps
+# Teamplay Options' rows of the port's (_teamplay_options_extras): the
+# gametype's FORCE TEAM SPAWNS, then the host's voice chat and vote kicks;
+# each row's key, its label, its choices' words (menu_functions.c's
+# gametype_options give their values) and their helps
 TEAMPLAY_EDIT = "main_menu/settings_select/multiplayer_setup/teamplay_options_edit"
 VOICE_QUALITIES = (8, 12, 16, 24, 32, 48, 64)
+# (the rows' step: closer than the PC's 30px, so that all of Server Setup's
+# fit above the help text, which moves down to TEAMPLAY_HELP_TOP)
+TEAMPLAY_STEP = 26
+TEAMPLAY_HELP_TOP = 351
+# (game_engine.c's game_engine_force_team_spawns: the gametype's own, so
+# shown in Edit Gametypes' copy too, and not on Server Setup's VOICE OPTIONS)
+TEAMPLAY_GAMETYPE_ROWS = [
+    ("force_team_spawns", "FORCE TEAM SPAWNS:", ["OFF", "ON"], [
+        "Players will spawn at any spawn point the\\ngametype allows.",
+        "Players will only spawn at their own team's\\nCapture the Flag spawn points.",
+    ]),
+]
 TEAMPLAY_ROWS = [
     ("voice_mode", "VOICE CHAT:", ["OFF", "TEAM NEAR", "ANYONE NEAR", "TEAM", "TEAM, ENEMIES NEAR"], [
         "No voice chat during the game.",
@@ -1063,6 +1107,8 @@ TEAMPLAY_ROWS = [
         "No text chat in the game.",
     ]),
 ]
+# (Teamplay Options' rows of the port's, in order)
+TEAMPLAY_EXTRA_ROWS = TEAMPLAY_GAMETYPE_ROWS + TEAMPLAY_ROWS
 
 # the profile menu's words for what its items now open
 STRING_OVERRIDES = {
@@ -1856,6 +1902,44 @@ OPENCE_ROWS = [
 ]
 OPENCE_ITEM = f"{PLAYLIST_EDIT}/playlist_edit_opence_item"
 
+# Capture the Flag's KILLS SCORE and KILLS PER CAPTURE (game_engine_ctf.c)
+# and King of the Hill's MULTI-HILL (game_engine_king.c), OpenCE's (#467):
+# rows after each editor's own (_gametype_rules_extras), with their labels
+# after the PC version's and their helps before TIME LIMIT's (STRING_INSERTS),
+# and TIME LIMIT moved below them (ce_menus.py's CHILD_OFFSETS). Each screen:
+# its rows (each its key, its label, its spinner's words and their helps;
+# menu_functions.c's gametype_options give their values), its list, where
+# the first row goes, the index of its first label and of TIME LIMIT's first
+# help, and the PC version's look of its rows, which differs: the prefix of
+# its labels' and spinners' names (op_ and var_ have the key alone), its
+# labels' width and its spinners' words' offset
+CTF_EDIT = f"{PLAYLIST_EDIT}/ctf_edit"
+KOTH_EDIT = f"{PLAYLIST_EDIT}/koth_edit"
+CTF_KILLS_PER_CAPTURE = (5, 10, 15, 20, 25, 30, 40, 50, 75, 100)
+GAMETYPE_RULES_EXTRAS = {
+    CTF_EDIT: {"list": "ctf_options_menu", "labels": "ctf_labels", "helps": "cap_ctf", "y": 223,
+               "label_index": 6, "help_index": 17, "prefix": "", "label_width": 320, "text_y": 4, "rows": [
+        ("kills_score", "KILLS SCORE:", ["YES", "NO"], [
+            "Each kill scores a point for the killer's team (a\\nbetrayal takes one away), and each capture is "
+            "worth\\nKills per Capture. The limit is in captures.",
+            "Only flag captures score."]),
+        ("kills_per_capture", "KILLS PER CAPTURE:", [str(points) for points in CTF_KILLS_PER_CAPTURE], [
+            f"With Kills Score on, each flag capture is worth\\n{points} points (a kill is worth 1)."
+            for points in CTF_KILLS_PER_CAPTURE]),
+    ]},
+    KOTH_EDIT: {"list": "koth_options_menu", "labels": "koth_labels", "helps": "cap_koth", "y": 163,
+                "label_index": 3, "help_index": 9, "prefix": "koth_", "label_width": 300, "text_y": None, "rows": [
+        ("multi_hill", "MULTI-HILL:", ["OFF", "2", "3", "4", "5"], [
+            "There will be only one Hill at a time.",
+            "There will be two Hills at once. Holding either one\\nscores.",
+            "There will be three Hills at once. Holding any of\\nthem scores.",
+            "There will be four Hills at once. Holding any of\\nthem scores.",
+            "There will be five Hills at once. Holding any of\\nthem scores."]),
+    ]},
+}
+# (the rows' step, the PC version's)
+GAMETYPE_RULES_STEP = 30
+
 STRING_INSERTS = {
     # (the gametype editor's OPENCE OPTIONS' words, after the PC version's:
     # menu_functions.c's playlist_edit_description)
@@ -1865,9 +1949,15 @@ STRING_INSERTS = {
     f"{PLAYER_EDIT}/cap_player_options": [(28, AIM_ASSIST_HELP + SHIELD_EFFECTS_HELP)],
     # (Teamplay Options' voice chat and vote kick rows, after its own:
     # TEAMPLAY_ROWS)
-    f"{TEAMPLAY_EDIT}/teamplay_options_labels": [(3, [label for _, label, *_ in TEAMPLAY_ROWS])],
-    f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in TEAMPLAY_ROWS for text in helps])],
+    f"{TEAMPLAY_EDIT}/teamplay_options_labels": [(3, [label for _, label, *_ in TEAMPLAY_EXTRA_ROWS])],
+    f"{TEAMPLAY_EDIT}/cap_teamplay_options": [(10, [text for *_, helps in TEAMPLAY_EXTRA_ROWS for text in helps])],
     f"{SLAYER_EDIT}/var_kills_to_win": [(5, ["75", "100", "150", "200", "250", "500"])],
+    # (Capture the Flag's and King of the Hill's rows: GAMETYPE_RULES_EXTRAS)
+    **{f"{folder}/{screen['labels']}": [(screen["label_index"], [label for _, label, *_ in screen["rows"]])]
+       for folder, screen in GAMETYPE_RULES_EXTRAS.items()},
+    **{f"{folder}/{screen['helps']}": [(screen["help_index"], [text for *_, helps in screen["rows"]
+                                                               for text in helps])]
+       for folder, screen in GAMETYPE_RULES_EXTRAS.items()},
     f"{VEHICLE_EDIT}/var_vehicle_set": [(8, ["PC"])],
     f"{VEHICLE_EDIT}/cap_vehicle_options": [(17, [
         "Every vehicle the map places will spawn, as in\\nHalo PC.",
@@ -2148,12 +2238,21 @@ WIDGET_PATCHES = {
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_primary_weapon" x="54" y="223"/>',
             f'<child widget="main_menu/settings_select/multiplayer_setup/item_options_edit/op_secondary_weapon" x="54" y="253"/>',
         ]}},
-    # (Teamplay Options' voice chat and vote kick rows, over its buttons:
-    # Server Setup's only, _teamplay_options_extras)
+    # (Teamplay Options' FORCE TEAM SPAWNS, then its voice chat and vote kick
+    # rows, Server Setup's only, over its buttons: _teamplay_options_extras)
     f"{TEAMPLAY_EDIT}/teamplay_options_menu": {"insert_before": {
         f"{TEAMPLAY_EDIT}/teamplay_button_bar": [
-            f'<child widget="{TEAMPLAY_EDIT}/op_{key}" x="54" y="{163 + 30 * index}"/>'
-            for index, (key, *_) in enumerate(TEAMPLAY_ROWS)]}},
+            f'<child widget="{TEAMPLAY_EDIT}/op_{key}" x="54" y="{163 + TEAMPLAY_STEP * index}"/>'
+            for index, (key, *_) in enumerate(TEAMPLAY_EXTRA_ROWS)]}},
+    f"{TEAMPLAY_EDIT}/teamplay_options_help": {"set": {"top": TEAMPLAY_HELP_TOP,
+                                                       "height": 414 - TEAMPLAY_HELP_TOP}},
+    # (Capture the Flag's and King of the Hill's rows, before TIME LIMIT,
+    # which King of the Hill's list has of Capture the Flag's:
+    # _gametype_rules_extras)
+    **{f"{folder}/{screen['list']}": {"insert_before": {f"{CTF_EDIT}/op_time_limit": [
+        f'<child widget="{folder}/op_{key}" x="54" y="{screen["y"] + GAMETYPE_RULES_STEP * index}"/>'
+        for index, (key, *_) in enumerate(screen["rows"])]}}
+       for folder, screen in GAMETYPE_RULES_EXTRAS.items()},
 
     # (VR Setup, below About, in VR only: _vr_item)
     f"{PE}/profile_edit_select_list": {"insert_before": {
@@ -2379,7 +2478,7 @@ def _password_screen() -> list:
         "",
         "This game has a password. Type it, then press\\nEnter to join.",
         "That is not the game's password. Try again.",
-        "Could not join the game.",
+        "Couldn't join this game. Refresh the list, then\\ntry again.",
     ])
     lines = _screen(base, spec, [(f"{base}/op_password", None)], ["port password update"],
                     ['<on event="created" run="port password init"/>'], extra)
@@ -2909,6 +3008,10 @@ def _lobby_board(base: str) -> tuple:
                                            ("text_flags", "no_focus_test")], [])
     panel.append(f'<child widget="{base}/board_section_bots" x="{inner_left}" y="{top + 134}"/>')
     lines += _section(f"{base}/board_section_bots", "BOTS", inner, grown)
+    # (a network game's host: the game after it, its playlist's or a change
+    # asked for, in the bots' place: lobby_board_update)
+    lines += text("board_after_label", 134, 16, "ui\\small_ui", PART_DIM, "THEN", wide_layout=None)
+    lines += text("board_after", 150, 16, "ui\\small_ui", SETTINGS_BLUE)
     # (how the game is: the countdown, waiting for players, how another
     # player joins; up in the bots' place when it has none:
     # lobby_board_update)
@@ -2958,9 +3061,19 @@ def _lobby_board(base: str) -> tuple:
                           ("wide", wide(panel_grown))],
                          ['<on event="created" run="port setting load"/>', start,
                           '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
-    items += [f'<child widget="{base}/board_settings" x="{inner_left}" y="{top + 256}"/>',
+    items += [f'<child widget="{base}/board_host" x="{inner_left}" y="{top + 176}"/>',
+              f'<child widget="{base}/board_settings" x="{inner_left}" y="{top + 256}"/>',
               f'<child widget="{base}/board_start" x="{inner_left}" y="{top + 284}"/>',
               f'<child widget="{base}/board_prompts" y="414"/>']
+    # (a network game's host: Host Controls over the lobby, its players,
+    # map and gametype, playlist and bans before the game starts)
+    lines += _widget(f"{base}/board_host", [("type", "text"), ("width", inner), ("height", LOBBY_CONTROL_HEIGHT),
+                                            ("bitmap", part_outline(inner, LOBBY_CONTROL_HEIGHT)),
+                                            ("wide", controls), ("text", "HOST CONTROLS"),
+                                            ("font", "ui\\small_ui"), ("color", "#FFCFE3FF"), ("align", "center"),
+                                            ("text_y", 4)],
+                     [f'<on event="a" run="port host open" open="{HOST_CONTROLS}/host_controls_screen" '
+                      'branch="true"/>', start, '<on event="left_mouse" run="mouse emit accept event"/>'])
     lines += _widget(f"{base}/board_settings", [("type", "text"), ("width", inner), ("height", LOBBY_CONTROL_HEIGHT),
                                                 ("bitmap", part_outline(inner, LOBBY_CONTROL_HEIGHT)),
                                                 ("wide", controls), ("text", "GAME SETTINGS"),
@@ -3336,13 +3449,42 @@ def _opence_options() -> list:
     return lines
 
 
+def _gametype_rules_extras(folder: str) -> list:
+    """Capture the Flag's or King of the Hill's rows of the port's
+    (GAMETYPE_RULES_EXTRAS), as the PC version's rows of the screen are"""
+    screen = GAMETYPE_RULES_EXTRAS[folder]
+    lines = []
+    for index, (key, _, strings, _) in enumerate(screen["rows"]):
+        name = f"{folder}/{screen['prefix']}{key}"
+        lines += _widget(f"{name}_label", [("type", "text"), ("controller", 1), ("width", screen["label_width"]),
+                                           ("height", 22), ("string_list", f"{folder}/{screen['labels']}"),
+                                           ("string_index", screen["label_index"] + index),
+                                           ("font", "ui\\large_ui"), ("color", "#FF2896FF"), ("text_x", 13),
+                                           ("text_y", 4)], [])
+        lines += _widget(f"{name}_spinner",
+                         [("type", "spinner"), ("left", 2), ("top", 2), ("width", 148), ("height", 20),
+                          ("flags", "pass_unhandled_to_focused_child left_right_tabs_items"),
+                          ("string_list", f"{folder}/var_{key}"), ("font", "ui\\large_ui"), ("color", "#FF2896FF"),
+                          ("align", "center"), ("text_y", screen["text_y"]), ("list_flags", "items_from_strings"),
+                          ("header_bitmap", "bitmaps/arrow_sm_left"), ("footer_bitmap", "bitmaps/arrow_sm_right"),
+                          ("header_bounds", "7 -6 19 0"), ("footer_bounds", "7 150 19 156")],
+                         ['<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+        lines += _widget(f"{folder}/op_{key}", [("width", 512), ("height", 28),
+                                                ("flags", "pass_unhandled_to_focused_child"),
+                                                ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
+                         [f'<child widget="{name}_label"/>', f'<child widget="{name}_spinner" x="320" y="1"/>'])
+        lines += _strings(f"{folder}/var_{key}", strings)
+    return lines
+
+
 def _teamplay_options_extras() -> list:
-    """Teamplay Options' rows of the port's: the host's voice chat
+    """Teamplay Options' rows of the port's: the gametype's FORCE TEAM
+    SPAWNS (game_engine.c), in both copies, then the host's voice chat
     (port/linux/game/network_voice.c) and vote kicks (network_votekick.c),
     in Server Setup's copy only (menu_functions.c's gametype_options_init),
     kept in config.toml"""
     lines = []
-    for index, (key, label, strings, _) in enumerate(TEAMPLAY_ROWS):
+    for index, (key, label, strings, _) in enumerate(TEAMPLAY_EXTRA_ROWS):
         lines += _widget(f"{TEAMPLAY_EDIT}/op_{key}", [("width", 512), ("height", 28),
                                                        ("flags", "pass_unhandled_to_focused_child"),
                                                        ("bitmap", "bitmaps/option_bkds"), ("color", "#FF2896FF")],
@@ -4570,7 +4712,8 @@ def _friends_add() -> list:
 # network game alone (menu_tags.c's pause_patch), laid out as the server
 # browser is (its rows, columns, panel and button: the menus' shared parts)
 HOST_CONTROLS = "main_menu/host_controls"
-HOST_TABS = [("tab_players", "PLAYERS"), ("tab_game", "GAME"), ("tab_bans", "BANS")]
+HOST_TABS = [("tab_players", "PLAYERS"), ("tab_game", "GAME"), ("tab_maps", "MAPS"), ("tab_playlist", "PLAYLIST"),
+             ("tab_bans", "BANS")]
 # the rows (the browser's), and each column's place and width in a row, with
 # its move and growth on a wide screen (the list BROWSER_WIDE_LIST wider): a
 # player's name, team, score, ping and tag (a pill: HOST, BOT, OPENH1,
@@ -4609,7 +4752,8 @@ def _host_controls() -> list:
     lines = _widget(f"{base}/host_controls_screen",
                     [("width", 640), ("height", 480), ("flags", "pass_unhandled_to_focused_child"),
                      ("bitmap", "bitmaps/gradient")],
-                    ['<on event="b" back="true"/>', '<on event="back" back="true"/>',
+                    ['<on event="b" run="port host back" back="true"/>',
+                     '<on event="back" run="port host back" back="true"/>',
                      '<on event="white" run="port host tab previous"/>',
                      '<on event="black" run="port host tab next"/>',
                      f'<child widget="{base}/header_host_controls"/>',
@@ -4870,7 +5014,8 @@ def touch_sizes() -> dict:
                for *_, width, _ in prompts}
     buttons |= {(panel_inner, TOUCH_TAP), (TOUCH_HOST_BACK[1], TOUCH_TAP)}
     return {
-        "chip": sorted({(TOUCH_CHIP_WIDTHS[count], TOUCH_TAP) for count in TOUCH_CHIP_WIDTHS}),
+        "chip": sorted({(TOUCH_CHIP_WIDTHS[count], TOUCH_TAP) for count in TOUCH_CHIP_WIDTHS} |
+                       {(TOUCH_HOST_CHIP_WIDTH, TOUCH_TAP)}),
         "row": [(TOUCH_LIST_WIDTH, TOUCH_TAP)],
         "tile": sorted({TOUCH_TILE, (TOUCH_HUB_WIDTH, TOUCH_TAP), (TOUCH_LOBBY_PANEL[2] - 28, TOUCH_TAP)}),
         "button": sorted(buttons),
@@ -4920,17 +5065,18 @@ def touch_pictures() -> list:
     return pictures
 
 
-# the chips' widths for a strip of so many (the browser's five, Host
-# Controls' three beside BACK), TOUCH_GAP + 2 apart
-TOUCH_CHIP_WIDTHS = {6: 92, 5: 112, 3: 116}
+# the chips' widths for a strip of so many (the browser's five), TOUCH_GAP + 2
+# apart; Host Controls' five over its list alone
+TOUCH_CHIP_WIDTHS = {6: 92, 5: 112}
+TOUCH_HOST_CHIP_WIDTH = 68
 
 
-def _touch_chips(base: str, strip: str, tabs: list, handlers: list, span: int) -> list:
+def _touch_chips(base: str, strip: str, tabs: list, handlers: list, span: int, width: int = None) -> list:
     """a strip of tabs as chips (a column list whose name ends "_tabs", as
     menu_tabs_show knows it): each its words, TOUCH_TAP tall, spread over
     span of the 640's width and each its part wider on a wide screen; a tap
     runs the handlers"""
-    width = TOUCH_CHIP_WIDTHS[len(tabs)]
+    width = width or TOUCH_CHIP_WIDTHS[len(tabs)]
     step = width + TOUCH_GAP + 2
     grown = span * WIDE_EXTRA // 584 // len(tabs)
     lines = _widget(f"{base}/{strip}", [("type", "column_list"), ("width", 640), ("height", TOUCH_TAP),
@@ -5254,6 +5400,8 @@ def _touch_lobby_board(base: str) -> tuple:
         panel.append(f'<child widget="{base}/{name}" x="{inner_left + x}" y="{top + y}"/>')
     panel.append(f'<child widget="{touch}/board_section_bots" x="{inner_left}" y="{top + 120}"/>')
     lines += _section(f"{touch}/board_section_bots", "BOTS", inner, grown)
+    lines += text("board_after_label", 120, 16, "ui\\small_ui", PART_DIM, "THEN")
+    lines += text("board_after", 136, 16, "ui\\small_ui", SETTINGS_BLUE)
     lines += text("board_status", height - 24, 24, "ui\\small_ui", SETTINGS_BLUE)
     lines += text("board_waiting", 142, LOBBY_START[1], "ui\\large_ui", SETTINGS_BLUE, align="center")
     lines += _widget(f"{touch}/board_panel", [("controller", 1), ("left", left), ("top", top), ("width", width),
@@ -5290,6 +5438,13 @@ def _touch_lobby_board(base: str) -> tuple:
                           ("wide", wide(0, panel_grown))],
                          ['<on event="created" run="port setting load"/>', start,
                           '<on event="left_mouse" run="mouse spinner 1wide click"/>'])
+    items.append(f'<child widget="{touch}/board_host" x="{inner_left}" y="{top + 160}"/>')
+    lines += _widget(f"{touch}/board_host", [("type", "text"), ("width", inner), ("height", TOUCH_TAP),
+                                             ("bitmap", touch_tile(inner, TOUCH_TAP)), ("wide", controls),
+                                             ("text", "HOST CONTROLS"), ("font", "ui\\small_ui"),
+                                             ("color", "#FFFFFFFF"), ("align", "center"), ("text_y", 19)],
+                     [f'<on event="a" run="port host open" open="{HOST_CONTROLS}/host_controls_screen" '
+                      'branch="true"/>', start, '<on event="left_mouse" run="mouse emit accept event"/>'])
     items.append(f'<child widget="{touch}/board_prompts" y="{TOUCH_FOOTER_TOP}"/>')
     lines += _widget(f"{touch}/board_list", [("type", "column_list"), ("width", 640), ("height", 480),
                                              ("flags", "pass_unhandled_to_focused_child up_down_tabs_items")],
@@ -5340,9 +5495,11 @@ def _touch_host_controls() -> tuple:
                      ['<data input="port host update"/>', '<on event="created" run="port host init"/>',
                       f'<child widget="{touch}/host_tabs" y="{TOUCH_CHIPS_TOP}"/>', *rows, *actions,
                       f'<child widget="{touch}/host_prompts" y="{TOUCH_FOOTER_TOP}"/>'])
-    lines += _touch_chips(touch, "host_tabs", HOST_TABS, ['<on event="a" run="port host tab"/>',
+    # (PLAYLIST as UP NEXT, which a chip a fifth of the list wide holds)
+    tabs = [(name, "UP NEXT" if name == "tab_playlist" else words) for name, words in HOST_TABS]
+    lines += _touch_chips(touch, "host_tabs", tabs, ['<on event="a" run="port host tab"/>',
                                                           '<on event="start" run="port host tab"/>'],
-                          TOUCH_LIST_WIDTH)
+                          TOUCH_LIST_WIDTH, TOUCH_HOST_CHIP_WIDTH)
     lines += _touch_prompts(touch, "host_prompts", [("prompt_back", "BACK", back_x, back_w,
                                                      '<on event="a" run="mouse emit back event"/>')])
     for row in range(1, TOUCH_HOST_ROWS + 1):
@@ -5421,6 +5578,8 @@ def multiplayer_files() -> dict:
         "main_menu/settings_select/multiplayer_setup/item_options_edit".replace("/", ".") + ".port.xml": head + _item_options_extras() + ["</menus>", ""],
         PLAYER_EDIT.replace("/", ".") + ".port.xml": head + _player_options_extras() + ["</menus>", ""],
         TEAMPLAY_EDIT.replace("/", ".") + ".port.xml": head + _teamplay_options_extras() + ["</menus>", ""],
+        **{folder.replace("/", ".") + ".port.xml": head + _gametype_rules_extras(folder) + ["</menus>", ""]
+           for folder in GAMETYPE_RULES_EXTRAS},
         OPENCE_EDIT.replace("/", ".") + ".port.xml": head + _opence_options() + ["</menus>", ""],
         MODS.replace("/", ".") + ".xml": [head[0], "<!-- The port's Mods screen, in the PC version's style "
                                           "(tools/port_settings.py) -->", head[2]] + _mods() + ["</menus>", ""],

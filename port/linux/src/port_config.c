@@ -334,6 +334,33 @@ static const struct config_setting config_settings[] =
 		"kept in the app's caches folder. \"auto\" by default on iOS; \"off\" on\n"
 		"Android, where it is yet to be checked on a device (try \"auto\"). Read\n"
 		"by the host from the file, at the start (port/linux/astc/xgpu_astc.h)." },
+	{ "display.picture_position", _config_string, "\"center\"", "HALO_PICTURE_POSITION", _environment_value,
+		_platform_android,
+		"Where the game's picture sits on a screen taller than it (a folding\n"
+		"phone's inner screen, a tablet, a window in split screen): \"center\",\n"
+		"with black above and below, \"top\", with all the black below it,\n"
+		"where the touch controls under the thumbs are, or \"bottom\", with all\n"
+		"the black above it. A window taller than it\n"
+		"is wide (portrait) has the picture under the touch controls' top strip\n"
+		"(lowered into the space above the controls when there is room)." },
+	{ "display.orientation", _config_string, "\"landscape\"", "HALO_ORIENTATION", _environment_value,
+		_platform_android,
+		"Which way up the game is held, changing at once: \"landscape\",\n"
+		"\"portrait\", with a strip along the top for back, pause and the touch\n"
+		"toolbar, the picture under it and the touch controls in the space\n"
+		"below it (display.picture_shape, display.frame_style), or \"auto\",\n"
+		"whichever way the device is held (as its own rotation lock allows)." },
+	{ "display.picture_shape", _config_string, "\"4:3\"", "HALO_PICTURE_SHAPE", _environment_value,
+		_platform_android,
+		"The picture's shape on a screen taller than it (portrait, a folding\n"
+		"phone's inner screen, a tablet): \"4:3\", the Xbox's, or \"16:9\", wider\n"
+		"and shorter, which sees more to the sides and leaves more of the screen\n"
+		"to the touch controls." },
+	{ "display.frame_style", _config_string, "\"plain\"", "HALO_FRAME_STYLE", _environment_value,
+		_platform_android,
+		"The look of the screen around the picture in portrait: \"plain\" black,\n"
+		"\"halo\" (navy, with the HUD's cyan lines and rings) or \"xbox\" (ribbed\n"
+		"black, with green). It is never drawn over the picture." },
 
 	{ "audio.enabled", _config_boolean, "true", "HALO_NO_AUDIO", _environment_set_is_false, _platform_all,
 		"Play sound." },
@@ -944,6 +971,11 @@ static const struct config_setting config_settings[] =
 		"The touch controls' swipe aiming gets a controller's aim assist: the\n"
 		"aim slows over a target and follows a moving one. false: none, as a\n"
 		"mouse (the bullets' own autoaim stays)." },
+	{ "input.touch_crouch", _config_string, "\"toggle\"", "HALO_TOUCH_CROUCH", _environment_value,
+		_platform_android | _platform_ios,
+		"The touch controls' Crouch: \"toggle\" crouches at a tap until Crouch\n"
+		"is tapped again, Jump is pressed, a vehicle's seat is taken or the\n"
+		"player dies; \"hold\" crouches while it is held." },
 	{ "input.mouse_sensitivity", _config_real, "5.73", "HALO_MOUSE_SENSITIVITY", _environment_value, _platform_desktop,
 		"How far the view turns for the mouse's movement, on " CONFIG_MOUSE_MARK " scale:\n"
 		"0.022 degrees a count of the mouse times this, with no acceleration,\n"
@@ -973,6 +1005,12 @@ static const struct config_setting config_settings[] =
 		"its light_show intensity, display.overshield_effect); \"players\": not\n"
 		"synced, each player sees their own settings'. SHIELD EFFECTS in Server\n"
 		"Setup > Player Options writes its choice here." },
+	{ "network.fire_origins", _config_boolean, "true", "HALO_NET_FIRE_ORIGINS", _environment_value, _platform_all,
+		"Host: whether a reported hit the shooter's camera had no line of sight\n"
+		"to may still count from where their machine says the shot left, when\n"
+		"that is not the camera (a VR build's hand: past a corner the camera is\n"
+		"behind), no further than a player leaning out and an arm, and in front\n"
+		"of the eye. false: from the camera and vehicles' guns only." },
 	{ "input.mouse_aim_assist", _config_boolean, "false", "HALO_MOUSE_AIM_ASSIST", _environment_value, _platform_desktop,
 		"Magnetism while aiming with the mouse, as with a controller: the view\n"
 		"slowed and dragged along by a target. The last of the mouse and the\n"
@@ -1272,9 +1310,13 @@ static const struct config_setting config_settings[] =
 		"to be heard by proximity voice chat (5 to 100)." },
 	{ "network.text_chat", _config_string, "\"on\"", "HALO_NET_TEXT_CHAT", _environment_value, _platform_all,
 		"Hosting: the text chat: \"on\" (links in lines are refused), \"links\"\n"
-		"(links allowed) or \"off\", in either case. Always off in a game a\n"
-		"player hosts that is listed in the server browser (a public internet\n"
-		"game); a dedicated server's follows this setting, listed or not." },
+		"(links allowed) or \"off\", in either case; listed in the server\n"
+		"browser or not." },
+	{ "network.host_playlist", _config_string, "\"\"", "HALO_NET_HOST_PLAYLIST", _environment_value, _platform_all,
+		"Hosting: the games played one after another when you host, each after\n"
+		"the last one's scores (Host Controls' PLAYLIST): map[:gametype\n"
+		"[+rule=value...]], separated by commas, as server.rotation has them.\n"
+		"Empty: you pick each game." },
 	{ "network.votekick", _config_boolean, "true", "HALO_NET_VOTEKICK", _environment_value, _platform_all,
 		"Hosting: let the players vote to kick a player (the scoreboard's\n"
 		"right-click, or the console's votekick). More than half of the players\n"
@@ -1661,6 +1703,11 @@ static const struct config_setting config_settings[] =
 		"every player of debug.network_test_cue_players has a unit:\n"
 		"\"<second> <line>|<second> <line>...\" (the host's, or a game of one\n"
 		"machine)." },
+	{ "debug.network_test_lobby_cues", _config_string, "\"\"", "HALO_NETWORK_TEST_LOBBY_CUES", _environment_value,
+		_platform_all,
+		"Console lines an automated test's host runs in its first lobby, at their\n"
+		"second of its setup, before debug.network_test_start starts the game:\n"
+		"\"<second> <line>|<second> <line>...\"." },
 	{ "debug.network_test_cue_players", _config_integer, "1", "HALO_NETWORK_TEST_CUE_PLAYERS", _environment_value,
 		_platform_all,
 		"The players debug.network_test_cues waits for." },
@@ -3297,6 +3344,10 @@ static const struct
 	{ "display.resolution_scaling", { "native", "original", NULL }, NULL },
 	{ "display.anti_aliasing", { "off", "fxaa", "smaa", "ssaa2x", "msaa2x", "msaa4x", "msaa8x", NULL }, NULL },
 	{ "display.astc_textures", { "auto", "always", "off", NULL }, NULL },
+	{ "display.picture_position", { "center", "top", "bottom", NULL }, NULL },
+	{ "display.orientation", { "landscape", "portrait", "auto", NULL }, NULL },
+	{ "display.picture_shape", { "4:3", "16:9", NULL }, NULL },
+	{ "display.frame_style", { "plain", "halo", "xbox", NULL }, NULL },
 	{ "display.hud_button_style", { "classic", "gems", "menu_gems", NULL }, NULL },
 	{ "display.menus", { "pc", "xbox", NULL }, NULL },
 	{ "display.player_names", { "all", "allies", "enemies", "none", NULL }, NULL },
@@ -3309,6 +3360,7 @@ static const struct
 	{ "audio.spatial", { "auto", "headphones", "speakers", NULL }, "auto" },
 	{ "audio.voice_chat", { "push_to_talk", "open_mic", "off", NULL }, NULL },
 	{ "input.touch_controls", { "auto", "on", "off", NULL }, NULL },
+	{ "input.touch_crouch", { "toggle", "hold", NULL }, NULL },
 	{ "input.button_prompts", { "auto", "controller", "keyboard", NULL }, NULL },
 	{ "input.zoom_sensitivity", { "cs2", "halo", NULL }, "cs2" },
 	{ "game.console_log", { "important", "all", "none", NULL }, NULL },

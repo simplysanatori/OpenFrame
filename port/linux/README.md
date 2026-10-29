@@ -473,28 +473,72 @@ END GAME ends the game as its time limit does: the players stay, and after
 the carnage report the host picks the next map and gametype (PICK GAME).
 
 HOST CONTROLS is the host's of a network game (internet or LAN), laid out as
-the server browser is, over the game dimmed and without its HUD, with three
-tabs:
+the server browser is, over the game dimmed and without its HUD, and in the
+lobby too (its HOST CONTROLS, in the details panel, before the game starts),
+with five tabs:
 
 - PLAYERS: everyone in the game, with their team, score, ping and a tag
   (HOST, BOT, OPENH1 or OPENCE; in a Legacy game the host cannot tell OpenH1's
-  players from OpenCE's). For the player chosen: KICK, BAN (pressed twice),
-  MOVE TO RED or BLUE, and MUTE FOR ALL (their text chat and voice, for
-  everyone). The host's own players are never kicked, banned or muted; KICK
-  on a bot takes it out, one bot fewer (`bots.count`). A team
-  move is offered in an OpenH1 game of teams with no OpenCE player: the
-  player dies (no death counted) and respawns on the other team.
+  players from OpenCE's). For the player chosen: KICK, BAN... (then BAN FOR
+  AN HOUR, BAN FOR A DAY or BAN FOR GOOD, with ADD A REASON to type why
+  first), MOVE TO RED or BLUE, and MUTE... (then for 10 minutes, an hour or
+  a day; their text chat and voice, for everyone) or UNMUTE. The host's own
+  players are never kicked, banned or muted; KICK on a bot takes it out, one
+  bot fewer (`bots.count`). In the lobby every player can be moved, OpenCE's
+  too. In a game a team move is offered in an OpenH1 game of teams with no
+  OpenCE player: the player dies (no death counted) and respawns on the
+  other team.
 - GAME: END GAME NOW and RESTART ROUND (each pressed twice; a restart starts
-  the same map and gametype again after a few seconds in the lobby), LOCK
-  TEAMS (players cannot switch teams in the lobby; the host still moves
-  them), ALLOW VOTEKICK (`network.votekick`), LISTING (a public internet
-  game's PUBLIC or PRIVATE), MAX PLAYERS (left and right; never fewer than
-  are in the game) and ALLOW OPENCE PLAYERS (an OpenH1 game's, for new
-  joins), then, in a gametype the bots play, the bots' rows: BOTS, BOT
-  SKILL, BOT TEAMS, MAKE ROOM FOR PLAYERS and (with it on) FILL TO, each
-  written to `config.toml` as it changes, which the game takes at once
-  (refer to "Bots").
+  the same map and gametype again after a few seconds in the lobby), CHANGE
+  MAP... (the MAPS tab; its value the game that plays next), SHUFFLE TEAMS
+  (at random, as many on each) and BALANCE TEAMS (as many on each, moving as
+  few as it can; in a game, by score too), each pressed twice in a game,
+  where those moved die and respawn; ANNOUNCE... (type a message every
+  player sees, as a dedicated server's notice; in a game only), SCORE LIMIT
+  and TIME LIMIT (left and right: in the lobby they change its game at once;
+  during a game they wait for the next one, which the row says), PASSWORD (a
+  public internet game's, typed: at once, for new joins), LOCK TEAMS
+  (players cannot switch teams in the lobby; the host still moves them),
+  ALLOW VOTEKICK (`network.votekick`), LISTING (a public internet game's
+  PUBLIC or PRIVATE), MAX PLAYERS (left and right; never fewer than are in
+  the game) and ALLOW OPENCE PLAYERS (an OpenH1 game's, for new joins), then,
+  in a gametype the bots play, the bots' rows: BOTS, BOT SKILL, BOT TEAMS,
+  MAKE ROOM FOR PLAYERS and (with it on) FILL TO, each written to
+  `config.toml` as it changes, which the game takes at once (refer to
+  "Bots").
+- MAPS: the gametype (left and right step it: the built-in gametypes,
+  OpenCE's and those you saved, Create Game's CUSTOM, which entries name
+  `saved=<name>`: its letters and digits, lowered, `_` between them, as
+  `saved=my_ctf_2` for "My CTF #2"), then every multiplayer map, the Xbox's and Custom Edition's
+  (`custom_maps`; map sharing gives them to the players without them). For
+  the map chosen: PLAY NOW (in a game, pressed twice: the game ends with no
+  scores, and every machine goes through the lobby to the new one), AFTER
+  THIS GAME (its scores, then the lobby with it, which starts by itself)
+  and ADD TO PLAYLIST. In the lobby PLAY IN THIS LOBBY sets the lobby's game.
+- PLAYLIST: the games `network.host_playlist` holds, the next marked, and
+  first a change asked for (NEXT, with CANCEL CHANGE). After each game's
+  scores the next one is set in the lobby and its countdown starts; a change
+  asked for comes first, and the playlist goes on after it. For the game
+  chosen: PLAY NOW, AFTER THIS GAME, REMOVE and CLEAR PLAYLIST (pressed
+  twice). The lobby shows the game after the next one (THEN), and every
+  player is told the next game as the scores show.
 - BANS: `bans.txt`'s players, when they were banned and why, and UNBAN.
+
+The host's console has the same: `host_map <map> [gametype]` plays a game
+now (as PLAY NOW; in the lobby, at once), `host_map_next <map> [gametype]`
+after this game, `host_playlist [entries]` shows or replaces the playlist,
+`host_playlist_add <map> [gametype]`, `host_playlist_remove <number>` and
+`host_playlist_clear` change it (entries as `server.rotation`'s:
+`bloodgulch:ctf+score=5`, `custom_maps\<name>`), `host_say <words>` (and the
+chat's `/say <words>`) tells everyone, `host_shuffle_teams` and
+`host_balance_teams` arrange the teams, `host_score_limit <score>` and
+`host_time_limit <minutes>` set the limits, and `ban <player> [30m|2h|7d|1w|forever]
+[reason]` bans for a while and says why (the duration with its unit).
+A co-op game has none of the map changes and no playlist: its next game is
+the campaign's next level. A list of more than 512 maps leaves the rest out,
+and MAPS says how many. Nothing new goes to the other machines: a map change is the lobby's own, a
+notice OpenCE knows, so OpenCE players in a Legacy game see it all as any
+host's.
 
 The scoreboard's player menu (a right click on a name) offers the host the
 same: Mute for everyone, Kick, Ban (picked twice), Move to the other team,
@@ -631,6 +675,34 @@ the rest of the game. The lobby and Server Setup name the gametype's mode.
 `hardcore`, `hardcore_ctf`, `hardcore_oddball` and `hardcore_king`
 (`host:bloodgulch:infection`).
 
+Three more options of OpenCE's (its pull request #467, by s3anyboy) are in
+the gametype editor's own screens:
+
+- Capture the Flag's KILLS SCORE and KILLS PER CAPTURE: with Kills Score
+  on, each kill is a point for the killer's team (a betrayal takes one
+  away) and a capture is worth Kills per Capture (5 to 100, 25 by
+  default); CAPTURES TO WIN stays in captures, so a game of 3 captures at
+  25 is won at 75 points. Off, Capture the Flag scores captures alone. A
+  gametype of OpenCE's earlier CTF/Slayer type is Capture the Flag with
+  Kills Score on.
+- King of the Hill's MULTI-HILL: 2 to 5 hills at once (as many as the map
+  has), any of which a player holds scores; they move together with MOVING
+  HILL. OFF is the one hill.
+- Teamplay Options' FORCE TEAM SPAWNS: a team game other than Capture the
+  Flag spawns each player only at their own team's Capture the Flag spawn
+  points (not on a map without them for both teams).
+
+They are kept in the gametype (Kills Score and Multi-Hill in its game
+type's options, Force Team Spawns in its PC options), so a saved gametype
+and Host Controls' `saved=<name>` keep them, and the network game carries
+them to every machine in fields the earlier versions left empty: network
+version 39 is unchanged, and OpenCE's builds play them with this one. The
+host sends Multi-Hill's other hills after King of the Hill's state, as
+OpenCE's host does. A dedicated server's gametype files and the rotation
+take them as `kills_score`, `points_per_capture` (`[ctf]`), `multi_hill`
+(`[king]`) and `force_team_spawns` (`[options]`):
+`bloodgulch:ctf+kills_score=true+points_per_capture=10`.
+
 ## Settings
 
 The settings are in `config.toml` in the game's folder (the release's
@@ -693,7 +765,7 @@ the setting for one start of the game. It has priority over the file.
 | `display.menu_language` | `"maps"` | `HALO_MENU_LANGUAGE` | The PC menus' language. `"maps"`: the language of the Custom Edition whose `loc.map` is in `custom_maps` (English without one). `"english"`: English. The port's own lines are English. |
 | `display.player_names` | `"all"` | `HALO_PLAYER_NAMES` | In multiplayer, whose names are drawn above their heads: `"all"`, `"allies"`, `"enemies"` or `"none"`. An ally's name is drawn above the triangle the game shows over teammates. An enemy's name shows only within the motion sensor's reach, while the enemy is in sight and not camouflaged, so it never shows where an enemy hides. The gametype's motion tracker setting also applies: no names if it shows no players, only allies' if it shows only friends. |
 | `display.player_name_scale` | `0.75` | `HALO_PLAYER_NAME_SCALE` | How large the players' names are drawn: `1.0` is three quarters of the size of the HUD's text, from `0.25` to `4`. With high-res text, larger names are rasterized at their size, so they stay sharp. |
-| `display.match_timer` | `false` | `HALO_MATCH_TIMER` | `true`: a multiplayer game draws its clock at the bottom right, counting up from the game's first tick, which the items' respawn periods count from too: a weapon is back on the map at every multiple of its period on the clock. Campaign and co-op have none. MATCH TIMER in Video Setup > Graphics. |
+| `display.match_timer` | `false` | `HALO_MATCH_TIMER` | `true`: a multiplayer game draws its clock at the bottom right, counting up from the game's first tick, which the items' respawn periods count from too: a weapon is back on the map at every multiple of its period on the clock. Campaign and co-op have none. MATCH TIMER in Settings > Interface, under Multiplayer. |
 | `display.text_chat` | `true` | `HALO_TEXT_CHAT` | Show the text chat of network games (Settings > Network Setup > Multiplayer HUD > TEXT CHAT). `false` hides its lines, and its keys and a controller's D-pad Up open nothing. Refer to "Text chat". |
 | `display.chat_style` | `"colors"` | `HALO_CHAT_STYLE` | The text chat's colours (Settings > Network Setup > Multiplayer HUD > CHAT TEXT): `"colors"`, the player's name in their team's colour and the text a pale blue; `"white"`, all of it white, as Custom Edition. |
 | `display.scoreboard_team_layout` | `"teams"` | `HALO_SCOREBOARD_TEAM_LAYOUT` | How the multiplayer scoreboard (hold BACK, or tab) lists a team game's players. `"teams"`: a column for each team, red on the left and blue on the right. `"score"`: all the players in order of score. With more players than fit, the mouse wheel and Page Up / Page Down scroll the scoreboard. |
@@ -712,6 +784,10 @@ the setting for one start of the game. It has priority over the file.
 | `display.hdr_mode` | `"faithful"` | `HALO_HDR_MODE` | With HDR: `"faithful"`: the picture as the game draws it, only its highlights brighter (what was under white stays exactly so); `"punchy"`: the whole scene and its bright parts lifted, each colour keeping its hue, for a brighter, remastered look. |
 | `display.hdr_paper_white` | `100` | `HALO_HDR_PAPER_WHITE` | With HDR, how bright paper white (white surfaces, the HUD, the menus) is, in percent of the system's SDR white (macOS's; on Vulkan, SDL's SDR white, or 203 nits where the system gives none), `50` to `250`. The highlights keep the rest of the display's headroom; paper white is never brighter than the display can show. |
 | `display.astc_textures` | `"auto"` | `HALO_ASTC_TEXTURES` | The builds with a host only, where the GPU cannot sample the maps' DXT (BC) textures: iPhones (Metal) and most Android phones (Vulkan). Checked on Android on a Pixel 11 Pro (PowerVR, no BC); the Android emulator, whose ASTC is emulated, draws those textures black. `"auto"`: where the GPU samples ASTC and not DXT, the DXT textures are transcoded to ASTC 4x4, a quarter of the memory and bandwidth of the decoded textures drawn before, and the same picture (within a third of an 8-bit step for nearly every block; the rest are encoded, at 39 to 43 dB of PSNR against their DXT texels, on worker threads the first time a texture is drawn, the texture drawn decoded meanwhile, and kept in the app's caches folder, 256 MB at most). `"always"`: wherever the GPU samples ASTC, beside DXT too (an Apple silicon Mac's, to try it). `"off"`: decoded, as before. Linux and Windows draw DXT as it is. Read by the host from the file at the start (`port/linux/astc/xgpu_astc.h`). |
+| `display.picture_position` | `"center"` | `HALO_PICTURE_POSITION` | Android only. Where the picture sits on a screen taller than it (a folding phone's inner screen, a tablet, a window in split screen): `"center"`, with black above and below, `"top"`, with all the black below it, where the touch controls are, or `"bottom"`, with all the black above it. Refer to [port/android/README.md](../android/README.md). |
+| `display.orientation` | `"landscape"` | `HALO_ORIENTATION` | Android only. Which way up the game is held: `"landscape"`, `"portrait"` (a strip along the top, the picture under it and the touch controls below it), or `"auto"`, whichever way the device is held, as its own rotation lock allows. A change applies at once. Refer to [port/android/README.md](../android/README.md). |
+| `display.picture_shape` | `"4:3"` | `HALO_PICTURE_SHAPE` | Android only. The picture's shape on a screen taller than it: `"4:3"`, the Xbox's, or `"16:9"`, which sees more to the sides and leaves more of the screen to the touch controls. |
+| `display.frame_style` | `"plain"` | `HALO_FRAME_STYLE` | Android only. The look of the screen around the picture in portrait: `"plain"` black, `"halo"` (navy, with the HUD's cyan lines and rings) or `"xbox"` (ribbed black, with green). It is never drawn over the picture. |
 | `audio.enabled` | `true` | `HALO_NO_AUDIO=1` sets `false` | `false`: no audio device. The sound continues without output. |
 | `audio.volume` | `1.0` | `HALO_VOLUME` | The master volume. |
 | `audio.music_volume` | `1.0` | `HALO_MUSIC_VOLUME` | The music's volume, of the master volume. |
@@ -776,11 +852,13 @@ the setting for one start of the game. It has priority over the file.
 | `network.voice_mode` | `"team_global_enemy_proximity"` | `HALO_NET_VOICE_MODE` | When you host: who hears whom during a game. `"off"`; `"team_proximity"` (teammates who are near); `"team_enemy_proximity"` (all players who are near); `"team_global"` (all teammates); `"team_global_enemy_proximity"` (all teammates, and enemies who are near). Refer to "Voice chat". |
 | `network.voice_kbps` | `24` | `HALO_NET_VOICE_KBPS` | When you host: the voice quality in the lobby and in a game, in kilobits per second, `8` to `64`. |
 | `network.voice_proximity` | `15.0` | `HALO_NET_VOICE_PROXIMITY` | When you host: the distance in world units (1 unit is approximately 3 metres) at which players are near, for voice chat. `5` to `100`. |
-| `network.text_chat` | `"on"` | `HALO_NET_TEXT_CHAT` | When you host: the text chat. `"on"`, lines with links refused; `"links"`, links allowed; `"off"`, no chat (in either case). Always off in a game a player hosts that is listed in the server browser; a dedicated server's follows it, listed or not. TEXT CHAT in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. Refer to "Text chat". |
+| `network.text_chat` | `"on"` | `HALO_NET_TEXT_CHAT` | When you host: the text chat. `"on"`, lines with links refused; `"links"`, links allowed; `"off"`, no chat (in either case). Listed in the server browser or not. TEXT CHAT in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. Refer to "Text chat". |
+| `network.host_playlist` | `""` | `HALO_NET_HOST_PLAYLIST` | When you host: the games played one after another, each after the last one's scores: `map[:gametype[+rule=value...]]`, separated by commas, as a dedicated server's `server.rotation` (`docs/dedicated_server.md`). Host Controls' PLAYLIST and MAPS write it, and the console's `host_playlist`. Empty: you pick each game. Refer to "Host Controls". |
 | `network.votekick` | `true` | `HALO_NET_VOTEKICK` | When you host: `true`, the players can vote to kick a player. Refer to "Security". `false`: no votes. VOTE KICK in Server Setup > Teamplay Options (in co-op, Voice and Voting) writes its choice here. |
 | `network.votekick_minutes` | `5` | `HALO_NET_VOTEKICK_MINUTES` | When you host: the minutes that a player must play on the server before the player can start a vote to kick (`0` to `60`). To vote, a player must play for 2 minutes, or for this time if it is less. |
 | `network.votekick_ban_minutes` | `30` | `HALO_NET_VOTEKICK_BAN_MINUTES` | When you host: the minutes that a player who is kicked by a vote cannot join again (`1` to `1440`). |
 | `network.shield_effects` | `stock` | `HALO_NET_SHIELD_EFFECTS` | Host: the shield effects every player of a network game sees, whatever their own settings, so that none sees what another does not: `stock`, `glow` (`display.shield_glow`), `light_show` (its Light Show intensity), `overshield` (`display.overshield_effect`), `glow_overshield` or `light_show_overshield`; or `players`, not synced: each player sees their own settings' (PLAYERS' OWN). Sent to each client when it is ready and when it changes (`network_shield_effects.c`); a client draws stock until it has it. SHIELD EFFECTS in Server Setup > Player Options writes its choice here. |
+| `network.fire_origins` | `true` | `HALO_NET_FIRE_ORIGINS` | Host: whether a client's reported hit that the shooter's camera had no line of sight to may still count from where the client says its player's shots leave, when that is not the camera (distributed message 93: a VR build's weapon hand, which may be past a corner the camera is behind). The hand must be within 0.4 world units of the camera, no more than 0.05 behind the eye along the line to the target, 0.2 to its side and 0.1 above it, with the line from the eye to it clear; the host logs how many hits counted only that way. `false`: from the camera and vehicles' guns only (`network_damage.c`). |
 | `network.block_mouse_aim_assist` | `false` | `HALO_NET_BLOCK_MOUSE_AIM_ASSIST` | Host: Player Options > Aim Assist, Allowed or Block M+KB. Block overrides optional mouse magnetism while mouse/keyboard aims, including on the host, without changing the saved preference. Controllers and touch retain their existing behavior; bullet autoaim is unchanged. |
 | `network.map_share` | `true` | `HALO_NET_MAP_SHARE` | When you host: send a player who joins without the game's Custom Edition map the map, and the resource maps that it needs and that the player does not have. SHARE MAPS in Server Setup > Map Sharing writes its choice here. Refer to "Map sharing". |
 | `network.map_share_upload` | `1024` | `HALO_NET_MAP_SHARE_UPLOAD` | When you host: the most kilobytes per second that the game sends of maps (`16` to `20480`, 20 MB/s). UPLOAD LIMIT in Server Setup > Map Sharing writes its choice here. |
@@ -869,6 +947,7 @@ the setting for one start of the game. It has priority over the file.
 | `debug.dynamic_lights_look`, `debug.dynamic_lights_log` | `""`, `false` | `HALO_DYNAMIC_LIGHTS_LOOK`, `HALO_DYNAMIC_LIGHTS_LOG` | Tools for the enhanced dynamic lights: up to eight numbers in place of their look's (the lights' brightness, `1.7`; their core's inverse square in radii, `12`; the spill past white, `0.18`; the wrap on models, `0.25`; the glow's size in the light's radius, `0.22`, its brightness, `1.2`, its softness against what it meets in world units, `0.12`, and its least size, `0.035`), and a log of where the first projectile's light is drawn each frame beside where the game placed it at the tick, and once a second how many lights there are. |
 | `debug.network_test`, `debug.network_test_start`, `debug.network_test_kill`, `debug.network_test_score`, `debug.network_test_shoot`, `debug.network_test_vehicle`, `debug.network_test_hitch`, `debug.network_test_pickup`, `debug.network_test_pickup_weapon`, `debug.network_test_chat`, `debug.network_test_name`, `debug.network_test_players`, `debug.network_test_most_players`, `debug.network_test_public`, `debug.test_input` | off | `HALO_NETWORK_TEST`, `HALO_NETWORK_TEST_START`, `HALO_NETWORK_TEST_KILL`, `HALO_NETWORK_TEST_SCORE`, `HALO_NETWORK_TEST_SHOOT`, `HALO_NETWORK_TEST_VEHICLE`, `HALO_NETWORK_TEST_HITCH`, `HALO_NETWORK_TEST_PICKUP`, `HALO_NETWORK_TEST_PICKUP_WEAPON`, `HALO_NETWORK_TEST_CHAT`, `HALO_NETWORK_TEST_NAME`, `HALO_NETWORK_TEST_PLAYERS`, `HALO_NETWORK_TEST_MOST_PLAYERS`, `HALO_NETWORK_TEST_PUBLIC`, `HALO_TEST_INPUT` | Automatic tests of system link, or (`log`) a log of the game one machine plays (`game/network_test.c`); a `local:` game has `debug.network_test_players` players (split screen), and a hosted one takes `debug.network_test_most_players` at most (`0`: the game's own); a test game starts `debug.network_test_start` seconds (`15.0`) after the host opens it. Refer to `NETCODE.md`. `debug.test_input = "menu:a down down a"` presses menu buttons one a second (`a`, `b`, `x`, `y`, `up`, `down`, `left`, `right`, `start`, `back` or `wait`, `screenshot`, the Screenshot key's capture, or `click:<x>:<y>`, a click of the pointer there, `x` and `y` 0 to 1 of the window; `back+x` holds Back through its second and presses X half way through it), for testing the menus; `"script:0.5 jump; 1-2 move=0,1; 2 aim=90,10"` presses, holds and aims on the simulation's clock, in seconds from the scenario's start, the same at any simulation rate (`tools/scorecard`). |
 | `debug.network_test_cues`, `debug.network_test_cue_players` | none, `1` | `HALO_NETWORK_TEST_CUES`, `HALO_NETWORK_TEST_CUE_PLAYERS` | Console lines a test runs at their seconds, from the first tick that many players are in (`"<second> <line>\|..."`). |
+| `debug.network_test_lobby_cues` | none | `HALO_NETWORK_TEST_LOBBY_CUES` | Console lines a test's host runs in its first lobby, at their seconds of its setup, before `debug.network_test_start` starts the game (`"<second> <line>\|..."`). |
 | `debug.bot_trace` | `0` | `HALO_BOT_TRACE` | Every this many seconds, each bot's state is written to the log: where it is and where it goes, its path, its target and its weapon. `0`: never. |
 | `debug.bot_player` | `false` | `HALO_BOT_PLAYER` (set) | In a local game with bots (`bots.count`), a bot of its own plays the first player too, and its view is drawn as the player's: footage of a fighter without a person at the controls. |
 | `debug.bot_player_weapon` | `""` | `HALO_BOT_PLAYER_WEAPON` | With `debug.bot_player`, a weapon (part of its tag's name: `sniper`, `rocket`) the player's bot goes for wherever on the map it lies, and keeps; with a sniper rifle it looks through the scope at a distance. |
@@ -1668,9 +1747,10 @@ Friends can group up before a game and go from game to game together
 - When the leader hosts an internet game, or joins one (by a link or from
   the Server Browser), every member joins it too: the Party screen opens
   over the main menu or Multiplayer, and joins the game. A member who
-  cannot join (the game is full, another version of OpenH1, a Legacy game
-  that this version cannot join, a host that cannot be reached, or a LAN
-  game) sees why, and stays in the party; the leader sees it too. JOIN
+  cannot join (the game is full, a different version of OpenH1, a Legacy
+  game that this version cannot join, a host that cannot be reached, or a
+  LAN game) sees why in plain words ("Couldn't join your leader's game: the
+  game is full."), and stays in the party; the leader sees it too. JOIN
   LEADER tries again. A member in another game joins when it goes back to
   the menus.
 - In the Server Browser, the leader sees whether a game has room for the
@@ -1679,8 +1759,8 @@ Friends can group up before a game and go from game to game together
   a slot for each member for 20 seconds while they follow, so that no one
   else takes them and splits the party; in a team game it puts the party on
   one team when that team has room. A Legacy game's host, or an older
-  OpenH1's, holds nothing: the browser says "No room guarantee", and the
-  members join as they can.
+  OpenH1's, holds nothing: the browser says "Room for your party (4), but
+  places aren't held", and the members join as they can.
 - After a game the party is where it was. When the host leaves, the party
   is in the menus again, and the leader takes it to the next game.
 - LEAVE PARTY leaves; the leader's party passes to the next member (also
@@ -1847,17 +1927,13 @@ ON (the default: a line with a link, such as `discord.gg/...`,
 `example.com`, `www.`, an address, or `example [dot] com`, is refused),
 WITH LINKS, or OFF. A domain that is a word as well (`.me`, `.to`, `.is`)
 counts only with a path after it (`youtu.be/...`), so that `go.to` and
-`he.is` are not refused. A game a player hosts that is listed in
-the server browser (a public internet game) never has the text chat,
-whatever it says (TEXT CHAT shows OFF there, and cannot be changed, while
-LISTING is PUBLIC); a private game, joined by its invite, and a LAN game have
-it as chosen. A player who joins such a game from the server browser has no
-text chat in it even if its host turns it on: their game takes no line from
-that host and sends none. A dedicated server is the exception: its own
-`network.text_chat` decides (on by default, and its operator can turn it
-off, or allow links), listed or not, and a player who joins it from the
-server browser's dedicated servers (a master server's list, which names
-approved operators alone) has the chat as it says. Pressing T where the chat
+`he.is` are not refused. Every game has the text chat its host chooses,
+public (listed in the server browser), private or LAN, a player's or a
+dedicated server's; it is on by default. An OpenCE player, or one on an
+older OpenH1, has none in a public game a player hosts: their game keeps
+the chat off there. The host can mute a player (`/mute`, or MUTE FOR ALL in
+Host Controls), and `display.text_chat` hides the chat on one machine.
+Pressing T where the chat
 is off says so, and a refused line tells its sender why.
 
 On the scoreboard (right-click, then click the player), Mute voice and chat
@@ -1951,10 +2027,25 @@ mode too long for its column ends in "..."; the panel shows all of it. A
 click selects a game, and a click on the selected game, a double click, A,
 Enter or JOIN GAME joins it. The game joins the invite of the game, as for a
 link. When it reaches the host, it opens the lobby. If it cannot reach the
-host in 30 seconds, it marks the game failed, and the panel says why; when
-this machine's NAT gives each destination its own port and no router
-forwards `network.tunnel_port`, it says so (turn on UPnP on the router, or
-forward the port: refer to "Connection").
+host in 10 seconds, it marks the game failed, and the panel says why in
+words for anyone, with no technical terms ("Couldn't join. Your network is
+blocking it."; with the game's name when another game is chosen); the log
+has the cause (`menus: could not reach
+...`: whether a signalling broker answered, whether the host did, and
+whether this network's NAT or the host's is strict). The connecting box
+that a link (PASTE LINK) or a game opens says the same, with what to try:
+
+| The box says | When |
+| --- | --- |
+| INTERNET PLAY IS OFF | `network.online` is off |
+| CAN'T GET ONLINE: check your internet connection | No signalling broker is reached |
+| GAME NOT FOUND: the game may have ended, or its host is offline (ask the host for a new invite link; a server browser's game: try another) | The host never answered (an invite works only while the copy of the game that made it runs) |
+| NETWORK BLOCKED: your network is blocking the connection | This machine's NAT gives each destination its own port and no router forwards `network.tunnel_port`: it says to turn on OPEN ROUTER PORT (`network.allow_upnp`) if that is off, else to try another network (on a phone, Wi-Fi instead of mobile data) or have someone else host |
+| CAN'T REACH THE HOST: the host's network is blocking the connection | The host's addresses show that its NAT is the strict one: the host is asked to turn on OPEN ROUTER PORT |
+| CAN'T REACH THE HOST: a network is blocking the connection | The host answered, but no path opened, and neither side is known to be strict |
+
+Port forwarding (a fixed `network.tunnel_port` forwarded on the router)
+helps too, on a computer: refer to "Connection".
 
 The Ping column shows the round trip to each host in milliseconds, coloured
 by how good it is, with bars before it. The browser times it as a join would
@@ -2007,8 +2098,9 @@ master servers, or only the brokers.
   The titles are: server name, map, game, players, the lock (the games
   with a password first) and the dedicated icon (dedicated servers first).
   A second choice of the same title reverses the order, and an arrow on
-  the title shows the direction. The default order is dedicated servers
-  first, then the games with the most players, then by name. The browser
+  the title shows the direction. The default order is OpenH1 games
+  first, the dedicated servers first among them and among the Legacy games
+  after them, then the games with the most players, then by name. The browser
   keeps the order in `network.browser_sort`.
 - FILTERS opens the Filters screen of Custom Edition. It has SHOW EMPTY
   SERVERS, SHOW FULL SERVERS, GAME TYPE (ANY or one game engine) and SHOW
@@ -5744,6 +5836,7 @@ Other changes:
 | `networking/`, `game/`, `interface/`, `bungie_net/network/` and the pools of objects, effects and sounds | The system link limits and the memory for them. |
 | `game/`, `objects/`, `units/`, `networking/` | The distributed netcode. Refer to `NETCODE.md`. |
 | `cache/cache_files.c` | When a map's tags load and unload, the port finds the bitmaps that the high-res HUD replaces (`game/hud_hires_tags.c`), adds the tags of the menus to the menus' map (`game/menu_tags.c`), and plays the mods' tags (`game/mods.c`). |
+| `cache/cache_files_windows.c` | Each cache slot (`z:\cacheNNN.map`) remembers the size and modification time of the map file it was copied from, in `z:\cacheNNN.source` (`src/xbox_files.c`). A slot whose map file has been replaced since, by a modded map that keeps the header's checksum, another region's or a corrected one, is copied again, at the start or the next time the map is loaded. The Xbox's disc never changed, so the name and checksum in the header were enough. |
 | `cache/xbox_sound_cache.c`, `cache/xbox_texture_cache.c` | The samples of a mod's sound are copied from memory, and the pixels of a mod's bitmap read from its file and laid out for the hardware, at once (`game/mod_sounds.c`, `game/mod_bitmaps.c`); a mod's linear bitmap need not have rows of whole steps of the pitch. |
 | `hs/hs.c` | The console's `mods_reload`, `mods_enable` and `mods_list`, which a client may run too. |
 | `interface/ui_widget.c`, `interface/ui_widget_event_handler_functions.c`, `interface/ui_widget_game_data_input_functions.c` | The main menu is the PC version's from `port/assets/menus` (`display.menus`); the menus' widgets can call the port's functions (`game/menu_functions.c`) and send the PC version's custom activation event; the widgets' memory is 256 KB, not 16 KB; the main menu and Multiplayer clear co-op's controllers, so that a gamepad going back to controller 1 is not a controller unplugged; the lobby's split screen players leave alone, and one who quits in game is not joined to the next game (`interface/player_ui.c`).; Multiplayer's PLAY WITH BOTS hosts a game that takes no other machine, as the Xbox's split screen does (`ui_widget_port_host_local`); the port's own screens are laid out for the view's width up to 16:9 (their widgets' `wide`: `game/menu_tags.c`'s `ui_widget_port_wide_layout`), a picture widened by stretching its middle (`draw_bitmap_widened_in_rect`); after a game of this machine alone the host's map select and the lobby open in place of the Xbox's split screen Select Map and Select Teams (`game/menu_tags.c`'s `pc_menus_screen`). |

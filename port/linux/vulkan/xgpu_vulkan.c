@@ -475,12 +475,18 @@ static struct
 	VkExtent2D surface_extent;
 	VkSurfaceTransformFlagBitsKHR surface_transform;
 	uint32_t suboptimal_presents;
+	/* the presents left, after the window's size changed, at which the
+	surface is asked again (RESIZE_CHECKS) */
+	uint32_t resize_checks;
 	/* quarter turns clockwise the frames are drawn turned by, for a
 	swapchain made for the display's own way up (preTransform: Android's
 	pre-rotation); and what turns them (NULL: none, the compositor turns
 	them) */
 	int swapchain_turns;
 	struct xgpu_vulkan_image *(*rotate)(struct xgpu_vulkan_image *image, int quarter_turns);
+	/* display.picture_position: the picture's top in a taller window, in
+	its pixels, plus 1; 0 centered (xgpu_vulkan_picture_top; any thread) */
+	int picture_top;
 	VkImage swapchain_images[8];
 	uint32_t swapchain_image_count;
 	VkSemaphore acquired[SLOTS], presentable[8];
@@ -3633,6 +3639,15 @@ of frames): a SUBOPTIMAL that making the swapchain again cannot mend is
 not asked about every frame */
 #define SUBOPTIMAL_CHECKS 60
 
+/* presents after the window's size changes in which the surface is asked
+again (about two seconds of frames), at every RESIZE_CHECK_EVERY of them,
+until it has the window's new size: Android can tell the new size a little
+after the event (split screen on a folding phone), and a swapchain made for
+the old one is scaled into the window, squashed or stretched, with no
+SUBOPTIMAL or OUT_OF_DATE to say so */
+#define RESIZE_CHECKS 120
+#define RESIZE_CHECK_EVERY 4
+
 static void swapchain_forget(void)
 {
 	uint32_t index;
@@ -3813,6 +3828,39 @@ void xgpu_vulkan_window_hdr(int enabled, float sdr_white, float headroom)
 	__atomic_store_n(&vk.window_hdr_changed, 1u, __ATOMIC_RELEASE);
 }
 
+void xgpu_vulkan_picture_top(int top)
+{
+	__atomic_store_n(&vk.picture_top, top < 0 ? 0 : top + 1, __ATOMIC_RELEASE);
+}
+
+/* a rectangle in the window, its way up, as it lies in a swapchain turned
+quarter_turns clockwise from it (the frame's turn: present_turned) */
+static void rectangle_turned(int quarter_turns, uint32_t window_width, uint32_t window_height, uint32_t *x,
+	uint32_t *y, uint32_t *width, uint32_t *height)
+{
+	uint32_t left = *x, top = *y, across = *width, down = *height;
+
+	switch (quarter_turns & 3)
+	{
+	case 1:
+		*x = window_height - (top + down);
+		*y = left;
+		*width = down;
+		*height = across;
+		break;
+	case 2:
+		*x = window_width - (left + across);
+		*y = window_height - (top + down);
+		break;
+	case 3:
+		*x = top;
+		*y = window_width - (left + across);
+		*width = down;
+		*height = across;
+		break;
+	}
+}
+
 void xgpu_vulkan_hdr_state(int active, int mode, int paper_white)
 {
 	vk.hdr_active = active != 0;
@@ -3893,7 +3941,10 @@ static void window_changes(void)
 	uint32_t asked = __atomic_load_n(&vk.interval_asked, __ATOMIC_ACQUIRE);
 
 	if (__atomic_exchange_n(&vk.window_resized, 0, __ATOMIC_ACQ_REL))
+	{
 		vk.swapchain_stale = 1;
+		vk.resize_checks = RESIZE_CHECKS;
+	}
 	if (asked && (int)(asked - 1) != vk.interval)
 	{
 		/* (made again for its present mode: not for the refreshes a
@@ -3910,6 +3961,17 @@ static void window_changes(void)
 		if (hdr_output_choose() != vk.hdr_output)
 			vk.swapchain_stale = 1;
 	}
+}
+
+/* the surface's extent the size the window was last told (either way
+round: Android's is the display's way up), or none, the swapchain's then */
+static int resize_told(VkExtent2D extent)
+{
+	uint64_t size = __atomic_load_n(&vk.window_size, __ATOMIC_ACQUIRE);
+	uint32_t width = (uint32_t)(size >> 32), height = (uint32_t)size;
+
+	return extent.width == 0xffffffffu || (extent.width == width && extent.height == height) ||
+		(extent.width == height && extent.height == width);
 }
 
 static int swapchain_make(void)
@@ -4079,6 +4141,9 @@ static int swapchain_make(void)
 	vk.swapchain_stale = 0;
 	vk.swapchain_turns = turns;
 	vk.surface_extent = capabilities.currentExtent;
+	/* (the window's new size come: RESIZE_CHECKS done) */
+	if (resize_told(capabilities.currentExtent))
+		vk.resize_checks = 0;
 	vk.surface_transform = capabilities.currentTransform;
 	vk.suboptimal_presents = 0;
 	hdr_metadata_set();
@@ -4110,18 +4175,13 @@ void xgpu_vulkan_window_interval(int interval)
 		__ATOMIC_RELEASE);
 }
 
-/* a SUBOPTIMAL present: 1 if the surface's extent or transform changed
-from the swapchain's (which making it again mends) or the surface is
-lost; else the present is fine as it is (a compositor that turns or
-scales it), and the surface is asked again only after SUBOPTIMAL_CHECKS
-more */
-static int swapchain_changed(void)
+/* 1 if the surface's extent or transform changed from the swapchain's
+(which making it again mends) or the surface is lost */
+static int surface_changed(void)
 {
 	VkSurfaceCapabilitiesKHR capabilities;
 	VkResult result;
 
-	if (vk.suboptimal_presents++ % SUBOPTIMAL_CHECKS)
-		return 0;
 	result = vkGetPhysicalDeviceSurfaceCapabilitiesKHR(vk.physical, vk.surface, &capabilities);
 	if (result == VK_ERROR_SURFACE_LOST_KHR)
 	{
@@ -4134,6 +4194,16 @@ static int swapchain_changed(void)
 		(capabilities.currentExtent.width != 0xffffffffu &&
 		(capabilities.currentExtent.width != vk.surface_extent.width ||
 		capabilities.currentExtent.height != vk.surface_extent.height));
+}
+
+/* a SUBOPTIMAL present: surface_changed, else the present is fine as it is
+(a compositor that turns or scales it), and the surface is asked again
+only after SUBOPTIMAL_CHECKS more */
+static int swapchain_changed(void)
+{
+	if (vk.suboptimal_presents++ % SUBOPTIMAL_CHECKS)
+		return 0;
+	return surface_changed();
 }
 
 void xgpu_vulkan_window_suspend(int suspended)
@@ -4222,20 +4292,33 @@ static uint64_t present(struct xgpu_vulkan_image *image, int frame)
 	VkImageBlit blit;
 	VkPresentInfoKHR info;
 	VkResult result;
-	uint32_t index, width, height, x, y;
+	uint32_t index, width, height, x, y, window_width, window_height, image_width, image_height;
+	int turns = 0, top;
 
 	uint64_t serial;
 
 	if (__atomic_load_n(&vk.window_hidden, __ATOMIC_ACQUIRE) || (!vk.surface && !surface_remake()))
 		return 0;
 	window_changes();
+	/* (a resize's new size, told late: RESIZE_CHECKS) */
+	if (vk.resize_checks && vk.swapchain && !vk.swapchain_stale && !(--vk.resize_checks % RESIZE_CHECK_EVERY))
+	{
+		if (surface_changed())
+			vk.swapchain_stale = 1;
+		if (!vk.surface)
+			return 0;
+	}
 	if (vk.swapchain_stale || !vk.swapchain)
 	{
 		if (!swapchain_make())
 			return 0;
 	}
 	if (image && vk.swapchain_turns && vk.rotate)
+	{
 		image = present_turned(image);
+		/* (none if it could not be turned: vk.rotate is let go of) */
+		turns = vk.rotate ? vk.swapchain_turns : 0;
+	}
 	if (image && vk.hdr_output != XGPU_HDR_OUTPUT_SDR && vk.encode)
 	{
 		image = present_encoded(image);
@@ -4289,16 +4372,27 @@ static uint64_t present(struct xgpu_vulkan_image *image, int frame)
 		VK_ACCESS_TRANSFER_WRITE_BIT);
 	if (image)
 	{
-		/* letterboxed to the image's shape */
-		width = vk.swapchain_extent.width;
-		height = (uint32_t)((uint64_t)width * image->description.height / image->description.width);
-		if (height > vk.swapchain_extent.height)
+		/* letterboxed to the image's shape, in the window as it is seen
+		(the swapchain and the image turned back): centered, or at the top
+		of a taller window, as the game says (d3d8_device.c's
+		picture_top_in: display.picture_position, a portrait window); then
+		turned with the frame */
+		window_width = turns & 1 ? vk.swapchain_extent.height : vk.swapchain_extent.width;
+		window_height = turns & 1 ? vk.swapchain_extent.width : vk.swapchain_extent.height;
+		image_width = turns & 1 ? image->description.height : image->description.width;
+		image_height = turns & 1 ? image->description.width : image->description.height;
+		width = window_width;
+		height = (uint32_t)((uint64_t)width * image_height / image_width);
+		if (height > window_height)
 		{
-			height = vk.swapchain_extent.height;
-			width = (uint32_t)((uint64_t)height * image->description.width / image->description.height);
+			height = window_height;
+			width = (uint32_t)((uint64_t)height * image_width / image_height);
 		}
-		x = (vk.swapchain_extent.width - width) / 2;
-		y = (vk.swapchain_extent.height - height) / 2;
+		x = (window_width - width) / 2;
+		top = __atomic_load_n(&vk.picture_top, __ATOMIC_ACQUIRE);
+		y = !top ? (window_height - height) / 2 : (uint32_t)(top - 1) < window_height - height ?
+			(uint32_t)(top - 1) : window_height - height;
+		rectangle_turned(turns, window_width, window_height, &x, &y, &width, &height);
 		memset(&blit, 0, sizeof(blit));
 		blit.srcSubresource.aspectMask = blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		blit.srcSubresource.layerCount = blit.dstSubresource.layerCount = 1;

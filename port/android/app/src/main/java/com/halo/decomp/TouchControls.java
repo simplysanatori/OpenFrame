@@ -4,6 +4,7 @@ import android.app.AlertDialog;
 import android.content.Context;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Configuration;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
@@ -11,8 +12,13 @@ import android.graphics.BlurMaskFilter;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.LightingColorFilter;
+import android.graphics.LinearGradient;
 import android.graphics.Paint;
+import android.graphics.Path;
+import android.graphics.Picture;
+import android.graphics.RadialGradient;
 import android.graphics.RectF;
+import android.graphics.Shader;
 import android.graphics.Typeface;
 import android.hardware.Sensor;
 import android.hardware.SensorEvent;
@@ -52,8 +58,9 @@ import java.util.Locale;
  * It shows only in a game, never at the main menu, over a menu (which
  * takes taps itself, port/linux/src/touch_input.c) or during a cinematic,
  * only on a touchscreen, and with input.touch_controls = "auto" only while
- * no controller, mouse or keyboard is connected. While it is not shown it
- * lets every finger through to the game.
+ * no controller is connected and no mouse or keyboard is plugged in or
+ * paired (the phone's own keys and touchpad do not count). While it is not
+ * shown it lets every finger through to the game.
  */
 public final class TouchControls extends View implements SensorEventListener, InputManager.InputDeviceListener {
     /** what a finger holds besides a control: the view swipe */
@@ -78,9 +85,13 @@ public final class TouchControls extends View implements SensorEventListener, In
     private static final float STICK_DEAD_ZONE = 0.12f;
     private static final float STICK_REACH = 1.28f;
     private static final float STICK_KNOB_RADIUS = 24;
-    /** a floating stick goes where a thumb lands in this part of the display (from the lower left) */
+    /**
+     * a floating stick goes where a thumb lands in this part of the display,
+     * from the lower left: a share of its width, and logical units up from
+     * the bottom (65% of a 16:9 display's height, as low on a taller one)
+     */
     private static final float FLOATING_ZONE_WIDTH = 0.45f;
-    private static final float FLOATING_ZONE_TOP = 0.35f;
+    private static final float FLOATING_ZONE_HEIGHT = 351;
     /** radians per logical unit of swipe (the mouse's rate: xinput_sdl.c) */
     private static final float LOOK_RADIANS_PER_UNIT = 0.0022f;
     /**
@@ -140,9 +151,19 @@ public final class TouchControls extends View implements SensorEventListener, In
     /** display.hud_button_style (0 classic, 1 gems, 2 menu_gems) and input.touch_captions */
     private static final int SCENE_STYLE_SHIFT = 5;
     private static final int SCENE_CAPTIONS = 128;
+    /** display.frame_style (0 plain, 1 halo, 2 xbox) and display.picture_shape "16:9", for portrait */
+    private static final int SCENE_FRAME_SHIFT = 16;
+    private static final int SCENE_WIDE_PICTURE = 1 << 18;
+    private static final int FRAME_HALO = 1;
+    /** the frame's accents: the HUD's cyan (HUD_COLOR) for halo, a green for xbox */
+    private static final int FRAME_GREEN = 0xff78cd3c;
+    /** input.touch_crouch "toggle" (none: "hold") */
+    private static final int SCENE_CROUCH_TOGGLE = 1 << 19;
 
     private static final String PREFERENCES = "touch-layout-v1";
     private static final String KEY_CONFIGURATION = "configuration";
+    /** the portrait layout's (display.orientation "portrait", a portrait-shaped window) */
+    private static final String KEY_PORTRAIT_CONFIGURATION = "configuration-portrait";
     private static final String KEY_HIDDEN = "hidden";
 
     /**
@@ -250,6 +271,7 @@ public final class TouchControls extends View implements SensorEventListener, In
     private static native int nativeRumble();
     private static native int nativeScene();
     private static native int nativeBindings(int[] controls);
+    private static native void nativePictureTop(int pixels);
 
     private final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private final Paint pictures = new Paint(Paint.ANTI_ALIAS_FLAG | Paint.FILTER_BITMAP_FLAG);
@@ -286,7 +308,14 @@ public final class TouchControls extends View implements SensorEventListener, In
         .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
         .build();
 
-    private TouchLayout layout = new TouchLayout();
+    /**
+     * the layouts of a landscape view and of a portrait one (taller than it
+     * is wide: the game's picture at the top, the controls below it), each
+     * edited and saved on its own; layout is the one in use (layoutControls)
+     */
+    private TouchLayout landscapeLayout = new TouchLayout(false);
+    private TouchLayout portraitLayout = new TouchLayout(true);
+    private TouchLayout layout = landscapeLayout;
     private float sensitivity = 1f;
     /** the controls removed by the toolbar's Hide, until its Touch */
     private boolean hidden;
@@ -304,6 +333,15 @@ public final class TouchControls extends View implements SensorEventListener, In
     private int lookPointer = -1;
     private float lookX;
     private float lookY;
+    /**
+     * the kind of control that crouches (the one bound to Crouch), tapped
+     * on with input.touch_crouch "toggle": it stays down while the stick
+     * moves, until it is tapped again, Jump is pressed, a vehicle's seat is
+     * taken or the player dies; -1 standing (TouchContext.crouchPressed,
+     * crouchKept). (Crouch sits under the left thumb beside the stick, where
+     * it cannot be held while moving; the Xbox's is the stick's own click.)
+     */
+    private int crouchedKind = -1;
     /** a floating stick's centre while a thumb holds it (logical units) */
     private boolean stickFloating;
     private float stickX;
@@ -319,11 +357,20 @@ public final class TouchControls extends View implements SensorEventListener, In
     private float logicalHeight = GRID_HEIGHT;
     private int insetRight;
     private int insetTop;
+    /** the camera cutout's top inset, in pixels: portrait's strip stays under it */
+    private int cutoutTop;
+    /** portrait: where the game's picture is, in logical units (empty in landscape) */
+    private final RectF pictureRect = new RectF();
+    /** the portrait frame, drawn once for its look and the picture's place (null: draw it again) */
+    private Picture frame;
+    private int frameStyle;
 
     private int scene;
     private boolean controllerConnected;
     private boolean mouseConnected;
     private boolean keyboardConnected;
+    /** the density the controls were last laid out for (onConfigurationChanged) */
+    private int densityDpi;
     private boolean touchscreen;
     private boolean deviceInputActive;
     /** the controls are on screen: shown() for SHOW_DELAY_MS */
@@ -386,6 +433,15 @@ public final class TouchControls extends View implements SensorEventListener, In
                     || TouchContext.fromScene(was) != TouchContext.fromScene(scene)
                     || (showing && !hidden && TouchContext.animating(TouchContext.fromScene(scene))))
                 invalidate();
+            // (the picture's shape and the frame's look: placed and drawn again)
+            if (((was ^ scene) & (3 << SCENE_FRAME_SHIFT | SCENE_WIDE_PICTURE | SCENE_KNOWN)) != 0)
+                placePicture();
+            // (a crouch tapped on stands up at death or in a seat, with no finger down)
+            if (((was ^ scene) & SCENE_CROUCH_TOGGLE) != 0
+                    || TouchContext.fromScene(was) != TouchContext.fromScene(scene)) {
+                publish();
+                invalidate();
+            }
             fadeWhenIdle();
             updateShowing();
             readBindings();
@@ -434,11 +490,17 @@ public final class TouchControls extends View implements SensorEventListener, In
             int top = insetTop;
             insetRight = insets.getSystemWindowInsetRight();
             insetTop = insets.getSystemWindowInsetTop();
+            int cutout = cutoutTop;
+            cutoutTop = 0;
             if (insets.getDisplayCutout() != null) {
                 insetRight = Math.max(insetRight, insets.getDisplayCutout().getSafeInsetRight());
                 insetTop = Math.max(insetTop, insets.getDisplayCutout().getSafeInsetTop());
+                cutoutTop = insets.getDisplayCutout().getSafeInsetTop();
             }
-            if (insetRight != right || insetTop != top)
+            // (portrait's strip, the controls in it and the picture under it move with the cutout alone)
+            if (cutoutTop != cutout)
+                layoutControls();
+            else if (insetRight != right || insetTop != top)
                 invalidate();
             return insets;
         });
@@ -453,16 +515,35 @@ public final class TouchControls extends View implements SensorEventListener, In
 
     private void loadLayout(Context context) {
         String configuration = preferences.getString(KEY_CONFIGURATION, null);
-        if (configuration == null)
-            return;
+        String portrait = preferences.getString(KEY_PORTRAIT_CONFIGURATION, null);
+        // (each read apart: one that cannot be read leaves the other as saved)
+        boolean unreadable = false;
         try {
-            TouchLayout.Configuration saved = TouchLayout.importConfiguration(configuration);
-            layout = saved.layout;
-            sensitivity = saved.sensitivity;
+            if (configuration != null) {
+                TouchLayout.Configuration saved = TouchLayout.importConfiguration(configuration);
+                if (!saved.layout.portrait) {
+                    landscapeLayout = saved.layout;
+                    sensitivity = saved.sensitivity;
+                }
+            }
         } catch (IllegalArgumentException e) {
+            unreadable = true;
+        }
+        // (none saved yet: the portrait defaults, with the settings the landscape layout has)
+        portraitLayout.takeSettings(landscapeLayout);
+        try {
+            if (portrait != null) {
+                TouchLayout.Configuration saved = TouchLayout.importConfiguration(portrait);
+                if (saved.layout.portrait)
+                    portraitLayout = saved.layout;
+            }
+        } catch (IllegalArgumentException e) {
+            unreadable = true;
+        }
+        if (unreadable)
             Toast.makeText(context, "The saved touch layout could not be read. Using the default one.",
                 Toast.LENGTH_LONG).show();
-        }
+        layout = landscapeLayout;
     }
 
     // ---------- the activity's lifecycle (HaloActivity)
@@ -497,18 +578,63 @@ public final class TouchControls extends View implements SensorEventListener, In
         requestApplyInsets();
     }
 
+    /**
+     * a new density, perhaps at the same size (the activity handles density
+     * in its configChanges, as a folding phone's two screens can differ):
+     * the finger's width in logical units changes
+     */
+    @Override
+    protected void onConfigurationChanged(Configuration configuration) {
+        super.onConfigurationChanged(configuration);
+        if (configuration.densityDpi != densityDpi)
+            layoutControls();
+    }
+
     /** scales the grid to the display (its height, keeping the circles round) */
     private void layoutControls() {
         if (getWidth() <= 0 || getHeight() <= 0)
             return;
         reset();
+        densityDpi = getResources().getConfiguration().densityDpi;
         float width = getWidth();
         float height = getHeight();
-        scale = Math.max(0.01f, Math.min(width / GRID_WIDTH, height / GRID_HEIGHT));
+        // (a portrait view has the portrait layout, its settings the ones in use)
+        boolean portrait = height > width;
+        if (portrait != layout.portrait) {
+            TouchLayout next = portrait ? portraitLayout : landscapeLayout;
+            next.takeSettings(layout);
+            layout = next;
+        }
+        scale = Math.max(0.01f, Math.min(width / layout.gridWidth(), height / layout.gridHeight()));
         logicalWidth = width / scale;
         logicalHeight = height / scale;
         layout.bounds(logicalWidth, logicalHeight);
+        layout.setTopInset(portrait ? cutoutTop / scale : 0);
         layout.setMinimumRadius(minimumRadius());
+        placePicture();
+    }
+
+    /**
+     * portrait: where the game's picture goes (under the strip, lowered into
+     * the space above the controls: TouchLayout.pictureTop), told to the
+     * game, which draws it there (host_touch_picture_top); landscape: none,
+     * the game places it itself
+     */
+    private void placePicture() {
+        if (!layout.portrait || getWidth() <= 0) {
+            pictureRect.setEmpty();
+            nativePictureTop(-1);
+        } else {
+            boolean wide = (scene & SCENE_WIDE_PICTURE) != 0;
+            int top = Math.round(layout.pictureTop(TouchLayout.pictureHeight(logicalWidth, wide)) * scale);
+            // (as the game's present: whole pixels, the picture no lower than the bottom)
+            int height = getWidth() * 480 / (wide ? 852 : 640);
+            top = Math.max(0, Math.min(top, getHeight() - height));
+            pictureRect.set(0, top / scale, logicalWidth, (top + height) / scale);
+            layout.setPictureTop(top / scale);
+            nativePictureTop(top);
+        }
+        frame = null;
         invalidate();
     }
 
@@ -523,7 +649,21 @@ public final class TouchControls extends View implements SensorEventListener, In
     }
 
     private float toolbarY() {
+        // (portrait: in the strip, with back and pause)
+        if (layout.portrait)
+            return layout.stripBottom() - TouchLayout.PORTRAIT_STRIP / 2;
         return Math.max(38, insetTop / scale + 38);
+    }
+
+    /**
+     * the toolbar's hide: in the middle, or in portrait beside the options
+     * (a camera's cutout is in the middle), but with the picture behind the
+     * strip right of the middle, beside pause, off the HUD's shields
+     */
+    private float hideX() {
+        if (layout.portrait)
+            return layout.stripGathered() ? logicalWidth / 2 + TouchLayout.GATHERED_APART : optionsX() - 70;
+        return logicalWidth / 2;
     }
 
     private float optionsX() {
@@ -579,18 +719,40 @@ public final class TouchControls extends View implements SensorEventListener, In
             || device.getMotionRange(MotionEvent.AXIS_HAT_X, InputDevice.SOURCE_JOYSTICK) != null;
     }
 
-    /** a physical mouse (or a trackpad): a non-virtual SOURCE_MOUSE device */
+    /**
+     * a mouse (or a trackpad) plugged in or paired: an external SOURCE_MOUSE
+     * device, not a phone's own touchpad (a Galaxy's sec_touchpad says
+     * SOURCE_MOUSE too)
+     */
     private static boolean isMouse(InputDevice device) {
-        if (device == null || device.isVirtual())
+        if (device == null || device.isVirtual() || !isExternal(device))
             return false;
         return (device.getSources() & InputDevice.SOURCE_MOUSE) == InputDevice.SOURCE_MOUSE;
     }
 
-    /** a physical keyboard: a non-virtual SOURCE_KEYBOARD device */
+    /**
+     * a keyboard plugged in or paired: an external SOURCE_KEYBOARD device
+     * with letters, not a phone's own keys (power, volume) or touchscreen,
+     * which say SOURCE_KEYBOARD too
+     */
     private static boolean isKeyboard(InputDevice device) {
-        if (device == null || device.isVirtual())
+        if (device == null || device.isVirtual() || !isExternal(device))
             return false;
-        return (device.getSources() & InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD;
+        return (device.getSources() & InputDevice.SOURCE_KEYBOARD) == InputDevice.SOURCE_KEYBOARD
+            && device.getKeyboardType() == InputDevice.KEYBOARD_TYPE_ALPHABETIC;
+    }
+
+    /**
+     * not built into the device: InputDevice.isExternal() from Android 10;
+     * on Android 9, anything without a touchscreen or touchpad source (a
+     * touchpad paired on Android 9 does not hide the controls)
+     */
+    private static boolean isExternal(InputDevice device) {
+        if (Build.VERSION.SDK_INT >= 29)
+            return device.isExternal();
+        int sources = device.getSources();
+        return (sources & InputDevice.SOURCE_TOUCHSCREEN) != InputDevice.SOURCE_TOUCHSCREEN
+            && (sources & InputDevice.SOURCE_TOUCHPAD) != InputDevice.SOURCE_TOUCHPAD;
     }
 
     private void refreshInputDevices() {
@@ -652,6 +814,7 @@ public final class TouchControls extends View implements SensorEventListener, In
         toolbarFingers.clear();
         lookPointer = -1;
         stickFloating = false;
+        crouchedKind = -1;
         gyroAim.reset();
         nativeLookReset();
         Arrays.fill(axes, 0);
@@ -669,15 +832,38 @@ public final class TouchControls extends View implements SensorEventListener, In
         axes[5] = 0;
         for (int i = 0; i < owners.size(); i++) {
             int control = owners.valueAt(i);
-            if (control < 0 || control >= layout.size())
+            if (control < 0 || control >= layout.size() || (crouchToggles() && crouches(layout.type(control))))
                 continue;
-            Kind kind = KINDS[layout.type(control)];
-            if (kind.bit >= 0)
-                bits |= 1 << kind.bit;
-            if (kind.trigger >= 0)
-                axes[kind.trigger] = 32767;
+            bits = press(KINDS[layout.type(control)], bits);
         }
+        // (crouch: tapped on, held by no finger)
+        if (crouchedKind >= 0)
+            crouchedKind = TouchContext.crouchKept(crouchedKind, gameControl(crouchedKind), context(), crouchToggles());
+        if (crouchedKind >= 0)
+            bits = press(KINDS[crouchedKind], bits);
         nativeState(axes[0], axes[1], axes[2], axes[3], axes[4], axes[5], bits);
+    }
+
+    /** a kind of control pressed: its trigger pulled (axes), and the buttons with its bit */
+    private int press(Kind kind, int bits) {
+        if (kind.trigger >= 0)
+            axes[kind.trigger] = 32767;
+        return kind.bit >= 0 ? bits | 1 << kind.bit : bits;
+    }
+
+    /** input.touch_crouch: whether Crouch is tapped on and off, not held */
+    private boolean crouchToggles() {
+        return (scene & SCENE_CROUCH_TOGGLE) != 0;
+    }
+
+    /** whether a kind of control crouches (is bound to Crouch) */
+    private boolean crouches(int type) {
+        return gameControl(type) == TouchContext.CONTROL_CROUCH;
+    }
+
+    /** held by a finger, or a crouch tapped on */
+    private boolean pressed(int control) {
+        return held(control) || (crouchedKind >= 0 && layout.type(control) == crouchedKind);
     }
 
     private boolean held(int control) {
@@ -711,7 +897,7 @@ public final class TouchControls extends View implements SensorEventListener, In
     }
 
     private boolean inFloatingZone(float x, float y) {
-        return x < logicalWidth * FLOATING_ZONE_WIDTH && y > logicalHeight * FLOATING_ZONE_TOP;
+        return x < logicalWidth * FLOATING_ZONE_WIDTH && y > logicalHeight - FLOATING_ZONE_HEIGHT;
     }
 
     private void moveStick(int control, float x, float y) {
@@ -743,7 +929,7 @@ public final class TouchControls extends View implements SensorEventListener, In
             return TOOLBAR_EXPORT;
         if (editing && inside(x, y, optionsX() - 78, toolbarY(), toolbarRadius(OPTIONS_RADIUS)))
             return TOOLBAR_IMPORT;
-        if (!editing && inside(x, y, logicalWidth / 2, toolbarY(), toolbarRadius(TOOLBAR_RADIUS)))
+        if (!editing && inside(x, y, hideX(), toolbarY(), toolbarRadius(TOOLBAR_RADIUS)))
             return TOOLBAR_TOGGLE;
         if (hidden && !editing)
             return NOTHING;
@@ -856,6 +1042,8 @@ public final class TouchControls extends View implements SensorEventListener, In
                 moveStick(target, x, y);
             } else {
                 buttonTouches.put(id, new float[] {px, py});
+                int type = layout.type(target);
+                crouchedKind = TouchContext.crouchPressed(crouchedKind, type, gameControl(type), crouchToggles());
                 tap();
             }
         } else if (!hidden && lookPointer < 0 && !inGestureZone(px, py, false)) {
@@ -1074,7 +1262,12 @@ public final class TouchControls extends View implements SensorEventListener, In
     // ---------- the layout, saved and in files
 
     private boolean saveLayout() {
-        boolean saved = preferences.edit().putString(KEY_CONFIGURATION, exportLayout()).commit();
+        // (the settings saved with every layout are the same in both)
+        (layout == landscapeLayout ? portraitLayout : landscapeLayout).takeSettings(layout);
+        boolean saved = preferences.edit()
+            .putString(KEY_CONFIGURATION, landscapeLayout.exportConfiguration(sensitivity))
+            .putString(KEY_PORTRAIT_CONFIGURATION, portraitLayout.exportConfiguration(sensitivity))
+            .commit();
         if (!saved)
             Toast.makeText(getContext(), "The touch layout could not be saved. Try again.", Toast.LENGTH_LONG).show();
         return saved;
@@ -1084,19 +1277,42 @@ public final class TouchControls extends View implements SensorEventListener, In
         return layout.exportConfiguration(sensitivity);
     }
 
-    /** replaces the layout with a layout file's (saved first: it throws if the file is not valid) */
+    /**
+     * replaces the layout of the file's orientation (a portrait layout's
+     * file says so) with the file's, and its settings both layouts' (saved
+     * first: it throws if the file is not valid)
+     */
     public void importLayout(String text) {
         TouchLayout.Configuration imported = TouchLayout.importConfiguration(text);
-        imported.layout.bounds(logicalWidth, logicalHeight);
-        imported.layout.setMinimumRadius(minimumRadius());
+        boolean inUse = imported.layout.portrait == layout.portrait;
+        if (inUse) {
+            imported.layout.bounds(logicalWidth, logicalHeight);
+            imported.layout.setMinimumRadius(minimumRadius());
+        }
+        TouchLayout other = imported.layout.portrait ? landscapeLayout : portraitLayout;
+        other.takeSettings(imported.layout);
         String normalized = imported.layout.exportConfiguration(imported.sensitivity);
-        if (!preferences.edit().putString(KEY_CONFIGURATION, normalized).commit())
+        if (!preferences.edit()
+                .putString(imported.layout.portrait ? KEY_PORTRAIT_CONFIGURATION : KEY_CONFIGURATION, normalized)
+                .putString(imported.layout.portrait ? KEY_CONFIGURATION : KEY_PORTRAIT_CONFIGURATION,
+                    other.exportConfiguration(imported.sensitivity))
+                .commit())
             throw new IllegalArgumentException("Could not save the imported layout");
         reset();
-        layout = imported.layout;
+        if (imported.layout.portrait)
+            portraitLayout = imported.layout;
+        else
+            landscapeLayout = imported.layout;
+        if (inUse)
+            layout = imported.layout;
+        else
+            layout.takeSettings(imported.layout);
         sensitivity = imported.sensitivity;
         setHidden(false);
         cancelRumble();
+        // (laid out again: the new layout has no top inset, picture or
+        // gather of its own until it is)
+        layoutControls();
         invalidate();
     }
 
@@ -1630,7 +1846,7 @@ public final class TouchControls extends View implements SensorEventListener, In
             toolbarItem(canvas, optionsX() - 78, OPTIONS_RADIUS, null, "Import");
             label(canvas, logicalWidth / 2, toolbarY() + 58, 1000, "Drag the controls, then push Save", 14, 1f);
         } else {
-            toolbarItem(canvas, logicalWidth / 2, TOOLBAR_RADIUS, hidden ? showIcon : hideIcon, null);
+            toolbarItem(canvas, hideX(), TOOLBAR_RADIUS, hidden ? showIcon : hideIcon, null);
             toolbarItem(canvas, optionsX(), OPTIONS_RADIUS, optionsIcon, null);
         }
     }
@@ -1658,20 +1874,140 @@ public final class TouchControls extends View implements SensorEventListener, In
         paint.clearShadowLayer();
     }
 
+    /**
+     * portrait's frame in display.frame_style's look, around the game's
+     * picture and never over it (clipped out): the strip along the top, the
+     * panel under the picture with its rings, and a line or brackets just
+     * outside the picture's edges; in menus too
+     */
+    private void drawFrame(Canvas canvas) {
+        int style = (scene >> SCENE_FRAME_SHIFT) & 3;
+        if (pictureRect.isEmpty() || (scene & SCENE_KNOWN) == 0 || style == 0 || style > 2)
+            return;
+        if (frame == null || frameStyle != style) {
+            frame = new Picture();
+            frameStyle = style;
+            recordFrame(frame.beginRecording((int) Math.ceil(logicalWidth), (int) Math.ceil(logicalHeight)), style);
+            frame.endRecording();
+        }
+        canvas.save();
+        canvas.clipOutRect(pictureRect);
+        canvas.drawPicture(frame);
+        canvas.restore();
+    }
+
+    /** the frame's drawing, in logical units: halo (the HUD's cyan on navy, rings like the menus') or xbox (green on ribbed black) */
+    private void recordFrame(Canvas canvas, int style) {
+        boolean halo = style == FRAME_HALO;
+        int accent = halo ? HUD_COLOR : FRAME_GREEN;
+        float width = logicalWidth, height = logicalHeight, strip = layout.stripBottom();
+        float x = width / 2, y = pictureRect.bottom + (height - pictureRect.bottom) / 2;
+        Paint ink = new Paint(Paint.ANTI_ALIAS_FLAG);
+        if (halo) {
+            ink.setShader(new LinearGradient(0, 0, 0, height, Color.rgb(5, 9, 17), Color.rgb(11, 19, 35),
+                Shader.TileMode.CLAMP));
+            canvas.drawRect(0, 0, width, height, ink);
+            ink.setShader(null);
+            ink.setColor(Color.argb(46, 0, 0, 0));
+            for (float line = 0; line < height; line += 3)
+                canvas.drawRect(0, line, width, line + 1, ink);
+            ink.setStyle(Paint.Style.STROKE);
+            ink.setStrokeWidth(0.75f);
+            float[][] rings = {{150, 0.10f}, {205, 0.13f}, {212, 0.07f}, {300, 0.055f}};
+            for (float[] ring : rings) {
+                ink.setColor(alpha(accent, ring[1]));
+                canvas.drawCircle(x, y, ring[0], ink);
+            }
+            ink.setColor(alpha(accent, 0.12f));
+            for (int tick = 0; tick < 72; tick++) {
+                double turn = tick * Math.PI / 36;
+                float outer = tick % 6 == 0 ? 228 : 218;
+                canvas.drawLine(x + 212 * (float) Math.cos(turn), y + 212 * (float) Math.sin(turn),
+                    x + outer * (float) Math.cos(turn), y + outer * (float) Math.sin(turn), ink);
+            }
+        } else {
+            canvas.drawColor(Color.rgb(7, 9, 7));
+            ink.setStyle(Paint.Style.STROKE);
+            ink.setStrokeWidth(1.5f);
+            ink.setColor(Color.rgb(12, 18, 11));
+            for (float line = -height; line < width; line += 6)
+                canvas.drawLine(line, 0, line + height, height, ink);
+            ink.setStyle(Paint.Style.FILL);
+            ink.setShader(new RadialGradient(x, y, 230, alpha(accent, 0.27f), alpha(accent, 0), Shader.TileMode.CLAMP));
+            canvas.drawCircle(x, y, 230, ink);
+            ink.setShader(null);
+            ink.setStyle(Paint.Style.STROKE);
+            ink.setColor(alpha(accent, 0.24f));
+            canvas.drawCircle(x, y, 120, ink);
+            ink.setColor(alpha(accent, 0.1f));
+            canvas.drawCircle(x, y, 126, ink);
+        }
+        // the strip, and the line under it
+        ink.setStyle(Paint.Style.FILL);
+        ink.setColor(halo ? Color.argb(235, 6, 11, 20) : Color.argb(235, 10, 13, 10));
+        canvas.drawRect(0, 0, width, strip, ink);
+        ink.setStyle(Paint.Style.STROKE);
+        ink.setStrokeWidth(1.5f);
+        ink.setColor(alpha(accent, 0.59f));
+        canvas.drawLine(0, strip, width, strip, ink);
+        // just outside the picture: brackets at its corners (halo) or a rounded frame (xbox)
+        float gap = 4;
+        RectF picture = pictureRect;
+        if (halo) {
+            Path shield = new Path();
+            shield.moveTo(x - 150, strip);
+            shield.lineTo(x - 130, strip - 8);
+            shield.lineTo(x + 130, strip - 8);
+            shield.lineTo(x + 150, strip);
+            ink.setColor(alpha(accent, 0.43f));
+            canvas.drawPath(shield, ink);
+            ink.setStrokeWidth(2);
+            ink.setColor(alpha(accent, 0.78f));
+            float reach = 22;
+            for (int corner = 0; corner < 4; corner++) {
+                float side = corner % 2 == 0 ? 1 : -1;
+                float cornerX = corner % 2 == 0 ? picture.left + 6 : picture.right - 6;
+                float lineY = corner < 2 ? picture.top - gap : picture.bottom + gap;
+                float out = corner < 2 ? -1 : 1;
+                Path bracket = new Path();
+                bracket.moveTo(cornerX, lineY + out * reach / 2);
+                bracket.lineTo(cornerX, lineY);
+                bracket.lineTo(cornerX + side * reach, lineY);
+                canvas.drawPath(bracket, ink);
+            }
+            ink.setStrokeWidth(1.5f);
+            ink.setColor(alpha(accent, 0.51f));
+            canvas.drawLine(picture.left, picture.bottom + 0.75f, picture.right, picture.bottom + 0.75f, ink);
+        } else {
+            ink.setStrokeWidth(2);
+            ink.setColor(alpha(accent, 0.67f));
+            canvas.drawRoundRect(picture.left - gap, picture.top - gap, picture.right + gap, picture.bottom + gap, 10, 10,
+                ink);
+        }
+    }
+
     @Override
     protected void onDraw(Canvas canvas) {
-        if (!showing && !editing)
+        if (!showing && !editing) {
+            if (!pictureRect.isEmpty()) {
+                canvas.save();
+                canvas.scale(scale, scale);
+                drawFrame(canvas);
+                canvas.restore();
+            }
             return;
+        }
         float opacity = layout.opacity * (editing ? 1f : idle);
         canvas.save();
         canvas.scale(scale, scale);
+        drawFrame(canvas);
         if (!hidden || editing) {
             if (layout.shown(TouchLayout.LEFT))
                 drawStick(canvas, opacity);
             for (int i = 0; i < layout.size(); i++) {
                 if (!layout.shown(i) || layout.type(i) == TouchLayout.LEFT || (!editing && hiddenNow(layout.type(i))))
                     continue;
-                control(canvas, i, held(i) || dragControl == i, opacity);
+                control(canvas, i, pressed(i) || dragControl == i, opacity);
             }
         }
         drawToolbar(canvas);

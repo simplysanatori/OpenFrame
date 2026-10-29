@@ -240,7 +240,8 @@ these settings, which `sv_settings` and `GET /api/settings` list:
 `network.votekick_ban_minutes`, `network.map_share`,
 `network.map_share_upload`, `network.public_address`,
 `network.coop_friendly_fire`, `network.coop_player_collisions`,
-`network.coop_ally_friendly_fire` and `network.shield_effects`. Of them,
+`network.coop_ally_friendly_fire`, `network.shield_effects` and
+`network.fire_origins`. Of them,
 `server.status_file`, `server.auto_update` and `server.log_addresses` need
 the owner role: from the web's admin, `sv_set` of one of them (`POST
 /api/command`) answers `403 forbidden`, and `PUT /api/settings` leaves it
@@ -291,13 +292,8 @@ not a moderator: spaced letters and look-alikes get past it.
 
 A dedicated server's text chat is its `network.text_chat`'s, listed or
 not: `on` by default (lines with links refused), `links`, or `off`, live
-(`sv_set network.text_chat off`). A game a player hosts has no text chat
-while it is listed in the server browser; a dedicated server is the
-exception, and the players who join it from the browser's dedicated servers
-have the chat as it says, as long as a master server lists it (the
-masters' word that it is an approved operator's; a listing's own flag is
-not enough, so a dedicated server listed by the brokers alone, before its
-operator is approved, has none for them).
+(`sv_set network.text_chat off`), as a game a player hosts follows its
+host's.
 
 The settings `sv_set` does not change (`server.web_viewer_password`,
 `server.web_owner_password`, `server.web_port`, `server.web_bind`, `server.web_trusted_proxy`, the
@@ -673,7 +669,12 @@ a rotation that long is saved whole and read back after a restart.
 - A rule is a gametype rule's name or its short name (`score`, `time`,
   `weapons`, `ff`...; `GET /api/gametypes`'s schema lists them), with a
   value it takes; a rule of another game engine than the gametype's is
-  refused. 48 rules at most; a rule given twice is the last.
+  refused. 48 rules at most; a rule given twice is the last. OpenCE's
+  gametype options are rules too: `kills_score` and `points_per_capture`
+  (CTF: a kill scores a point and a capture that many, the score to win
+  still in captures), `multi_hill` (King of the Hill: 2 to 5 hills at
+  once) and `force_team_spawns` (a team game's players spawn at their own
+  team's CTF spawn points): `bloodgulch:ctf+kills_score=true`.
 
 An entry that cannot be played (a map that is not there, a bad gametype
 file, a rule out of range) is left out with a warning, at the start and at

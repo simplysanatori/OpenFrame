@@ -43,7 +43,10 @@ signing key (the builds before it were signed with keys that changed): such
 an app cannot be updated, and Android refuses to install the new APK over it.
 Uninstall it first. Uninstalling deletes its data folder, so first make a
 copy of `maps/` and `save/u` (refer to "Game data"), or extract `maps/` from
-the disc image again afterwards.
+the disc image again afterwards. A build that has the backup screen can
+also back up the saves and settings first (long-press the app's icon and
+choose Back up saves; refer to "Back up and restore"); the builds from
+before the key have no such screen.
 
 ## Requirements
 
@@ -85,7 +88,9 @@ Your own builds all have the same signature (the debug key of WSL,
 `~/.android`), so they install over each other and keep the data
 (`adb install -r`).
 
-To keep the saved games before you remove the app, enter
+Before you remove the app, make a backup: long-press the app's icon and
+choose Back up saves (refer to "Back up and restore"). Or use adb. To keep
+the saved games, enter
 `adb pull /sdcard/Android/data/com.openh1.openh1/files/save/u` (the profiles).
 After the new install, before the first start of the app, enter
 `adb push u /sdcard/Android/data/com.openh1.openh1/files/save/u`. The app reads
@@ -156,10 +161,59 @@ To install the data from a computer:
 | Log | `debug.txt` |
 | Settings | `config.toml` |
 
-To make a copy of the saved games, enter
-`adb pull /sdcard/Android/data/com.openh1.openh1/files/save/u` (the profiles).
-An `adb pull` of the whole `save` folder stops at the `blam.lst` files of
-`save/z`, which adb cannot read.
+To make a copy of the saved games, use "Back up and restore" below, or
+enter `adb pull /sdcard/Android/data/com.openh1.openh1/files/save/u` (the
+profiles). An `adb pull` of the whole `save` folder stops at the `blam.lst`
+files of `save/z`, which adb cannot read.
+
+## Back up and restore
+
+Removing the app deletes its data folder, so the app can make a backup of
+your data first. A backup holds your profiles with their saved games and
+their friends (`friends.txt`, the profile's key and friends list), the
+settings (`config.toml`), the server browser's favorite games
+(`favorites.txt`) and the touch layout. It does not hold the maps: the disc
+image gives those back.
+
+To make a backup:
+
+1. Quit the game from its main menu. The backup does not operate while the
+   game runs.
+2. Long-press the app's icon and choose Back up saves.
+3. Push "Back up". The file picker of the system opens.
+4. Choose where to keep the file, and save it.
+
+The backup is a zip file named `openh1-saves-<date>.zip`. Keep it on the
+phone, on a computer or in a cloud folder that only you can open.
+
+Keep the backup private and do not share it. It holds each profile's
+friend identity (the key in `friends.txt`), so anyone with the file can act
+as you to your friends. Restoring the same backup on a second phone gives
+both phones the same friend code.
+
+To restore a backup:
+
+1. Quit the game from its main menu.
+2. Long-press the app's icon, choose Back up saves, and push "Restore". On
+   a fresh install, push "Restore saves and settings" on the first screen
+   of the app instead.
+3. Select the zip file. The app reads it, and shows what it holds and
+   what it replaces on the phone.
+4. Tick what you want back: the profiles and their saved games, the
+   settings and the touch layout. Then push "Restore".
+
+A profile in the backup that is also on the phone (the same profile, not
+only the same name; the app lists them before you restore) is replaced
+whole: anything newer in it on the phone, such as campaign progress, is
+lost. It keeps its friends when the backup has none for it (a backup made
+before the profile had a friend code). The other profiles on the phone stay. The
+settings and the touch layout are each a choice, and they replace the ones
+on the phone. The app refuses a file that is not a backup of OpenH1, and
+says why. After a restore on a fresh install, the app still needs the disc
+image for the maps.
+
+Android TV has no icon shortcuts, so the backup needs a phone or a tablet
+launcher.
 
 ## Controls
 
@@ -185,7 +239,7 @@ with the positions on the Xbox controller:
 | Create | back | |
 
 The controller gets the rumble. The back gesture of Android is the B
-button. A Bluetooth or USB keyboard operates as on Linux.
+button in the menus (back out) and pauses a game. A Bluetooth or USB keyboard operates as on Linux.
 
 The touchscreen operates the menus: tap an item to select it (on a
 setting with values, tap its left or right half), tap a button of the key
@@ -196,7 +250,9 @@ and the Party screen are laid out for a finger: tiles, rows and buttons
 words; a tap on a row chooses it and shows it in the panel beside, a second
 tap opens or joins it. Drag a list to scroll it (down or right steps back,
 up or left steps forward). A drag stops at the first and the last item, and it does not change a setting's
-value. Touches that start in the edge-gesture zones of Android do not tap
+value. A slider moves with a finger that drags sideways along it; a drag
+that starts up or down scrolls the list, even on a slider, and a tap on
+the chosen row's slider sets it there. Touches that start in the edge-gesture zones of Android do not tap
 or scroll at the sides, and do not scroll at the top and bottom, because the
 first swipe from an edge in full screen only shows the system bars.
 
@@ -265,6 +321,11 @@ controls' scene (`port/linux/game/touch_game.c`, `TouchContext.java`):
 - With none of the current grenade type, the grenade button is dimmed.
 - In a vehicle's seat (driver, passenger or gunner), Jump and Crouch hide
   and the action button's caption says EXIT; Fire stays.
+- Crouch is tapped on and off by default, not held: it sits under the left
+  thumb beside the stick, so a tap crouches until Crouch is tapped again,
+  Jump is pressed, a vehicle's seat is taken or the player dies, and the
+  button shows held meanwhile. The setting `input.touch_crouch` makes it a
+  button to hold instead.
 - Each button press gives a short, light tap of the vibrator, with the
   vibration on ("General"), on top of the game's own rumble.
 
@@ -283,18 +344,26 @@ as the phone turns, never inverted). The setting `input.touch_aim_assist`
 turns the aim assist off. "Look sensitivity" sets how far a swipe turns;
 the mouse settings do not apply.
 
+On a screen taller than 16:9 (the inner screen of a folding phone, a
+tablet) the controls under the thumbs keep the distance from the bottom
+that they have on a phone, and the top row stays at the top; the space
+between them is left to the game. On a wider screen they spread to the
+sides.
+
 The touch controls show only in a game. In the menus and during
 cinematics they hide, and the touchscreen operates the menus as described
-above. They also hide when a controller, a physical mouse or a physical
-keyboard is connected, for example the built-in controller of a handheld:
-the game says which controllers it sees, as SDL finds a pad the app's own
-device list can miss (one paired while the game runs). A device without a
-touchscreen (a TV) never shows them. The setting `input.touch_controls`
-changes this (refer to "Settings").
+above. They also hide when a controller is connected, for example the
+built-in controller of a handheld (the game says which controllers it
+sees, as SDL finds a pad the app's own device list can miss: one paired
+while the game runs), and when a mouse or a keyboard with letters is
+plugged in or paired; the phone's own buttons, touchscreen and touchpad do
+not count. A device without a touchscreen (a TV) never shows them. The
+setting `input.touch_controls` changes this (refer to "Settings").
 
 The buttons at the top of the screen:
 
-- "Hide" (in the middle, four corners pointing in) removes the controls
+- "Hide" (in the middle, four corners pointing in; in portrait beside
+  "Options") removes the controls
   (and stops the gyroscope aiming and the vibration) until you push it
   again (four corners pointing out); the app remembers it.
 - "Options" (the gear, at the right) opens these items:
@@ -347,10 +416,15 @@ These settings are only for Android:
 | --- | --- |
 | `input.touch_captions` | (Android and iOS) `true` (the default): what each of the touch controls' controller buttons does in the profile (JUMP, MELEE, FIRE) is written under it, in the HUD's font and colour. `false`: the buttons alone. The buttons are drawn in `display.hud_button_style`. |
 | `input.touch_aim_assist` | (Android, iOS and the web) `true` (the default): the touch controls' swipe aiming gets the aim assist of a controller (the aim slows over a target and follows a moving one). `false`: none, as with a mouse; the bullets' own autoaim stays. |
+| `input.touch_crouch` | (Android and iOS) `"toggle"` (the default): a tap on the touch controls' Crouch crouches until Crouch is tapped again, Jump is pressed, a vehicle's seat is taken or the player dies. `"hold"`: you crouch while you hold it. |
 | `input.touch_controls` | (Android, iOS and the web) The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to textures and vertices by page protection. `false`: it compares page contents once a frame instead, which is slower. Refer to "Limits". |
 | `display.astc_textures` | `"auto"` (the default): on a GPU without BC's formats (Mali, PowerVR) that samples ASTC, the maps' DXT textures are transcoded to ASTC 4x4, a quarter of the memory and bandwidth of the decoded textures; their few blocks that need encoding are encoded on worker threads the first time and kept in the app's cache folder. `"off"`: decoded, as before. Checked on a Pixel 11 Pro (PowerVR); the emulator, whose ASTC is emulated, draws those textures black. The log says which (`vulkan: DXT textures as ...`). Refer to [port/linux/README.md](../linux/README.md#settings). |
+| `display.picture_position` | Where the picture sits on a screen taller than it, such as the inner screen of a folding phone, a tablet or a window in split screen. `"center"` (the default) leaves black above and below it. `"top"` puts all the black below it, where the touch controls under the thumbs are. `"bottom"` puts all the black above it. A window taller than it is wide (portrait) has the picture under the strip along the top, lowered into the space above the touch controls when there is room. |
+| `display.orientation` | `"landscape"` (the default), `"portrait"`, or `"auto"`, whichever way the device is held (as its own rotation lock allows); a change applies at once, the game turning in place. In portrait a strip along the top holds back, pause and the touch toolbar; the picture is under it, lowered into the middle of the space above the touch controls when there is room; when there is none (a folding phone's inner screen, half a phone in split screen) it moves up, as far as the top of the screen, to clear the controls, and pause and the toolbar's hide move to the middle of the strip, off the corners of the game's HUD. |
+| `display.picture_shape` | The shape of the picture on a screen taller than it: `"4:3"` (the default, the Xbox's) or `"16:9"`, which sees more to the sides and leaves more of the screen to the touch controls. |
+| `display.frame_style` | The look of the screen around the picture in portrait: `"plain"` (the default) black, `"halo"` (navy, with the HUD's cyan lines and rings) or `"xbox"` (ribbed black, with green). It is never drawn over the picture. |
 
 ## Internet play
 
@@ -397,7 +471,9 @@ signed with others, so an app installed before it cannot update: remove it
 once and install the new APK (refer to "Install"). If you installed a build
 that has a different signature, remove that build before you install a new
 build. Removing the app deletes its data folder: first make a copy of
-`maps/` and `save/u`.
+`maps/` and `save/u`, or, on a build that has it, a backup of the saves
+and settings (long-press the app's icon, Back up saves), and a copy of
+`maps/`.
 
 ## Widescreen
 
@@ -413,6 +489,17 @@ shape and scaled to those pixels:
   and backgrounds (the pause menu's dim, dialogs, the menus' gradient).
 
 All the ports draw this way.
+
+The game also runs in a window: in split screen (with a video or notes
+beside it), in a pop-up window and in Samsung DeX, and on a folding phone
+folded or unfolded mid-game. The window can have any shape and size from
+320 x 240 dp; it changes in place, and the touch controls are laid out
+again. A window taller than 4:3 has the 640 columns across its width, with
+black above and below (`display.picture_position` puts all of it below or above;
+`display.picture_shape` makes the picture 16:9). In full screen the game
+stays in landscape unless `display.orientation` is `"portrait"` or `"auto"`; a
+portrait-shaped window has a strip along the top (back, pause and the
+toolbar), the picture under it and the touch controls below it.
 
 The old Android-only `display.screen_width` setting is removed. The
 drawable determines both the aspect ratio and the render resolution,
