@@ -18,7 +18,6 @@ Known issues:
 - The first few seconds after a level loads run slower.
 - The campaign has one save slot. Starting a new game overwrites it (see [Files](#files)).
 - In bullet time the sound plays at normal speed.
-- In multiplayer against a host on plain OpenH1, shots fired by hand around a corner may be refused. I am working on it.
 
 ## What this adds over OpenH1 build-769
 

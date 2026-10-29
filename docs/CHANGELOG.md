@@ -84,7 +84,6 @@ The mod is built for the Quest, so on the Frame it would run through Lepton. Her
 - The first few seconds after a level loads run slower.
 - The campaign has one save slot. Starting a new game overwrites it.
 - In bullet time the sound plays at normal speed.
-- In multiplayer against a host on plain OpenH1, shots fired by hand around a corner may be refused. I am working on it.
 
 ### Credits
 
