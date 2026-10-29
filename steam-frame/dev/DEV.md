@@ -4,7 +4,7 @@ OpenFrame is the Steam Frame fork of [OpenH1](https://github.com/OpenH1/OpenH1):
 Halo: Combat Evolved with OpenXR VR, drawn with Vulkan (Mesa's Turnip on the Frame's Adreno), run in
 the Frame's own SteamVR. This folder (`steam-frame/`) is the Frame packaging layer: build, install,
 launch wrapper, logs, release. It touches nothing under `source/`, `port/`, `tools/` or
-`configure.py`. The branch `steam-frame` is pinned to OpenH1's release tag `build-734`.
+`configure.py`. The branch `steam-frame` began at OpenH1's release tag `build-734`; its current base is `build-769`.
 
 Everything below is what the scripts do. Nothing here has been run in a headset yet: see
 [What is confirmed](#what-is-confirmed).
@@ -92,7 +92,7 @@ over `config.toml`.
 ## Release
 
 ```
-steam-frame/release.sh --version 0.1.0-alpha.1   # steam-frame/release/openframe-0.1.0-alpha.1-linux-arm64.tar.gz + SHA256SUMS (the script's default version)
+steam-frame/release.sh --version 1.0.0   # steam-frame/release/openframe-1.0.0-linux-arm64.tar.gz + SHA256SUMS (the script's default version)
 ```
 
 Needs a finished build. The tarball has the game, the library, the scripts, `brokers.txt`, `art/` (if it
@@ -103,8 +103,8 @@ licence texts (`licenses/`, `LICENSE*`, `COPYING*`, `THIRD-PARTY-NOTICES.md`) ar
 ## Privacy check
 
 ```
-steam-frame/tools/privacy-check.sh              # our files since build-734
-steam-frame/tools/privacy-check.sh --history    # commits after build-734: lines, authors, messages
+steam-frame/tools/privacy-check.sh              # our files since build-769 (the base)
+steam-frame/tools/privacy-check.sh --history    # commits after build-769: lines, authors, messages
 steam-frame/tools/privacy-check.sh TARBALL|DIR
 ```
 

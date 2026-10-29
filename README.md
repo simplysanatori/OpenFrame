@@ -21,7 +21,7 @@ What it does:
 | Tested hardware | not yet |
 | SteamOS | not yet |
 | SteamVR | not yet |
-| Game version | OpenH1 `build-734` (the base of branch `steam-frame`) |
+| Game version | OpenH1 `build-769` (the base of branch `steam-frame`; it began at `build-734`) |
 | Disc / maps | not yet |
 | Refresh rates seen working | not yet |
 

@@ -3,7 +3,7 @@
 #
 #   steam-frame/release.sh [--version VER] [--build DIR] [--out DIR]
 #
-#   --version VER the release version, e.g. 0.1.0-alpha.1 (default: the VERSION line below)
+#   --version VER the release version, e.g. 1.0.0 (default: the VERSION line below)
 #   --build DIR   the build folder (default <repo>/build/linux_arm64): halo and libSDL3.so.0
 #   --out DIR     where the tarball and SHA256SUMS go (default <repo>/steam-frame/release)
 #   --stage DIR   only stage the file set into DIR (created if missing) and stop: no tarball, no checks.
@@ -17,7 +17,7 @@
 # tarball, and SHA256SUMS is written beside it. Any failure deletes the tarball again.
 set -euo pipefail
 
-VERSION=0.1.0-alpha.1
+VERSION=1.0.0
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$here/.." && pwd)
 build=$repo/build/linux_arm64 out=$here/release stage_only=

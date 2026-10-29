@@ -2,14 +2,14 @@
 # Looks for personal data before anything is published. GPLv3 (adapted from PrimedFrame's and
 # GalaxyFrame's checker, which came from Moonlight XR Native's tools/privacy-check.sh).
 #   privacy-check.sh              our own additions: the files changed or added on this branch since
-#                                 OpenH1's build-734 (git diff --name-only build-734...HEAD) plus every
+#                                 OpenH1's build-769 (git diff --name-only build-769...HEAD) plus every
 #                                 tracked file under steam-frame/, plus the README, credits, licence and
 #                                 notice files. OpenH1's own code has contributors' e-mail addresses in
 #                                 places; they are out of scope.
-#   privacy-check.sh --history    the lines every commit after build-734 added, and those commits'
+#   privacy-check.sh --history    the lines every commit after build-769 added, and those commits'
 #                                 authors, committers and messages
 #   privacy-check.sh DIR|TAR      every file under DIR, or inside a release tarball
-# OPENFRAME_BASE=REF changes the upstream reference (default build-734).
+# OPENFRAME_BASE=REF changes the upstream reference (default build-769).
 # Prints each finding (never the matched text itself) and exits 1 when there is one.
 #
 # Bundled third-party licence texts are shipped verbatim and carry their authors' e-mail addresses, so
@@ -40,7 +40,7 @@ PAT="${OPENFRAME_PRIVACY_PATTERNS:-$HOME/.config/openframe-privacy.txt}"
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 MODE=files
 if [ $# -eq 0 ]; then
-    BASEREF=${OPENFRAME_BASE:-build-734}
+    BASEREF=${OPENFRAME_BASE:-build-769}
     { git diff --name-only -z --diff-filter=d "$BASEREF"...HEAD
       git ls-files -z -- steam-frame README.md README.upstream.md CREDITS.md THIRD-PARTY-NOTICES.md NOTICE.md LICENSE; } |
         tr '\0' '\n' | sort -u | tr '\n' '\0' | grep -zv -e '^port/third_party/' > "$TMP/list"
@@ -48,7 +48,7 @@ if [ $# -eq 0 ]; then
     BASE=.
 elif [ "$1" = "--history" ]; then
     MODE=history; BASE=.
-    RANGE=${OPENFRAME_BASE:-build-734}..HEAD
+    RANGE=${OPENFRAME_BASE:-build-769}..HEAD
     git log --format='@@@%H%n%an <%ae>%n%cn <%ce>%n%B%n@@@END' "$RANGE" > "$TMP/meta"
     git log -p -U0 --no-color --no-ext-diff --format='@@@COMMIT %H' "$RANGE" > "$TMP/diffs"
     : > "$TMP/list"

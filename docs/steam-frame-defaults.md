@@ -12,16 +12,17 @@ SteamVR 2.18's OpenXR runtime, eyes of 1728x1728 recommended, 72, 90 or
 the wrapper's `TU_DEBUG=sysmem`.
 
 OpenH1's VR defaults were already chosen and measured on a Frame (its
-README, "Steam Frame" and "Frame rate"), so OpenFrame changes none of them
-today: the table says where a change is worth measuring, and what to
-measure, before it becomes a default.
+README, "Steam Frame" and "Frame rate"), so OpenFrame changes only two of
+them, the resolution scale and the foveation inset: the table says where
+another change is worth measuring, and what to measure, before it becomes a
+default.
 
 | Setting | OpenH1 default | OpenFrame default | Why | Risk of changing it |
 | --- | --- | --- | --- | --- |
 | `vr.refresh_rate` | `90` | `90` (the installer writes it when `config.toml` lacks it; the wrapper's `OPENFRAME_REFRESH_HZ`, when given, wins at run time) | 11.1 ms a frame leaves the GPU room at 1728x1728 (OpenH1 measured about 8 ms GPU there with its older renderer); 72 Hz for heavy levels | 120 Hz needs the GPU under about 7 ms: unmeasured with the Vulkan renderer, SteamVR halves the rate when it is missed |
-| `vr.resolution_scale` | `1.0` (1728x1728) | `1.0` | The runtime's recommended size; 1.25 was at the edge of 72 Hz, 1.5 dropped to 36 Hz (OpenH1's Frame numbers) | Above 1.0 at 90 Hz drops frames |
-| `vr.foveation` | `"eye"` | `"eye"` | SteamVR on the Frame offers `XR_EXT_eye_gaze_interaction` (its client logs list it); half the eyes' pixels drawn; without tracking it falls back to `"fixed"` | `"off"` doubles the eye pass's pixels |
-| `vr.foveation_inset` | `0.5` | `0.5` | 864x864 inset of 1728; the blend hides its edge | 0.4 is faster but its edge may show where the eye tracker lags (unmeasured on the Frame) |
+| `vr.resolution_scale` | `1.0` (1728x1728) | `0.9` | A little under the runtime's recommended size; trials on the Frame settled it (OpenH1's numbers: 1.25 was at the edge of 72 Hz, 1.5 dropped to 36 Hz) | Above 1.0 at 90 Hz drops frames |
+| `vr.foveation` | `"eye"` | `"eye"` | SteamVR on the Frame offers `XR_EXT_eye_gaze_interaction` (its client logs list it); about a third of the eyes' pixels drawn; without tracking it falls back to `"fixed"` | `"off"` doubles the eye pass's pixels |
+| `vr.foveation_inset` | `0.5` | `0.4` | Trials on the Frame settled it; the blend hides the inset's edge | Smaller is faster but its edge may show where the eye tracker lags |
 | `vr.depth` | `false` | `false` | SteamVR on the Frame cannot take the eyes' depth, and it is never sent while foveated | none (true does nothing useful there) |
 | `vr.late_latch` | `true` | `true` | Pacing: not touched by this review | n/a |
 | Eye anti-aliasing | none (the VR eyes have no FXAA/SMAA pass; MSAA cost 15 ms at 2x on the old renderer) | none | No budget at 90 Hz | Alpha-tested foliage and grates crawl; MSAA on the Vulkan eyes is unmeasured on the Frame |

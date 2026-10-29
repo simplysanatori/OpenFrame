@@ -4417,7 +4417,7 @@ the next start.
 | Setting | Default | Environment variable | Function |
 | --- | --- | --- | --- |
 | `vr.enabled` | `true` | `HALO_VR` | `false`: play flat. |
-| `vr.resolution_scale` | `1.0` | `HALO_VR_RESOLUTION_SCALE` | The eyes' images, as a multiple of the size that the headset recommends (from `0.25` to `2`). |
+| `vr.resolution_scale` | `0.9` | `HALO_VR_RESOLUTION_SCALE` | The eyes' images, as a multiple of the size that the headset recommends (from `0.25` to `2`). |
 | `vr.refresh_rate` | `90.0` | `HALO_VR_REFRESH_RATE` | The refresh rate to ask the runtime for. `0`: the runtime's. When the runtime refuses it or gives another, the log lists the rates the display has (`vr: the display's refresh rates: ...`). |
 | `vr.aim` | `"controller"` | `HALO_VR_AIM` | `"controller"`: the right controller aims and holds the weapon. `"head"`: the head aims. `"gamepad"`: a gamepad aims and plays, as on the flat screen, and the head looks about freely (above, "With a gamepad"). |
 | `vr.gamepad_view` | `"camera"` | `HALO_VR_GAMEPAD_VIEW` | With `vr.aim = "gamepad"`: `"camera"`, the stick turns and pitches the view as the flat screen's camera, the head's turn on top (the most like the Xbox game, and the most likely to make you sick); `"level"`, it turns the view smoothly, and its pitch moves only the reticle; `"snap"`, the view turns a step of `vr.snap_turn_angle` each time the aim is more than that from it, and its pitch moves only the reticle. |
@@ -4425,8 +4425,8 @@ the next start.
 | `vr.swap_sticks` | `"auto"` | `HALO_VR_SWAP_STICKS` | `"yes"`: the right stick moves (its click crouches) and the left turns (its click zooms or toggles bullet time); `"no"`: as they are; `"auto"`: swapped with `vr.dominant_hand = "left"`. Not with `vr.aim = "gamepad"`. |
 | `vr.weapon_offset` | `"0.15, -0.22, 0.30"` | `HALO_VR_WEAPON_OFFSET` | With `vr.hands = "game"`: where the weapon's grip is from the eye that the game poses it for, in metres: right, up, forward. |
 | `vr.depth` | `false` | `HALO_VR_DEPTH` | `true`: give the runtime the eyes' depth too (`XR_KHR_composition_layer_depth`), for its reprojection. SteamVR on the Steam Frame could not make a depth swapchain for the OpenGL session the VR build had before it drew with Vulkan. |
-| `vr.foveation` | `"eye"` | `HALO_VR_FOVEATION` | Foveated rendering (below, "How it operates"): each eye's image at its full resolution in an inset where you look, and at less about it, which draws half of the eyes' pixels (at the default `vr.foveation_inset`). `"eye"`: the inset follows the eyes, where the runtime tracks them (`XR_EXT_eye_gaze_interaction`; else as `"fixed"`); `"fixed"`: it stays in the middle of each eye's view; `"off"`: all of each image at full resolution. In VR Setup > DISPLAY (FOVEATION); from the next start. |
-| `vr.foveation_inset` | `0.5` | `HALO_VR_FOVEATION_INSET` | With `vr.foveation`: how much of each eye's image across and up is the inset (from `0.3` to `0.8`), at the image's resolution; about it, the image is drawn at this much of it (`0.5`: half across and up). Smaller is faster. From the next start. |
+| `vr.foveation` | `"eye"` | `HALO_VR_FOVEATION` | Foveated rendering (below, "How it operates"): each eye's image at its full resolution in an inset where you look, and at less about it, which draws about a third of the eyes' pixels (at the default `vr.foveation_inset`). `"eye"`: the inset follows the eyes, where the runtime tracks them (`XR_EXT_eye_gaze_interaction`; else as `"fixed"`); `"fixed"`: it stays in the middle of each eye's view; `"off"`: all of each image at full resolution. In VR Setup > DISPLAY (FOVEATION); from the next start. |
+| `vr.foveation_inset` | `0.4` | `HALO_VR_FOVEATION_INSET` | With `vr.foveation`: how much of each eye's image across and up is the inset (from `0.3` to `0.8`), at the image's resolution; about it, the image is drawn at this much of it (`0.5`: half across and up; OpenFrame's default is `0.4`, OpenH1's `0.5`). Smaller is faster. From the next start. |
 | `vr.late_latch` | `true` | `HALO_VR_LATE_LATCH` | The late latch (below, "How it operates"): each frame is drawn from where the head and the weapon's controller are just before it goes to the headset, located again by the renderer's thread, not where they were as the game began the frame; the game's work is the frame's as it was. `false`: as located when the game began it. |
 | `vr.melee_gesture` | `true` | `HALO_VR_MELEE_GESTURE` | A swing of the right controller melees, as B does: a hard one in any direction, or a softer one with the right grip held ("Meleeing with a swing"). |
 | `vr.holsters` | `true` | `HALO_VR_HOLSTERS` | With `vr.aim = "controller"`: the weapon you carry but do not hold is on your body, and the right hand reaching there and gripping draws it (above, "Holsters"). Y switches weapons as ever. |
@@ -4652,13 +4652,13 @@ does; making the eye images from the four layers cost 0.2 ms more there.
 - Foveated (`vr.foveation`, the default), the eye pass draws four views
   in the same draws (multiview with four views, where the device has them
   and fragment storage-buffer atomics; `vulkan/host_vulkan_vr.c`),
-  each `vr.foveation_inset` of an eye's image across and up (864x864 of
-  1728x1728 by default): for each eye the whole of it, at that fraction of
+  each `vr.foveation_inset` of an eye's image across and up (0.5 would be 864x864 of
+  1728x1728; OpenFrame's default is 0.4): for each eye the whole of it, at that fraction of
   its resolution, and an inset of it, at its full resolution, about where
   the eyes look. Each eye's vertices move to its two views as they moved to
   its one, the inset's magnified about its place, so the game's work and
-  its draws are as before; half of the eyes' pixels are drawn (as many as
-  one eye's), and the GPU drops what is outside an inset before it shades
+  its draws are as before; at 0.5 half of the eyes' pixels are drawn (as many as
+  one eye's; about a third at 0.4), and the GPU drops what is outside an inset before it shades
   it. The screen's targets have four layers, each layer drawn as its view
   is, and sampled at the point that the layer has (where an inset does not
   reach, as at the edge of a blur, from the whole eye's layer). The present

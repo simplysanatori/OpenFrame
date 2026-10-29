@@ -429,7 +429,9 @@ static const struct config_setting config_settings[] =
 	/* the VR build's (configure.py --vr; vr.c) */
 	{ "vr.enabled", _config_boolean, "true", "HALO_VR", _environment_value, _platform_desktop,
 		"Play in the VR headset (OpenXR); false plays flat, in the window." },
-	{ "vr.resolution_scale", _config_real, "1.0", "HALO_VR_RESOLUTION_SCALE", _environment_value, _platform_desktop,
+	/* OpenFrame: 0.9 (OpenH1's was 1.0), as headset trials on the Steam Frame
+	settled it */
+	{ "vr.resolution_scale", _config_real, "0.9", "HALO_VR_RESOLUTION_SCALE", _environment_value, _platform_desktop,
 		"The eyes' images, as a multiple of the size the headset recommends\n"
 		"(0.25 to 2): smaller is faster, larger sharper." },
 	{ "vr.refresh_rate", _config_real, "90.0", "HALO_VR_REFRESH_RATE", _environment_value, _platform_desktop,
@@ -458,7 +460,7 @@ static const struct config_setting config_settings[] =
 		"DOMINANT HAND; vr.hand_swap's gesture sets it too." },
 	{ "vr.swap_sticks", _config_string, "\"auto\"", "HALO_VR_SWAP_STICKS", _environment_value, _platform_desktop,
 		"\"yes\": the right stick moves and the left turns (and zooms, its click;\n"
-		"pushed down, ejects the magazine), \"no\": as they are; \"auto\": swapped\n"
+		"flicked up, sprints), \"no\": as they are; \"auto\": swapped\n"
 		"with vr.dominant_hand = \"left\". Not with vr.aim = \"gamepad\"." },
 	{ "vr.weapon_offset", _config_string, "\"0.15, -0.22, 0.30\"", "HALO_VR_WEAPON_OFFSET", _environment_value,
 		_platform_desktop,
@@ -472,7 +474,9 @@ static const struct config_setting config_settings[] =
 		"about it, which is faster: \"eye\" the inset follows the eyes where the\n"
 		"headset tracks them (else as \"fixed\"), \"fixed\" it stays in the\n"
 		"middle of each eye's view, \"off\" all at full detail. From the next start." },
-	{ "vr.foveation_inset", _config_real, "0.5", "HALO_VR_FOVEATION_INSET", _environment_value,
+	/* OpenFrame: 0.4 (OpenH1's was 0.5), as headset trials on the Steam Frame
+	settled it */
+	{ "vr.foveation_inset", _config_real, "0.4", "HALO_VR_FOVEATION_INSET", _environment_value,
 		_platform_desktop,
 		"With vr.foveation: how much of each eye's image across (and up) is at full\n"
 		"detail, from 0.3 to 0.8, which is also the detail about it (0.5: half).\n"

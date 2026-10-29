@@ -655,7 +655,7 @@ over FOVEA_SETTLE_SECONDS after smaller ones (the eyes' drift and the
 tracker's noise, which would move it for nothing); with the gaze lost (a
 blink), it stays FOVEA_LOST_SECONDS, then returns to the middle of the view
 over FOVEA_RETURN_SECONDS */
-#define FOVEA_INSET 0.5f
+#define FOVEA_INSET 0.4f
 #define FOVEA_INSET_SMALLEST 0.3f
 #define FOVEA_INSET_LARGEST 0.8f
 #define FOVEA_SACCADE_DEGREES 3.0f
@@ -1525,7 +1525,7 @@ int halo_vr_initialize(void)
 	memset(&vr.info, 0, sizeof(vr.info));
 	vr.info.scale = (float)config_real("vr.resolution_scale");
 	if (vr.info.scale < 0.25f || vr.info.scale > 2.0f)
-		vr.info.scale = 1.0f;
+		vr.info.scale = 0.9f;
 	vr.info.hud_width = HUD_WIDTH;
 	vr.info.hud_height = HUD_HEIGHT;
 	/* (no image for the visor's glass: it is drawn into the eyes', vr_visor.c) */
