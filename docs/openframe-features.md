@@ -29,9 +29,6 @@ player profile menu) is a tree of pages of one purpose each:
   GRABBING... (fists, punch speed and damage, weapon pull and range, hand
   swap, prop throw and strength, grab world).
 
-**Untested in the headset** marks a feature built and compiled but not yet
-played on a Steam Frame.
-
 ## Ported from HaloCE-DecompRemix-VR
 
 Ported from moistman42069's HaloCE-DecompRemix-VR
@@ -41,7 +38,7 @@ AGPL-3.0-or-later, as OpenH1 is), re-implemented on OpenH1's VR layer
 share almost no code, so mostly the ideas and the tuning were carried over;
 the few functions whose lines came across say so at their top.
 
-### Fists: punch and parry (untested in the headset)
+### Fists: punch and parry
 
 `port/linux/game/vr_fists.c`, once a tick (`source/game/game.c`, a marked
 port change), the hands from `port/linux/src/vr.c`.
@@ -85,7 +82,7 @@ port change), the hands from `port/linux/src/vr.c`.
   aim assist's pill, and a strong hit's stagger the game's own stun and
   stumble.
 
-### Weapon pull, prop throw and hand swap (untested in the headset)
+### Weapon pull, prop throw and hand swap
 
 `port/linux/game/vr_grab.c` (OpenH1's grab, extended), its hands from
 `vr_fists.c`'s tick; the grips' sharing in `port/linux/src/vr.c`. All for
@@ -130,7 +127,7 @@ the hand without the weapon.
   their own), lifting vehicles and grabbing bodies, PULL STYLE GRIP and
   PULL GLOW's outline (the game's own highlight lights it instead).
 
-### Third person on foot (untested in the headset)
+### Third person on foot
 
 On foot, the view from behind and above you, your body drawn as the game
 animates it for everyone else, its weapon in its hands. Only the view
@@ -157,15 +154,13 @@ game's (`source/render/render_objects.c` and
   does nothing here; `"off"`).
 - Input, `"hold"`: hold the turning stick (the right, or the left with
   `vr.swap_sticks`) pushed down for 0.8 s to switch between it and the first
-  person. The hold is the switch: it needs `vr.third_person` on in
-  config.toml no longer (headset trial 9: with it off, two holds toggled
-  nothing); it turns the view on or off whichever it was, and writes the
+  person. The hold is the switch: it does not need `vr.third_person` on in
+  config.toml; it turns the view on or off whichever it was, and writes the
   new state into `vr.third_person`, so the view stays as you left it at the
   next start (the THIRD PERSON row of MOVEMENT AND COMFORT shows it). The hold counts however the push began: it begins as more down than
   sideways (a push that started on a diagonal and settled still counts) and
   goes on while the stick stays well down (down at least 0.4, sideways at most
-  1.4 times the down), so a thumb that drifts does not end it unheard (trial 9:
-  holds that dipped to 0.51 down were dropped by the tighter hold cone). The
+  1.4 times the down), so a thumb that drifts does not end it unheard. The
   stick's down is no game control while the controllers aim, and ejects no
   magazine (removed on purpose). The HUD says "Third person" and
   "First person", both controllers pulse, and the log says `vr: third person
@@ -180,7 +175,7 @@ game's (`source/render/render_objects.c` and
   rather than the aim; its switching of the hands' features off (the head
   aiming) is not carried over: the controller aims as ever.
 
-### Parkour: slide, wall jump, wall run (untested in the headset)
+### Parkour: slide, wall jump, wall run
 
 `port/linux/game/vr_parkour.c`, from `source/units/bipeds.c` (marked port
 changes) as each tick's movement is made ready, and in each sub-step of
@@ -196,8 +191,7 @@ changes) as each tick's movement is made ready, and in each sub-step of
   then a wall jump), leave the ground, meet a wall, slow to half a run,
   after 1.1 seconds, or, with the head, as you let the crouch go (the head
   coming up). A slide begun by the click is latched (`vr.slide_latch`,
-  default `true`): the Frame's stick click is a tap (headset trial 4: a
-  slide of 0.17 s), so click once and it runs its whole time with the click
+  default `true`): the Frame's stick click is a tap, so click once and it runs its whole time with the click
   let go; click again to stop it early. The game's crouch is held for it
   (`player_control.c`'s two marked sites ask `vr_parkour_slide_active()`),
   so the body and its hitbox stay low. `vr.slide_latch = false` holds the
@@ -239,7 +233,7 @@ changes) as each tick's movement is made ready, and in each sub-step of
   holsters, the foregrip, magazines, grenades and a vehicle's holds, and
   both together recentre.
 
-### Bullet time (untested in the headset)
+### Bullet time
 
 Slows the world while your head and hands keep the display's rate. The
 game's clock runs slower (`source/main/main.c` scales the time it gives
@@ -292,8 +286,7 @@ turns it off. It eases in and out over about a sixth of a second.
   state is logged as `vr: stick click: held 0.12 s -> zoom` or `vr: stick
   click: held 0.40 s -> bullet time`. A hold of the click may trigger a Steam
   Input script that is bound to it: use `"flick_down"` then.
-- Input, `"stick_click"` (from headset trial 10: the flicks were fiddly, or
-  too easy to do by accident; not the default: it takes the zoom; for players with `vr.scope_view = "eye"`,
+- Input, `"stick_click"` (not the default: it takes the zoom; for players who find the flicks fiddly or too easy to do by accident, and for players with `vr.scope_view = "eye"`,
   where the scope on the eye makes the zoom redundant): pressing in the
   turning stick toggles bullet time at once, on or off alike, and rests for
   half a second after a toggle. The click is the game's zoom otherwise, as in
@@ -306,20 +299,18 @@ turns it off. It eases in and out over about a sixth of a second.
   the third person's; a flick down does nothing here, logged as
   `vr: stick down: held 0.12 s -> nothing (...)`. The same cone as
   `"flick_down"`'s begins sprint's flick up.
-- Input, `"double_flick_down"` (trials 8 to 10; not the default): two
-  quick flicks DOWN of the turning stick, each let go within 0.45 s (trial 10:
-  flicks of 0.35 to 0.40 s were thrown out by the old 0.3 s), the second begun
+- Input, `"double_flick_down"` (not the default): two
+  quick flicks DOWN of the turning stick, each let go within 0.45 s, the second begun
   within 0.35 s of the first's end, toggle bullet time, on or off alike. One
-  flick down on its own does nothing (it was the magazine's eject in trials 9
-  and earlier; see "Left out on purpose" in `steam-frame/dev/DEV.md`), and
+  flick down on its own does nothing, and
   neither does a slower push. A hold down of 0.8 s is the third person's, and
   a push the third person took is no flick. The snap or smooth turn is off
   while the stick is in the cone. With `vr.third_person_binding =
   "double_flick_down"` the down is the third person's and bullet time works
   as `"double_flick"`.
-- Input, `"double_flick"` (a hold of 0.8 s was the first binding and
-  conflicts with a Steam Input script that holds the stick for a second; the
-  stick's down ejects nothing):
+- Input, `"double_flick"` (a hold of 0.8 s conflicts with a Steam
+  Input script that holds the stick for a second; the stick's down ejects
+  nothing):
   two quick flicks up of the turning stick (the right, or the left with
   `vr.swap_sticks`), the second beginning within 0.35 s of the first's end.
   The first flick toggles sprint at once as ever (no added latency); the
@@ -344,13 +335,8 @@ turns it off. It eases in and out over about a sixth of a second.
   while the stick is in the cone. Each push is logged once when it is over
   (stdout.log): `vr: stick up: held 0.93 s -> hold (bullet time on; sideways
   at most 0.41, up at least 0.62)`, or `flick`, or `nothing (spent, off foot;
-  menus ...)`. (Headset trial 7: no hold was ever seen in a session of
-  attempts; the old gesture needed 0.75 up and under 0.6 sideways for the
-  whole 0.8 s, one frame of not being on foot spent the push silently, and a
-  drift ended it as a flick.) The player's own body is of the world and slows with it (the run at
-  40%, jumps floating): in headset trial 3 a push held a little long (the
-  hold was half a second then) took bullet time, which was felt as a slow,
-  floaty sprint that no flick turned off. The stick's up is no game control
+  menus ...)`. The player's own body is of the world and slows with it (the run at
+  40%, jumps floating). The stick's up is no game control
   while the controllers aim (OpenH1 sends the right stick to the game only
   in the menus, cinematics and with `vr.aim = "gamepad"`), so no binding is
   taken from anything. On foot, with the controllers aiming.
@@ -374,12 +360,12 @@ pouch at the left hip (grip squeezed there; the rocket launcher's tubes from
 behind the left shoulder), which ejects the one in the weapon as the new one
 is taken. There is no other hand gesture: pulling the magazine out of the
 weapon with the free hand is not one. X reloads as ever, without the hand's
-work. The turning stick pushed down no longer ejects the magazine (OpenH1's
-stick eject was removed on purpose, headset trial 10: it left the HUD
-showing rounds while the gun could not fire); a flick down is bullet time's
+work. The turning stick pushed down ejects no magazine (OpenH1's
+stick eject is removed on purpose: it left the HUD showing rounds while the
+gun could not fire); a flick down is bullet time's
 (`vr.bullet_time_binding`, once bullet time is on in VR Setup) or nothing.
 
-### Sprint (untested in the headset)
+### Sprint
 
 Runs faster than the game's run, on foot and standing (not crouched), forward
 and sideways (not backing), accelerating faster with it. The view's field is
@@ -411,7 +397,7 @@ local player (`vr_sprint_speed_scale`).
   along your aim.
 - Where: a game of this computer alone, as bullet time.
 
-### Comfort vignette for moving and turning (untested in the headset)
+### Comfort vignette for moving and turning
 
 OpenH1's comfort vignette dimmed the edges of the view only in vehicles
 (handlebars' and wheels' turns, speeding up and braking, a seat's ride).
@@ -425,7 +411,7 @@ snap turn.
   older switch, still turns it off.
 - Input: none.
 
-### Wrist HUD and HUD modes (untested in the headset)
+### Wrist HUD and HUD modes
 
 `vr.hud_mode` says where the HUD's corners are: the shields and health, the
 weapon's ammunition and grenades, and the motion tracker. `"wrist"` puts them
@@ -457,7 +443,7 @@ glass, glow and reaction to the world (`port/linux/vulkan/host_vulkan_vr.c`).
   untracked, and in the menus the corners go back to the visor. It works at
   `vr.hud_depth` 0 as well (the corners are then on the visor at the HUD's
   distance when not on the wrist). The HUD's layer is placed in the play
-  space while the wrist HUD is on (it was locked to the view space at
+  space while the wrist HUD is on (otherwise it is locked to the view space at
   `vr.hud_lag` 0).
 - Its place and its test of facing the head come from moistman42069's
   (`vr_frame.c`, `place_wrist`: 10 cm behind the grip along the arm, 4.5 cm
@@ -472,25 +458,22 @@ glass, glow and reaction to the world (`port/linux/vulkan/host_vulkan_vr.c`).
   head, world, follow). A lag for the HUD following the head needs nothing
   new: OpenH1 has `vr.hud_lag`.
 
-## Recentring and Pillar of Autumn's tutorial (after the first headset trial)
+## Recentring and the Pillar of Autumn tutorial
 
-These fix what the first trial found (the player's eye outside the cryo
-tube, the tutorial not going on as the head looked about, the menu off to
-the side). Unlike the features above, `vr.auto_recentre` is on by default.
+These keep the player's eye in the cryo tube, let the tutorial go on as the
+head looks about, and put each menu in front of you. Unlike the features
+above, `vr.auto_recentre` is on by default.
 
 - SteamVR's own recentre (its dashboard's, or the system button's) moves
-  the play space; the game now recentres with it (the runtime's
-  `XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING`). Before, the game
-  kept its recentred origin from before, so the eye was as far from the
-  player's as the head had been from where it was then, and the menus were
-  as far round.
+  the play space; the game recentres with it (the runtime's
+  `XR_TYPE_EVENT_DATA_REFERENCE_SPACE_CHANGE_PENDING`), so the eye stays at
+  the player's and the menus stay in front of you.
 - `vr.auto_recentre` (default `true`): the game recentres (as both grips
   do) on the first frame drawn of each level start: a map loaded (a new
   game, CONTINUE, the next mission), a mission restarted or a checkpoint
   gone back to (the game's time going back). That is the frame the
-  loading picture fades into the level, not the start of the load: the
-  third trial's recentre came as the 16 s of a10's pipelines began, and the
-  head moved while they were made (`port/linux/game/vr_render.c`,
+  loading picture fades into the level, not the start of the load, so the
+  head has not moved while the pipelines are made (`port/linux/game/vr_render.c`,
   `level_start_check`). It also recentres as play comes back after a
   cinematic or the scripts letting go of the aim (half a second or more;
   held back while the loading picture is up), and places each menu in
@@ -523,7 +506,7 @@ the side). Unlike the features above, `vr.auto_recentre` is on by default.
   same with its head (`vr_head_look_actions`, `vr_script_can_see_point`);
   this is written for OpenH1's VR mode, not ported.
 
-## HUD placement (after the second headset trial; untested in the headset)
+## HUD placement
 
 With a glasses spacer the Frame's comfortable view is narrower, and the
 visor HUD's corners (the ammunition and grenades at the top left, the motion
