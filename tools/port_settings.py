@@ -405,8 +405,8 @@ VR_SCREENS["vr_gestures"] = {
     "help_top": 366,
     "rows": [
         ("BULLET TIME BINDING:", "vr.bullet_time_binding",
-         [("STICK CLICK", "stick_click"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("DOUBLE FLICK UP", "double_flick"), ("HOLD UP", "hold"), ("OFF", "off")],
-         "Stick click: press in the turning stick (first person; the third person keeps it as the zoom). Double flick down: two quick flicks, one alone does nothing. Up is sprint.",
+         [("CLICK, HELD", "click_hold"), ("STICK CLICK", "stick_click"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("DOUBLE FLICK UP", "double_flick"), ("HOLD UP", "hold"), ("OFF", "off")],
+         "Click, held: the turning stick's click zooms (in bullet time too); held for 0.4 s it is bullet time. Stick click: bullet time at once, no zoom (for the eye scope). Double flick down: two quick flicks. Up is sprint.",
          None),
         ("THIRD PERSON BINDING:", "vr.third_person_binding",
          [("HOLD", "hold"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("OFF", "off")],

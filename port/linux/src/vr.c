@@ -244,10 +244,11 @@ dead zone, and the push past it to the full ask */
 /* vr.sprint_mode = "toggle" and vr.bullet_time (comfort_update): the right
 stick pushed up (vr_stick_gesture.h's STICK_UP_*): a flick toggles sprint
 at once as it is pushed. Bullet time by vr.bullet_time_binding: a press of
-the turning stick's click ("stick_click", the default; headset trial 10: the
-flicks were fiddly or too easy to do by accident; the click is zoom's, which
-the scope on the eye makes redundant on foot in the first person, and the
-third person keeps), a double flick DOWN ("double_flick_down": two flicks
+the turning stick's click ("click_hold", the default: a short press is the
+zoom and a press held CLICK_HOLD_SECONDS bullet time; "stick_click": a press
+is bullet time's at once and no zoom, for vr.scope_view = "eye"; headset
+trial 10: the flicks were fiddly or too easy to do by accident; the
+third person keeps the zoom), a double flick DOWN ("double_flick_down": two flicks
 down, each let go within BULLET_FLICK_MAX_SECONDS, the second begun within
 STICK_DOUBLE_SECONDS of the first's end; one flick down alone is nothing),
 or a double
@@ -280,9 +281,11 @@ a push down does nothing else (the stick's eject of the magazine was removed
 on purpose, headset trial 10: with the HUD showing rounds the gun could not
 fire; the hand takes a magazine from the left hip, or X reloads) */
 /* vr.bullet_time_binding (comfort_update): what takes bullet time from the
-turning stick: "stick_click" (the default) a press of its click, in the first
-person on foot with the controllers aiming (the third person and the
-gamepad aim keep the click as the zoom); "double_flick_down" two flicks DOWN
+turning stick: "click_hold" (the default) its click, a short press the zoom
+and a press held CLICK_HOLD_SECONDS bullet time, and "stick_click" a press
+of its click at once (no zoom), both in the first person on foot with the
+controllers aiming (the third person and the gamepad aim keep the click as
+the zoom, live); "double_flick_down" two flicks DOWN
 (one on its own is nothing), the others from the stick pushed up;
 vr.third_person_binding: what switches the third person from the stick
 pushed down. A flick up is sprint's in every binding. */
@@ -291,6 +294,8 @@ pushed down. A flick up is sprint's in every binding. */
 #define BULLET_BINDING_OFF 2
 #define BULLET_BINDING_CLICK 3
 #define BULLET_BINDING_DOUBLE_DOWN 4
+#define BULLET_BINDING_CLICK_HOLD 5
+#define CLICK_ZOOM_PRESS_FRAMES 6
 #define THIRD_BINDING_HOLD 0
 #define THIRD_BINDING_DOUBLE_FLICK 1
 #define THIRD_BINDING_OFF 2
@@ -794,6 +799,10 @@ static struct
 	last frame, and this press taken (the zoom is not given it) */
 	int bullet_click_was;
 	int bullet_click_taken;
+	/* the click of "click_hold" (click_hold_update), and the frames left of
+	the zoom press given the game at a short click's release */
+	struct click_hold click_hold;
+	int click_zoom_frames;
 	struct stick_gesture third_hold;
 	int third_hold_push;
 	const char *stick_down_note;
@@ -1342,7 +1351,8 @@ static void settings_read(void)
 		!strcmp(config_string("vr.bullet_time_binding"), "off") ? BULLET_BINDING_OFF :
 		!strcmp(config_string("vr.bullet_time_binding"), "double_flick") ? BULLET_BINDING_DOUBLE_FLICK :
 		!strcmp(config_string("vr.bullet_time_binding"), "double_flick_down") ? BULLET_BINDING_DOUBLE_DOWN :
-		BULLET_BINDING_CLICK;
+		!strcmp(config_string("vr.bullet_time_binding"), "stick_click") ? BULLET_BINDING_CLICK :
+		BULLET_BINDING_CLICK_HOLD;
 	settings.third_person_binding = !strcmp(config_string("vr.third_person_binding"), "double_flick_down") ?
 		THIRD_BINDING_DOUBLE_FLICK : !strcmp(config_string("vr.third_person_binding"), "off") ? THIRD_BINDING_OFF :
 		THIRD_BINDING_HOLD;
@@ -4167,14 +4177,28 @@ static int bullet_on_double_down(void)
 	return settings.bullet_time && bullet_binding() == BULLET_BINDING_DOUBLE_DOWN;
 }
 
-/* whether the turning stick's click is bullet time's (the default binding)
-and not the zoom's: on foot in the first person with the controllers aiming,
-where the game allows bullet time (the campaign); the third person, a
-vehicle, the menus, a network game and the gamepad aim keep the zoom */
+/* whether the turning stick's click may be bullet time's (vr.bullet_time_binding
+"stick_click" or "click_hold"): on foot in the first person with the
+controllers aiming, where the game allows bullet time (the campaign); the
+third person, a vehicle, the menus, a network game and the gamepad aim keep
+the zoom, live */
+static int bullet_click_able(void)
+{
+	return settings.bullet_time && vr.bullet_able && !vr.third_person_on && comfort_on_foot();
+}
+
+/* whether the click is bullet time's at once and not the zoom's ("stick_click") */
 static int bullet_on_click(void)
 {
-	return settings.bullet_time && settings.bullet_time_binding == BULLET_BINDING_CLICK && vr.bullet_able &&
-		!vr.third_person_on && comfort_on_foot();
+	return settings.bullet_time_binding == BULLET_BINDING_CLICK && bullet_click_able();
+}
+
+/* whether the click is the zoom when short and bullet time's when held
+("click_hold", the default): the game is given the zoom at the release
+(click_zoom_frames), or the press itself where this is not so */
+static int bullet_on_click_hold(void)
+{
+	return settings.bullet_time_binding == BULLET_BINDING_CLICK_HOLD && bullet_click_able();
 }
 
 /* the arms' run (vr.sprint_mode = "arm_swing", ARM_SWING_* above): ported
@@ -4300,6 +4324,32 @@ static void comfort_update(float seconds, float turn)
 	}
 	if (vr.bullet_cooldown > 0.0f)
 		vr.bullet_cooldown -= seconds;
+	if (vr.click_zoom_frames > 0)
+		vr.click_zoom_frames--;
+	/* the turning stick's click (vr.bullet_time_binding = "click_hold"): a
+	click let go before CLICK_HOLD_SECONDS is the zoom (one press to the
+	game at the release), one held that long toggles bullet time, once, and
+	its release is nothing (the press is held back from the game while it
+	may be either, halo_vr_gamepad) */
+	{
+		int click = (vr.input.buttons & VR_BUTTON_RIGHT_STICK) != 0;
+		float held = 0.0f;
+		int result = click_hold_update(&vr.click_hold, click, bullet_on_click_hold(), seconds, &held);
+
+		if (result == CLICK_RESULT_ZOOM)
+		{
+			vr.click_zoom_frames = CLICK_ZOOM_PRESS_FRAMES;
+			platform_log("vr: stick click: held %.2f s -> zoom", held);
+		}
+		else if (result == CLICK_RESULT_BULLET)
+		{
+			platform_log("vr: stick click: held %.2f s -> bullet time", held);
+			if (vr.bullet_cooldown > 0.0f)
+				platform_log("vr: stick click: bullet time is resting");
+			else
+				bullet_time_switch("the stick held in");
+		}
+	}
 	/* the turning stick's click (vr.bullet_time_binding = "stick_click"): a
 	press toggles bullet time (the zoom is not given it, halo_vr_gamepad) */
 	{
@@ -6750,8 +6800,17 @@ void halo_vr_gamepad(void *gamepad)
 	head's (vr.physical_crouch), which Halo holds only while it is pressed */
 	vr.crouch_button = (buttons & VR_BUTTON_LEFT_STICK) || (pad->wButtons & XINPUT_GAMEPAD_LEFT_THUMB);
 	if (vr.crouch_button || vr.crouching) pad->wButtons |= XINPUT_GAMEPAD_LEFT_THUMB;
-	/* (the zoom; but not the press that is bullet time's, vr.bullet_time_binding = "stick_click") */
-	if ((buttons & VR_BUTTON_RIGHT_STICK) && !vr.bullet_click_taken && !bullet_on_click())
+	/* (the zoom; but not the press that is bullet time's, vr.bullet_time_binding
+	= "stick_click"; with "click_hold" a press is held back while it may be
+	either (the zoom comes at a short press's release), and live once
+	click_hold_update has seen that it began where it cannot be bullet time's) */
+	if (settings.bullet_time_binding == BULLET_BINDING_CLICK_HOLD)
+	{
+		if (vr.click_zoom_frames > 0 || ((buttons & VR_BUTTON_RIGHT_STICK) && vr.click_hold.was &&
+			!vr.click_hold.active && !vr.click_hold.spent))
+			pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
+	}
+	else if ((buttons & VR_BUTTON_RIGHT_STICK) && !vr.bullet_click_taken && !bullet_on_click())
 		pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
 	/* (the left stick's sideways push steers where the sticks steer a seat
 	or turn a driver: not the game's sideways throttle, the Ghost's strafe) */

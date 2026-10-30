@@ -6,7 +6,8 @@ vr.sprint_speed, vr.bullet_time, vr.bullet_time_scale;
 docs/openframe-features.md): the game's side of them, for main.c and
 bipeds.c. vr.c reads the controllers (comfort_update): the right stick
 flicked up toggles sprint (also while bullet time is on); a press of its
-click toggles bullet time (vr.bullet_time_binding = stick_click, the default,
+click held 0.4 s toggles bullet time (vr.bullet_time_binding = click_hold, the
+default: a shorter press is the zoom; "stick_click" = a press, at once; both
 in the first person; "double_flick_down" = two flicks down within 0.35 s,
 "double_flick" = two flicks up within 0.35 s, "hold" = held up 0.8 s); and with vr.sprint_mode =
 "arm_swing" both arms pumping are a run's effort. The HUD says each:

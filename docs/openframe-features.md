@@ -251,21 +251,38 @@ turns it off. It eases in and out over about a sixth of a second.
 
 - Keys: `vr.bullet_time` (default `false`), `vr.bullet_time_scale` (the
   world's speed, 0.2 to 0.8, default `0.4`), `vr.bullet_time_binding`
-  (`"stick_click"`, the default; `"double_flick_down"`; `"double_flick"`;
-  `"hold"`; `"off"`).
-- Input, `"stick_click"` (the default, from headset trial 10: the flicks were
-  fiddly, or too easy to do by accident): pressing in the turning stick (the
-  right, or the left with `vr.swap_sticks`; its click) toggles bullet time, on
-  or off alike, and rests for half a second after a toggle. The click is the
-  game's zoom otherwise, and stays the zoom in the third person (where zoom
-  is needed), in a vehicle, in the menus, with `vr.aim = "gamepad"`, and
-  wherever the game does not allow bullet time (online, split screen, bots,
-  a film). In the first person on foot with the controllers aiming the scope
-  on the eye makes the zoom redundant; but with `vr.scope_view = "smartlink"`
-  (the default) the click's smart-link window is given up there: set the
-  binding to another to have it back. The press is taken by bullet time at
-  once (the zoom never sees it), logged as `vr: bullet time on (the stick
-  pressed)`. A flick up is sprint's, the two independent, and a hold down is
+  (`"click_hold"`, the default; `"stick_click"`; `"double_flick_down"`;
+  `"double_flick"`; `"hold"`; `"off"`).
+- Input, `"click_hold"` (the default): the turning stick's click (the right
+  stick, or the left with `vr.swap_sticks`) is both the zoom and bullet
+  time's. A short press, let go before 0.4 s (`CLICK_HOLD_SECONDS` in
+  `port/linux/src/vr_stick_gesture.h`), is the zoom: the game is given one
+  press of the click as you let go, so the zoom steps through its levels
+  exactly as the flat game's does. A press held to 0.4 s toggles bullet time,
+  on or off alike, once, at the moment the threshold is reached (the HUD says
+  "Bullet time" or "Bullet time off"); that press then does nothing more, so
+  no zoom comes as you let go. A short press zooms in bullet time as well:
+  the zoom does not depend on bullet time being on or off. Bullet time rests
+  for half a second after a toggle (a hold in that time is no toggle, but a
+  short press in that time still zooms). This is only in the first person on
+  foot with the controllers aiming, in a game where bullet time works and
+  `vr.bullet_time` is on. Otherwise (bullet time off, the third person, a
+  vehicle, the menus, `vr.aim = "gamepad"`, online, split screen, bots, a
+  film) the click goes to the game live, with no delay. Each click in that
+  state is logged as `vr: stick click: held 0.12 s -> zoom` or `vr: stick
+  click: held 0.40 s -> bullet time`. A flick up is sprint's and a hold down
+  is the third person's, as in every binding, and nothing ejects a magazine.
+- Input, `"stick_click"` (from headset trial 10: the flicks were fiddly, or
+  too easy to do by accident; for players with `vr.scope_view = "eye"`,
+  where the scope on the eye makes the zoom redundant): pressing in the
+  turning stick toggles bullet time at once, on or off alike, and rests for
+  half a second after a toggle. The click is the game's zoom otherwise, as in
+  `"click_hold"` (the third person, a vehicle, the menus, `vr.aim =
+  "gamepad"`, where the game does not allow bullet time). In the first person
+  on foot with the controllers aiming with `vr.scope_view = "smartlink"` the
+  click's smart-link window is given up there: use `"click_hold"` to have it
+  back. The press is taken by bullet time at once (the zoom never sees it),
+  logged as `vr: bullet time on (the stick pressed)`. A flick up is sprint's, the two independent, and a hold down is
   the third person's; one flick down on its own does nothing, logged as
   `vr: stick down: held 0.12 s -> nothing (...)`. A push begins only when it
   is well down: down at least 0.6 and at least 1.5 times the sideways push
@@ -360,7 +377,7 @@ local player (`vr_sprint_speed_scale`).
   sprint, and again to stop, with bullet time on or off. With bullet time
   enabled and `vr.bullet_time_binding = "double_flick"`, two quick
   flicks up toggle bullet time instead of sprint twice (the second undoes the
-  first's toggle); with the default `"stick_click"` (or `"double_flick_down"`)
+  first's toggle); with the default `"click_hold"` (or `"stick_click"` or `"double_flick_down"`)
   a flick up is sprint's alone and bullet time is on the click (or the stick's down). The two multiply (bullet time's entry). The sprint stays on as you stop or crouch (a crouch pauses it:
   `bipeds.c` sprints standing), and ends by itself only off foot (a vehicle,
   death; half a second of it, the menus aside). The HUD says "Sprint" and
@@ -570,9 +587,9 @@ How each feature behaves, left-handed:
   magazines' pouches at the right hip (and the right shoulder).
 - Turning stick: whichever stick turns you (the left with SWAP STICKS as
   the hand or YES; the right with NO). Sprint's flick up, the third person's
-  hold down and bullet time's press (its click, or the old double flick down /
-  double flick up / hold up) are all on it, and the smart-link's zoom where
-  the click is not bullet time's.
+  hold down and the click are all on it: a short press of the click is the
+  zoom (smart-link or a raised scope), a hold of 0.4 s is bullet time's (or
+  the old double flick down / double flick up / hold up).
 - Third person on foot: the view sits over the left shoulder instead of
   the right.
 - Wrist HUD (`vr.hud_mode = "wrist"`): on the right wrist, read the same

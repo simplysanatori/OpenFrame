@@ -854,7 +854,7 @@ int halo_vr_sprint_toggled(void);
 (vr.bullet_time_scale while toggled on); and turned off, where the game will
 not slow the world (vr_comfort.c). The game says each frame whether it may
 (the campaign, a player on foot): where it may not, the turning stick's click
-stays the zoom (vr.bullet_time_binding = "stick_click") */
+stays the zoom (vr.bullet_time_binding = "click_hold" or "stick_click") */
 float halo_vr_bullet_time(void);
 void halo_vr_bullet_time_off(void);
 void halo_vr_bullet_time_able(int able);

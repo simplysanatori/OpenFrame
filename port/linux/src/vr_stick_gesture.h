@@ -35,7 +35,7 @@ flicks quickly in a row.
 
 The stick pushed down (stick_down_update below; it is the third person's hold,
 and the flicks of vr.bullet_time_binding = "double_flick_down", which is not
-the default: the default, "stick_click", is the stick's click, so the push
+the default: the default, "click_hold", is the stick's click, so the push
 down is no bullet time's, and a flick up is sprint's whatever the binding): a
 flick is told as the push is let go (hold 1: a push let go before
 STICK_UP_HOLD_SECONDS), so that a hold, which is the third person's, never
@@ -366,6 +366,82 @@ static inline int stick_double_update(struct stick_double *d, int gesture, int e
 		return STICK_ACT_FLICK;
 	}
 	return STICK_ACT_NONE;
+}
+
+/* The turning stick's click with vr.bullet_time_binding = "click_hold" (the
+default), where the click is both the zoom and bullet time's: a click let go
+before CLICK_HOLD_SECONDS is the zoom (told at its release: the caller gives
+the game one press then), one held that long is bullet time (told once, the
+moment the threshold is reached; its release is nothing). It is told only
+for a press that began where the click can be bullet time's (capable): any
+other press is the game's, live, and the caller does not hold it back. A
+press that stops being capable for longer than STICK_UP_ABLE_SECONDS (a
+vehicle, the third person, a menu) is dropped: nothing comes of it. */
+#define CLICK_HOLD_SECONDS 0.4f
+
+#define CLICK_RESULT_NONE 0
+#define CLICK_RESULT_ZOOM 1
+#define CLICK_RESULT_BULLET 2
+
+struct click_hold
+{
+	/* pressed last frame; this press began capable (it is held back from
+	the game); this press has come to its end (bullet time given, or
+	dropped); seconds held; seconds not capable in a row */
+	int was;
+	int active;
+	int spent;
+	float seconds;
+	float unable;
+};
+
+/* one call a frame; returns CLICK_RESULT_*, and the press's seconds in
+*held_out when it is a result */
+static int click_hold_update(struct click_hold *c, int click, int capable, float seconds, float *held_out)
+{
+	int result = CLICK_RESULT_NONE;
+
+	if (seconds > STICK_UP_FRAME_MAX)
+		seconds = STICK_UP_FRAME_MAX;
+	if (click && !c->was)
+	{
+		c->active = capable;
+		c->spent = 0;
+		c->seconds = 0.0f;
+		c->unable = 0.0f;
+	}
+	if (click && c->active && !c->spent)
+	{
+		c->unable = capable ? 0.0f : c->unable + seconds;
+		if (c->unable > STICK_UP_ABLE_SECONDS)
+		{
+			c->spent = 1;
+		}
+		else
+		{
+			c->seconds += seconds;
+			if (c->seconds >= CLICK_HOLD_SECONDS)
+			{
+				c->spent = 1;
+				result = CLICK_RESULT_BULLET;
+				*held_out = c->seconds;
+			}
+		}
+	}
+	if (!click && c->was && c->active && !c->spent)
+	{
+		result = CLICK_RESULT_ZOOM;
+		*held_out = c->seconds;
+	}
+	if (!click)
+	{
+		c->active = 0;
+		c->spent = 0;
+		c->seconds = 0.0f;
+		c->unable = 0.0f;
+	}
+	c->was = click;
+	return result;
 }
 
 #endif
