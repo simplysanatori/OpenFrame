@@ -37,48 +37,27 @@ What OpenH1's own Frame build did, and what this one does instead.
 - While a script holds you still, your head can lean the view up to 15 cm from the player's eye instead of the view being locked. HELD LEAN on the PLAYER page sets the distance.
 - The HUD's corners sat partly outside the Frame's view. Now they default to positions that fit, and you can move them.
 - Pushing the left stick all the way dropped the crouch. Now a click of the stick crouches at a full run.
-- The right stick pushed down used to eject your magazine. It no longer does anything by itself: see the controls below.
+- The right stick pushed down used to eject your magazine. It no longer does anything by itself: reload with X or take a magazine from your left hip.
 
 ### Controls
 
-The turning stick is the right stick, or the left when you play left-handed. Flicks must be within about 34 degrees of straight up or down to count. While the stick is inside that cone, turning pauses, so a flick never turns you. A diagonal push only turns you.
-
-- Flick the turning stick up: sprint on or off. Needs SPRINT set to TOGGLE on the MOVEMENT AND COMFORT page.
-- Flick the turning stick down and let go within 0.8 seconds: bullet time on or off. Needs BULLET TIME on. It switches as you let go, and rests half a second between switches.
-- Hold the turning stick down for 0.8 seconds: third person on or off. Needs no setting.
-- Press the turning stick in: zoom, as in the flat game, in bullet time as well. Nothing in this release holds the click.
-- Reload with X. Or squeeze your off hand's grip at the pouch on your left hip to take a magazine: the empty one drops out of the weapon by itself, and pushing the new one into the weapon loads it.
-- Click the left stick while sprinting at full speed: slide. Needs PARKOUR on.
-- Sprint, bullet time and the third person each show a label on the HUD when they switch.
-
-The GESTURES page offers other bindings for bullet time: a held click, a plain click, a double flick down, a double flick up, a held push up, or off. The third person can be a double flick down instead of a hold.
+The controls, the turning stick's gestures and how each added feature is used are in [CONTROLS.md](CONTROLS.md).
 
 ### From other people's work
 
-These come from moistman42069's Halo VR mod, rewritten for OpenH1's renderer and the Frame's controllers. The mod is an Android build, so on the Frame it would run through Lepton; here it runs natively. Sprint, bullet time, parkour, fists, weapon pull, prop throw and hand swap work in the campaign and are each off until you turn them on in VR Setup. The third person works in the campaign with no setting. The wrist HUD and the vignette are options for everywhere.
+These come from moistman42069's Halo VR mod, rewritten for OpenH1's renderer and the Frame's controllers. The mod is an Android build, so on the Frame it would run through Lepton; here it runs natively. Each is off until you turn it on in VR Setup, apart from the third person, which needs no setting.
 
-MOVEMENT AND COMFORT page:
-
-- SPRINT: TOGGLE for the stick flick, or ARM SWING to run faster by swinging both arms. SPRINT SPEED sets how much faster, 1.5 times by default.
-- BULLET TIME: the world slows to 40 % while your head and hands stay at full speed. BULLET TIME SPEED sets the slowdown. It ends by itself at a cinematic or when you die.
-- THIRD PERSON and VIEW DISTANCE: the camera floats 1.7 m behind you, over the shoulder of your weapon hand, and tucks in at walls. Zooming, a vehicle or a cinematic puts you back in first person.
-- PARKOUR: slide, wall jump and wall run.
-  - Slide: crouch while sprinting at full speed, by the stick click or by ducking your head. A click-started slide runs its whole way with the stick let go, up to 1.1 seconds. Click again to stand early. SLIDE MOMENTUM sets its length and speed.
-  - Wall jump: in the air beside a wall, press jump again. You leap where you look. WALL JUMP sets the strength.
-  - Wall run: jump at a wall with the stick pushed along it. You run along the wall for up to two seconds. Steer away to drop, or jump off it.
-- VIGNETTE: VEHICLES as in OpenH1, ALWAYS to also narrow the view when you move or turn on foot, or OFF. VIGNETTE STRENGTH sets how much.
-
-HANDS AND WEAPONS page, under FISTS AND GRABBING:
-
-- FISTS: your free hand punches. Swing it at an enemy at 2 m/s or more. A hard swing staggers them for a second. Swipe across an enemy's melee as it lands to parry it; the HUD says "Parry". PUNCH SPEED and PUNCH DAMAGE tune it.
-- WEAPON PULL: hold your free hand out, point it at a weapon on the floor within PULL RANGE, 3 m by default, squeeze the grip and flick the hand back. The weapon flies to your hand. Keep the grip squeezed to catch it.
-- PROP THROW: squeeze the grip with your free hand on a loose weapon or piece of equipment to pick it up, and let go to throw it. THROW STRENGTH scales the throw.
-- HAND SWAP: bring your empty hand to the weapon, squeeze its grip and open the other. The weapon changes hands, and the game remembers which hand is yours. The sticks stay where they were.
-
-HUD page:
-
-- HUD STYLE: VISOR as in OpenH1, or WRIST to carry shields, ammo and the motion tracker on the back of your off hand's wrist. Turn the wrist toward your face to read it. WRIST HUD sets its size and place on the arm. The reticle, messages and waypoints stay on the visor, and the visor comes back in menus and in vehicles.
-- HUD LAYOUT: sliders in percent to bring the corners in, and to move or resize the ammo, shields and tracker, together or one by one. Changes apply when you press OK on the page.
+- Sprint, by a flick of the stick or by swinging your arms.
+- Bullet time: the world slows and your head and hands do not.
+- Third person on foot.
+- Parkour: slide, wall jump and wall run.
+- Fists: punch, stagger and parry.
+- Weapon pull: call a gun on the floor to your hand.
+- Prop throw: pick up a loose item and throw it.
+- Hand swap: pass the weapon to your other hand.
+- The wrist HUD: shields, ammo and tracker on the back of your wrist.
+- The comfort vignette on foot, not only in vehicles.
+- A HUD layout page with sliders to bring the corners in and move or resize each one.
 
 ### VR Setup
 

@@ -4,84 +4,72 @@ Halo: Combat Evolved in VR, running natively on the Valve Steam Frame. OpenFrame
 
 ## The game on the Frame
 
-- OpenH1's `build-769` (the fork began at `build-734`): the Xbox game's own code, built for Arm64 Linux, drawn with Vulkan, in VR through the Frame's SteamVR. No emulator, no Lepton, no APK, no PC.
-- An installer that copies the game and your maps, adds the Steam library entry, and keeps your saves and settings on an update.
-- A launch wrapper that sets SteamVR's per-app settings at every launch: your refresh rate, no throttling, no motion smoothing.
+- OpenH1 `build-769`: the Xbox game's own code, built for Arm64 Linux, drawn with Vulkan, in VR through the Frame's SteamVR. No emulator, no Lepton, no APK, no PC.
+- An installer that copies the game and your maps, adds the Steam library entry, and keeps your maps, saves and settings on an update. An uninstaller beside it.
+- A launch wrapper that sets SteamVR's per-app settings each time you start from the library: your refresh rate, no throttling, no motion smoothing.
 - 90 Hz by default. 72 and 120 Hz are in VR Setup.
 - Saves, settings and logs in their own folder, apart from OpenH1's.
 - OpenH1's self-updater is switched off, so it never swaps this build for OpenH1.
-- A log collector that masks personal details before you share anything.
+- A log collector that masks addresses, names and ids before you share anything.
 
 ## What came with OpenH1 build-769
 
-OpenH1's own fixes between `build-734` and `build-769` are in this release:
-
-- Lights past the 128-per-window cap no longer drop lit objects.
-- A portal corner that sits on a clip line no longer flashes the level.
-- Respawn goes straight to first person.
-- The d-pad's focus is kept when you back out of a settings screen.
-- Multiplayer, from OpenH1: host controls, OpenH1 games listed first in the server browser, the Kills Score, Multi-Hill and Force Team Spawns rules, and network errors in plain words.
+OpenH1's own work since its first Frame build is in here too. Lights past the 128-per-window cap no longer drop lit objects, a portal corner on a clip line no longer flashes the level, respawn goes straight to first person, and the d-pad keeps its place when you back out of a settings screen. Multiplayer gained host controls, OpenH1 games first in the server browser, the Kills Score, Multi-Hill and Force Team Spawns rules, and network errors in plain words. All of that is OpenH1's.
 
 ## Performance
 
-- Both eyes at 0.9 of SteamVR's recommended resolution. The full-detail area that follows your eyes is 0.4 of the view.
-- With those defaults, firefights in the first level average 88 to 89 frames a second. No frames are dropped in play.
-- In the heaviest firefight of the first level, OpenH1's resolution and foveation averaged about 77 fps. Mine average 86 to 89.
-- Over a session, SteamVR used to fill in about a third of the frames. Now it is about one in ten.
+- Both eyes at 0.9 of SteamVR's recommended resolution. Full detail over the middle 0.4 of each eye's image, across and up, where you look.
 - The GPU renders straight to memory instead of in tiles. On the Frame that is about 10 fps more in the same rooms.
+- In the heaviest firefight of the first level, OpenH1's own settings averaged about 77 fps. With mine it averages 86 to 89, and the first level's firefights hold the display's 90 Hz most of the time.
+- Over a session, SteamVR used to fill in about a third of the frames. Now it is about one in ten.
 - OpenH1 froze the world for one to two seconds each time a level moved on to its next section. Now that is a short hitch.
-- The first level used to take about 17 seconds to load. Now it takes 4 to 8.
+- The first level used to take about 17 seconds to load. Now it takes about 5.
 
 ## Fixed
 
-- SteamVR's recentre used to be ignored. The menu sat off to one side and the view could start outside your body. Now recentring works.
-- The game recentres by itself on the first frame of each level start, restart and checkpoint reload.
-- Menus open in front of you.
+What OpenH1's own Frame build did, and what this one does instead.
+
+- SteamVR's recentre was ignored, so the menu sat off to one side and the view could start outside your body. Now recentring works, and putting the headset back on recentres too.
+- The game recentres by itself on the first frame of each level start, restart and checkpoint reload, and when play comes back after a cinematic. Menus open in front of you. AUTO RECENTRE on the PLAYER page turns this off.
 - At the start in the cryo tube, the tutorial's look tests waited for the stick. Now looking with your head counts.
-- While a script holds you still, your view stays with the player's head.
-- The HUD's corners used to sit partly outside the Frame's view. Now they default to positions that fit.
+- While a script holds you still, your head can lean the view up to 15 cm from the player's eye instead of the view being locked. HELD LEAN on the PLAYER page sets the distance.
+- The HUD's corners sat partly outside the Frame's view. Now they default to positions that fit, and you can move them.
+- Pushing the left stick all the way dropped the crouch. Now a click of the stick crouches at a full run.
+- The right stick pushed down used to eject your magazine. It no longer does anything by itself: reload with X or take a magazine from your left hip.
 
 ## Controls
 
-- Flick the right stick up: sprint on or off, once sprint is on in VR Setup.
-- Flick the right stick down: bullet time on or off, once bullet time is on in VR Setup.
-- Hold the right stick down for 0.8 seconds: third person on or off.
-- Press the right stick in: zoom, in bullet time as well.
-- There is no magazine eject on the stick. Reload with X, or take a magazine from your left hip with your left hand.
-- A push on a diagonal while you turn is ignored, so looking around does not set it off.
-- One click of the left stick while sprinting slides you the whole way, once the slide is on. Click again to stop early.
-- Each toggle shows a label on the HUD.
-
-## VR Setup
-
-- VR Setup is split into pages: Display, HUD, Player, Movement and comfort, Hands and weapons.
-- A HUD layout page with sliders: bring the corners in, and move or resize each one.
-- The refresh rate, foveation and auto recentre are in the menu.
-- Left-handed play carries through: the third-person view sits over your left shoulder, and passing the weapon to the other hand saves it as your hand.
+The controls, the turning stick's gestures and how each added feature is used are in [docs/CONTROLS.md](https://github.com/simplysanatori/OpenFrame/blob/steam-frame/docs/CONTROLS.md).
 
 ## From other people's work
 
-These come from moistman42069's Halo VR mod, rewritten for OpenH1. Each is off until you turn it on in VR Setup (sprint, bullet time, slide and the wall moves, fists, weapon pull, prop throw, hand swap, the wrist HUD and the vignette), and they play offline. Holding the right stick down for 0.8 seconds turns the third-person view on or off, and needs no setting.
+These come from moistman42069's Halo VR mod, rewritten for OpenH1's renderer and the Frame's controllers. The mod is an Android build, so on the Frame it would run through Lepton; here it runs natively. Each is off until you turn it on in VR Setup, apart from the third person, which needs no setting.
 
-- Sprint, by flicking the stick or by swinging your arms.
+- Sprint, by a flick of the stick or by swinging your arms.
 - Bullet time: the world slows and your head and hands do not.
-- Third person on foot (the hold on the right stick needs no setting).
-- Slide, wall jump and wall run.
+- Third person on foot.
+- Parkour: slide, wall jump and wall run.
 - Fists: punch, stagger and parry.
 - Weapon pull: call a gun on the floor to your hand.
 - Prop throw: pick up a loose item and throw it.
 - Hand swap: pass the weapon to your other hand.
 - The wrist HUD: shields, ammo and tracker on the back of your wrist.
 - The comfort vignette on foot, not only in vehicles.
+- A HUD layout page with sliders to bring the corners in and move or resize each one.
 
-The mod is built for the Quest, so on the Frame it would run through Lepton. Here these features run natively inside OpenH1's renderer.
+## VR Setup
+
+- VR Setup is split into pages: DISPLAY, HUD, PLAYER, MOVEMENT AND COMFORT, HANDS AND WEAPONS, each with its sub-pages.
+- DISPLAY: RESOLUTION, FOVEA SIZE and REFRESH RATE, 72, 90 or 120 Hz. These take effect at the next launch.
+- Left-handed play carries through: the sticks swap, the pouch and holsters mirror, the third-person camera sits over your left shoulder, and a hand swap saves your hand.
+- The menus show which build you are running.
 
 ## Known issues
 
-- Big fights with a lot of explosions can dip into the 70s for a few seconds.
+- Big fights with many explosions fall into the 60s for as long as the fight lasts.
 - The first few seconds after a level loads run slower.
-- The campaign has one save slot. Starting a new game overwrites it.
 - In bullet time the sound plays at normal speed.
+- The launch wrapper can only set SteamVR's refresh rate and smoothing when the game starts from the Steam library.
 
 ## Download
 

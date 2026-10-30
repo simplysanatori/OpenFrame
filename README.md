@@ -92,11 +92,11 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Right trigger | Fire |
 | Left trigger | Second weapon in a Banshee. On foot you throw grenades by hand |
 | Left stick | Move |
-| Left stick click | Crouch. While sprinting, slide (once you turn on the slide) |
+| Left stick click | Crouch, at any speed. While sprinting, slide (PARKOUR on) |
 | Right stick, left and right | Turn, in steps or smoothly |
-| Right stick, flick up | Sprint on or off (once you turn on sprint) |
-| Right stick, flick down | Bullet time on or off (once you turn on bullet time) |
-| Right stick, held down 0.8 seconds | Third person on or off |
+| Right stick, flick up | Sprint on or off (SPRINT set to TOGGLE) |
+| Right stick, flick down | Bullet time on or off (BULLET TIME on) |
+| Right stick, held down 0.8 seconds | Third person on or off. Needs no setting |
 | Right stick, pressed in | Zoom, always, in bullet time as well |
 | **A** | Jump |
 | **B** | Melee. A hard swing of the right controller melees too |
@@ -110,32 +110,15 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Both grips, held | Recentre |
 | Right grip | Draw a weapon from a holster, over the shoulder or at the hip |
 | Left grip on a long gun's foregrip | Aim it with both hands |
-| Left grip at the left hip | Take a magazine. The old one drops out |
+| Left grip at the left hip | Take a magazine. The old one drops out of the weapon by itself; push the new one in to load |
 | Left grip held, swung and let go | Throw a grenade where your hand threw it |
 | A raised scope at your eye | Look through it, magnified |
 | Either hand pushed into a control | Press it |
 | Both grips on a Ghost's handles or a Warthog's wheel | Steer it |
 
-The features that come from moistman42069's mod (below) are each off until you turn them on in VR Setup: sprint, bullet time, slide, wall jump and wall run, fists, weapon pull, prop throw, hand swap, the wrist HUD and the comfort vignette. Holding the right stick down for 0.8 seconds turns the third-person view on or off, and needs no setting. The right stick has no magazine eject: reload with **X**, or take a magazine from your left hip. A push on a diagonal while you turn is ignored, so looking around does not set anything off. Each toggle shows a label on the HUD.
+A flick counts when the right stick goes within about 34 degrees of straight up or down; while it is inside that cone, turning pauses, so a flick never turns you, and a diagonal push only turns you. A flick down switches bullet time as you let go. There is no magazine eject on the stick: reload with **X**, or take a magazine from your left hip. Sprint, bullet time and the third person show a label on the HUD when they switch.
 
-### The added features
-
-These come from moistman42069's Halo VR mod, rewritten for OpenH1. Each is off until you turn it on in VR Setup, under **MOVEMENT AND COMFORT...**, **HANDS AND WEAPONS...** or **HUD...**. They play offline: the campaign, not online games.
-
-- **Sprint** (SPRINT in MOVEMENT AND COMFORT...). Flick the right stick up to start and again to stop. Or set it to arm swing and swing your arms as you run. Crouching pauses it.
-- **Bullet time** (BULLET TIME on, in MOVEMENT AND COMFORT...). Flick the right stick down. The world slows to 40 % and your head and hands keep full speed. Your own body slows with the world, so jumps float.
-- **Third person.** Hold the right stick down for 0.8 seconds, with no setting turned on first. The view moves behind your body; you still aim with the controller. Not in vehicles or multiplayer.
-- **Slide** (PARKOUR on). While sprinting, click the left stick once and you slide about a second. Click again to stop early.
-- **Wall jump** (PARKOUR on). In the air beside a wall, press A again.
-- **Wall run** (PARKOUR on). Jump at a wall with the left stick pushed along it. Steer away to drop off.
-- **Fists.** Swing your empty hand into an enemy. A hard punch staggers. Swipe across an enemy's blow to parry it.
-- **Weapon pull.** Point your free hand at a gun on the floor, grip, and flick the hand back. It flies to you.
-- **Prop throw.** Grip a loose item near your free hand and let go to throw it.
-- **Hand swap.** Bring your palms together and squeeze the other grip. The weapon moves to that hand, and that becomes your setting.
-- **Wrist HUD** (HUD STYLE = WRIST). Shields, ammo and tracker on the back of your other wrist. Turn it toward your face to read it.
-- **Comfort vignette** (VIGNETTE = ALWAYS). The edges of the view dim as you move and turn on foot, not only in vehicles.
-
-[docs/openframe-features.md](docs/openframe-features.md) has every setting of each one.
+Sprint, bullet time, parkour, fists, weapon pull, prop throw and hand swap come from moistman42069's mod and are each off until you turn them on in VR Setup. The third person needs no setting. [docs/CONTROLS.md](docs/CONTROLS.md) explains how each one is used, and [docs/openframe-features.md](docs/openframe-features.md) has every setting.
 
 ## Settings
 
