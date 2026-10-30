@@ -3164,7 +3164,8 @@ The Steam Frame's controllers are the halves of an Xbox controller:
 | Left stick | Move (click: crouch) |
 | Head | Crouch: crouch in the room, and the game crouches (`vr.physical_crouch`) |
 | Right stick, left and right | Turn: in steps (`vr.turn = "snap"`) or smoothly (`"smooth"`) |
-| Right stick click | Zoom: a window about the reticle (`vr.scope_view = "smartlink"`), or a raised scope's magnification (`"eye"`): below. Held for 0.4 s on foot with `vr.bullet_time` on (`vr.bullet_time_binding = "click_hold"`, the default): bullet time on or off instead, and no zoom on release |
+| Right stick click | Zoom: a window about the reticle (`vr.scope_view = "smartlink"`), or a raised scope's magnification (`"eye"`): below. Always the zoom, in bullet time as well, with the default `vr.bullet_time_binding = "flick_down"` |
+| Right stick, flick down | Bullet time on or off, if `vr.bullet_time` is on (let go before 0.8 s; held 0.8 s it is the third person's) |
 | Head | Look |
 | Right controller | Aim: it holds the weapon, and the reticle shows where it points (`vr.aim = "controller"`). With `vr.aim = "head"`, the head aims and the reticle stays in the middle of the view. |
 | Left controller | The left hand, where the controller is; the left grip closes it (`vr.hands`). The right index finger lies off the right trigger until your finger touches it, then rests on it and pulls with it ("The trigger finger", below). |
@@ -3214,7 +3215,7 @@ the left controller).
   marks on its display are mirrored.
 - The sticks swap with the hand (`vr.swap_sticks = "auto"`, VR Setup > PLAYER's
   SWAP STICKS): the right stick moves (its click crouches) and the left
-  turns, its click zooms (held for 0.4 s, toggles bullet time).
+  turns, its click zooms.
   `vr.swap_sticks = "no"` keeps the left stick moving, `"yes"` swaps them
   for a right hand too.
 - The buttons stay where they are, as the game's prompts name them: A and
@@ -3443,9 +3444,9 @@ helmet's HUD (the pistol's scope is a "smart-linked scope"), the zoom shows
 on your visor: you never bring a scope to your eye.
 
 - The right stick's click zooms as on the flat screen, wherever you hold
-  the weapon (with `vr.bullet_time` on, on foot, a press let go before 0.4 s is
-  the zoom, given as you let go, in bullet time as well, and a press held to
-  0.4 s is bullet time instead): it steps through the weapon's levels and from the last
+  the weapon (in bullet time as well; only with
+  `vr.bullet_time_binding = "stick_click"` or `"click_hold"` is it bullet
+  time's too): it steps through the weapon's levels and from the last
   unzooms (the sniper rifle 2x, then "10x", which magnifies 8 times as on
   the flat screen, then none; the pistol 2x, then none; the rocket
   launcher's too). What unzooms the game unzooms it: a hit, a reload, a
@@ -4424,7 +4425,7 @@ the next start.
 | `vr.aim` | `"controller"` | `HALO_VR_AIM` | `"controller"`: the right controller aims and holds the weapon. `"head"`: the head aims. `"gamepad"`: a gamepad aims and plays, as on the flat screen, and the head looks about freely (above, "With a gamepad"). |
 | `vr.gamepad_view` | `"camera"` | `HALO_VR_GAMEPAD_VIEW` | With `vr.aim = "gamepad"`: `"camera"`, the stick turns and pitches the view as the flat screen's camera, the head's turn on top (the most like the Xbox game, and the most likely to make you sick); `"level"`, it turns the view smoothly, and its pitch moves only the reticle; `"snap"`, the view turns a step of `vr.snap_turn_angle` each time the aim is more than that from it, and its pitch moves only the reticle. |
 | `vr.dominant_hand` | `"right"` | `HALO_VR_DOMINANT_HAND` | The hand that holds the weapon: `"right"`, or `"left"`: the weapon in the left controller, drawn mirrored with both hands, the left trigger firing, the right hand on the foregrip, at the magazines (at the right hip) and throwing, the holsters on the left, the haptics swapped with the hands (above, "Left-handed"). Not with `vr.aim = "gamepad"`. |
-| `vr.swap_sticks` | `"auto"` | `HALO_VR_SWAP_STICKS` | `"yes"`: the right stick moves (its click crouches) and the left turns (its click zooms, or held for 0.4 s toggles bullet time); `"no"`: as they are; `"auto"`: swapped with `vr.dominant_hand = "left"`. Not with `vr.aim = "gamepad"`. |
+| `vr.swap_sticks` | `"auto"` | `HALO_VR_SWAP_STICKS` | `"yes"`: the right stick moves (its click crouches) and the left turns (its click zooms); `"no"`: as they are; `"auto"`: swapped with `vr.dominant_hand = "left"`. Not with `vr.aim = "gamepad"`. |
 | `vr.weapon_offset` | `"0.15, -0.22, 0.30"` | `HALO_VR_WEAPON_OFFSET` | With `vr.hands = "game"`: where the weapon's grip is from the eye that the game poses it for, in metres: right, up, forward. |
 | `vr.depth` | `false` | `HALO_VR_DEPTH` | `true`: give the runtime the eyes' depth too (`XR_KHR_composition_layer_depth`), for its reprojection. SteamVR on the Steam Frame could not make a depth swapchain for the OpenGL session the VR build had before it drew with Vulkan. |
 | `vr.foveation` | `"eye"` | `HALO_VR_FOVEATION` | Foveated rendering (below, "How it operates"): each eye's image at its full resolution in an inset where you look, and at less about it, which draws about a third of the eyes' pixels (at the default `vr.foveation_inset`). `"eye"`: the inset follows the eyes, where the runtime tracks them (`XR_EXT_eye_gaze_interaction`; else as `"fixed"`); `"fixed"`: it stays in the middle of each eye's view; `"off"`: all of each image at full resolution. In VR Setup > DISPLAY (FOVEATION); from the next start. |

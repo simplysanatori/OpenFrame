@@ -243,12 +243,15 @@ dead zone, and the push past it to the full ask */
 #define COMFORT_FULL 0.6f
 /* vr.sprint_mode = "toggle" and vr.bullet_time (comfort_update): the right
 stick pushed up (vr_stick_gesture.h's STICK_UP_*): a flick toggles sprint
-at once as it is pushed. Bullet time by vr.bullet_time_binding: a press of
-the turning stick's click ("click_hold", the default: a short press is the
-zoom and a press held CLICK_HOLD_SECONDS bullet time; "stick_click": a press
-is bullet time's at once and no zoom, for vr.scope_view = "eye"; headset
-trial 10: the flicks were fiddly or too easy to do by accident; the
-third person keeps the zoom), a double flick DOWN ("double_flick_down": two flicks
+at once as it is pushed. Bullet time by vr.bullet_time_binding: a flick
+DOWN ("flick_down", the default: a push down let go before
+STICK_UP_HOLD_SECONDS toggles it, told as it is let go, on or off alike; a
+hold of that long is the third person's, never bullet time's; a push on a
+diagonal is nothing; the click is the zoom always), a press of the turning
+stick's click ("stick_click": a press is bullet time's at once and no zoom,
+for vr.scope_view = "eye"; "click_hold": a short press the zoom and a press
+held CLICK_HOLD_SECONDS bullet time; both only in the first person on foot,
+the third person keeps the zoom), a double flick DOWN ("double_flick_down": two flicks
 down, each let go within BULLET_FLICK_MAX_SECONDS, the second begun within
 STICK_DOUBLE_SECONDS of the first's end; one flick down alone is nothing),
 or a double
@@ -281,11 +284,13 @@ a push down does nothing else (the stick's eject of the magazine was removed
 on purpose, headset trial 10: with the HUD showing rounds the gun could not
 fire; the hand takes a magazine from the left hip, or X reloads) */
 /* vr.bullet_time_binding (comfort_update): what takes bullet time from the
-turning stick: "click_hold" (the default) its click, a short press the zoom
-and a press held CLICK_HOLD_SECONDS bullet time, and "stick_click" a press
-of its click at once (no zoom), both in the first person on foot with the
-controllers aiming (the third person and the gamepad aim keep the click as
-the zoom, live); "double_flick_down" two flicks DOWN
+turning stick: "flick_down" (the default) a flick DOWN, let go before
+STICK_UP_HOLD_SECONDS (the click stays the zoom, in bullet time as well);
+"click_hold" its click, a short press the zoom and a press held
+CLICK_HOLD_SECONDS bullet time, and "stick_click" a press of its click at
+once (no zoom), both in the first person on foot with the controllers aiming
+(the third person and the gamepad aim keep the click as the zoom, live);
+"double_flick_down" two flicks DOWN
 (one on its own is nothing), the others from the stick pushed up;
 vr.third_person_binding: what switches the third person from the stick
 pushed down. A flick up is sprint's in every binding. */
@@ -295,6 +300,7 @@ pushed down. A flick up is sprint's in every binding. */
 #define BULLET_BINDING_CLICK 3
 #define BULLET_BINDING_DOUBLE_DOWN 4
 #define BULLET_BINDING_CLICK_HOLD 5
+#define BULLET_BINDING_FLICK_DOWN 6
 #define CLICK_ZOOM_PRESS_FRAMES 6
 #define THIRD_BINDING_HOLD 0
 #define THIRD_BINDING_DOUBLE_FLICK 1
@@ -1352,7 +1358,8 @@ static void settings_read(void)
 		!strcmp(config_string("vr.bullet_time_binding"), "double_flick") ? BULLET_BINDING_DOUBLE_FLICK :
 		!strcmp(config_string("vr.bullet_time_binding"), "double_flick_down") ? BULLET_BINDING_DOUBLE_DOWN :
 		!strcmp(config_string("vr.bullet_time_binding"), "stick_click") ? BULLET_BINDING_CLICK :
-		BULLET_BINDING_CLICK_HOLD;
+		!strcmp(config_string("vr.bullet_time_binding"), "click_hold") ? BULLET_BINDING_CLICK_HOLD :
+		BULLET_BINDING_FLICK_DOWN;
 	settings.third_person_binding = !strcmp(config_string("vr.third_person_binding"), "double_flick_down") ?
 		THIRD_BINDING_DOUBLE_FLICK : !strcmp(config_string("vr.third_person_binding"), "off") ? THIRD_BINDING_OFF :
 		THIRD_BINDING_HOLD;
@@ -4160,14 +4167,22 @@ static int comfort_on_foot(void)
 
 /* the binding bullet time works by: the third person's double flick down
 (vr.third_person_binding, with vr.third_person) has the stick's down, so a
-bullet time on the down falls back to the double flick up (vr.third_person
-is the state the hold leaves, no condition) */
+bullet time on the down (a flick or two) falls back to the double flick up
+(vr.third_person is the state the hold leaves, no condition) */
 static int bullet_binding(void)
 {
-	if (settings.bullet_time_binding == BULLET_BINDING_DOUBLE_DOWN &&
+	if ((settings.bullet_time_binding == BULLET_BINDING_DOUBLE_DOWN ||
+		settings.bullet_time_binding == BULLET_BINDING_FLICK_DOWN) &&
 		settings.third_person_binding == THIRD_BINDING_DOUBLE_FLICK)
 		return BULLET_BINDING_DOUBLE_FLICK;
 	return settings.bullet_time_binding;
+}
+
+/* whether bullet time is a flick down (vr.bullet_time_binding = "flick_down",
+the default): a push down let go before STICK_UP_HOLD_SECONDS */
+static int bullet_on_stick_down(void)
+{
+	return settings.bullet_time && bullet_binding() == BULLET_BINDING_FLICK_DOWN;
 }
 
 /* whether bullet time is two flicks down (vr.bullet_time_binding =
@@ -4371,16 +4386,37 @@ static void comfort_update(float seconds, float turn)
 			vr.bullet_click_taken = 0;
 		vr.bullet_click_was = click;
 	}
-	/* the pushes down are followed in any binding, for the log: a flick on
-	its own does nothing, two within STICK_DOUBLE_SECONDS toggle bullet time
-	with "double_flick_down" (each let go within BULLET_FLICK_MAX_SECONDS); a
-	hold is the third person's */
+	/* the pushes down are followed in any binding, for the log: a flick
+	toggles bullet time with "flick_down" (the default, told as it is let
+	go; a push on a diagonal never begins one), and does nothing otherwise;
+	two within STICK_DOUBLE_SECONDS toggle it with "double_flick_down" (each
+	let go within BULLET_FLICK_MAX_SECONDS); a hold is the third person's,
+	never bullet time's */
 	{
 		int third = vr.bullet_down_third;
 		int quick = vr.bullet_down.ended_seconds <= BULLET_FLICK_MAX_SECONDS;
 		const char *slow = NULL;
+		int flick_down = stick_down_update(&vr.bullet_down, &vr.bullet_down_third, able, -up, sideways, seconds);
 
-		stick_down_update(&vr.bullet_down, &vr.bullet_down_third, able, -up, sideways, seconds);
+		if (flick_down == STICK_GESTURE_FLICK && bullet_on_stick_down())
+		{
+			/* (a push that drifted out of the cone but is still held down is
+			no flick: it may be the third person's hold, which has the
+			generous cone; a push let go has the stick back by now) */
+			if (-up >= STICK_UP_KEEP)
+			{
+				slow = "the stick is still down: a hold that drifted";
+			}
+			else if (vr.bullet_cooldown > 0.0f)
+			{
+				slow = "bullet time is resting";
+			}
+			else
+			{
+				bullet_time_switch("the stick flicked down");
+				vr.stick_down_note = vr.bullet_time_on ? "bullet time on" : "bullet time off";
+			}
+		}
 		stick_diag_update(&vr.down_diag, &vr.bullet_down, -up, sideways, seconds);
 		/* the double flick down: two flicks (each quick, the second begun
 		within STICK_DOUBLE_SECONDS of the first's end) */
@@ -4450,8 +4486,9 @@ static void comfort_update(float seconds, float turn)
 				g->ended_result == STICK_GESTURE_NONE ? "spent, off foot" :
 				slow ? slow :
 				hold ? "third person: vr.third_person_binding is not hold" :
-				!quick ? "a slow push: nothing" :
+				!quick && !bullet_on_stick_down() ? "a slow push: nothing" :
 				bullet_on_double_down() ? "a flick on its own: nothing, unless a second follows" :
+				!settings.bullet_time ? "vr.bullet_time off" :
 				"a flick down: nothing";
 
 			platform_log("vr: stick down: held %.2f s -> %s (%s; sideways at most %.2f, down at least %.2f%s)",
@@ -5115,6 +5152,10 @@ static void input_update(void)
 	taken the push: a thumb that holds the stick down must not snap-turn) */
 	if (bullet_on_double_down() && comfort_on_foot() &&
 		stick_gesture_inside(&vr.bullet_dbl, -vr.input.right_stick[1], fabsf(vr.input.right_stick[0])))
+		x = 0.0f;
+	/* (and bullet time's flick down, vr.bullet_time_binding = "flick_down") */
+	if (bullet_on_stick_down() && comfort_on_foot() &&
+		stick_gesture_inside(&vr.bullet_down, -vr.input.right_stick[1], fabsf(vr.input.right_stick[0])))
 		x = 0.0f;
 	if (vr.third_hold.held && vr.third_hold.taken && comfort_on_foot())
 		x = 0.0f;

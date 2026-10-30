@@ -34,9 +34,10 @@ second of it, does nothing in the end. stick_double (below) reads two
 flicks quickly in a row.
 
 The stick pushed down (stick_down_update below; it is the third person's hold,
-and the flicks of vr.bullet_time_binding = "double_flick_down", which is not
-the default: the default, "click_hold", is the stick's click, so the push
-down is no bullet time's, and a flick up is sprint's whatever the binding): a
+and the flicks of vr.bullet_time_binding = "flick_down", the default, or
+"double_flick_down"; a flick up is sprint's whatever the binding, and the
+stick's click is the zoom, bullet time's only with "stick_click" or
+"click_hold"): a
 flick is told as the push is let go (hold 1: a push let go before
 STICK_UP_HOLD_SECONDS), so that a hold, which is the third person's, never
 is one. The third person's hold is a gesture of its own in vr.c with

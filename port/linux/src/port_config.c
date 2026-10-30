@@ -656,27 +656,31 @@ static const struct config_setting config_settings[] =
 	{ "vr.sprint_speed", _config_real, "1.5", "HALO_VR_SPRINT_SPEED", _environment_value, _platform_desktop,
 		"Sprinting, how many times the running speed, 1.1 to 2." },
 	{ "vr.bullet_time", _config_boolean, "false", "HALO_VR_BULLET_TIME", _environment_value, _platform_desktop,
-		"Bullet time: holding in the turning stick (its click for 0.4 s; the\n"
-		"right, or the left with vr.swap_sticks; vr.bullet_time_binding) slows\n"
-		"the world, your body's run and jumps with it (sprint multiplies with\n"
-		"it); the same hold ends it. A shorter press is the zoom. In a game\n"
+		"Bullet time: a flick of the turning stick down (the right, or the left\n"
+		"with vr.swap_sticks; vr.bullet_time_binding) slows the world, your\n"
+		"body's run and jumps with it (sprint multiplies with it); the same\n"
+		"flick ends it. The stick's click stays the zoom. In a game\n"
 		"of this computer alone (the campaign; never online, split screen or\n"
 		"with bots). Your head and hands stay at full speed; the sounds keep\n"
 		"their pitch." },
-	{ "vr.bullet_time_binding", _config_string, "\"click_hold\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
+	{ "vr.bullet_time_binding", _config_string, "\"flick_down\"", "HALO_VR_BULLET_TIME_BINDING", _environment_value, _platform_desktop,
 		"What toggles bullet time (vr.bullet_time), on or off alike:\n"
-		"\"click_hold\" the turning stick's click (the default): a short press,\n"
-		"let go before 0.4 s, is the game's zoom (it comes as you let go), a\n"
-		"press held 0.4 s toggles bullet time, once, and its release does\n"
-		"nothing more (a short press zooms in bullet time too, and in the half\n"
-		"second's rest after a toggle); on foot in the first person with the controllers\n"
-		"aiming: in the third person, in a vehicle, in the menus and with\n"
-		"vr.aim = \"gamepad\" the click is the game's zoom, live, and so it is\n"
-		"while bullet time cannot work, online; bullet time rests half a\n"
-		"second after a toggle; \"stick_click\" pressing in the turning stick\n"
-		"toggles bullet time at once, with no zoom on foot in the first\n"
-		"person (for vr.scope_view = \"eye\", where the scope needs no click;\n"
-		"with \"smartlink\" the click's zoom is given up in the first person);\n"
+		"\"flick_down\" one flick DOWN of the turning stick (the default): a\n"
+		"push down let go before 0.8 s, told as you let go; a push begins only\n"
+		"within about 34 degrees of straight down, so a diagonal look does\n"
+		"nothing; a hold of 0.8 s is the third person's (vr.third_person_binding),\n"
+		"never bullet time's; bullet time rests half a second after a toggle.\n"
+		"The stick's click is the game's zoom always, in bullet time as well;\n"
+		"\"stick_click\" pressing in the turning stick toggles bullet time at\n"
+		"once, with no zoom on foot in the first person (for\n"
+		"vr.scope_view = \"eye\"; with \"smartlink\" its zoom is given up there);\n"
+		"\"click_hold\" the click: a short press, let go before 0.4 s, is the\n"
+		"zoom (it comes as you let go), a press held 0.4 s toggles bullet time\n"
+		"once and its release does nothing (a short press zooms in bullet time\n"
+		"too); both click bindings work on foot in the first person with the\n"
+		"controllers aiming: in the third person, in a vehicle, in the menus and\n"
+		"with vr.aim = \"gamepad\" the click is the game's zoom, live, and so it\n"
+		"is while bullet time cannot work, online;\n"
 		"\"double_flick_down\" two quick\n"
 		"flicks DOWN, each let go within 0.45 s, the second begun within a\n"
 		"third of a second of the first's end (one flick down alone does\n"
@@ -689,7 +693,7 @@ static const struct config_setting config_settings[] =
 		"holding the stick up most of a second; \"off\" never. A flick UP is\n"
 		"always sprint's, the two independent. With vr.third_person_binding =\n"
 		"\"double_flick_down\" the down is the third person's and\n"
-		"\"double_flick_down\" works as \"double_flick\". The stick pushed down\n"
+		"\"flick_down\" and \"double_flick_down\" work as \"double_flick\". The stick pushed down\n"
 		"does not eject the magazine (take another from the left hip, or X)." },
 	{ "vr.bullet_time_scale", _config_real, "0.4", "HALO_VR_BULLET_TIME_SCALE", _environment_value, _platform_desktop,
 		"Bullet time's speed of the world, 0.2 to 0.8 (0.4: two fifths)." },
