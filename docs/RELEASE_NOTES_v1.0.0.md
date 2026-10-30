@@ -44,11 +44,11 @@ OpenH1's own fixes between `build-734` and `build-769` are in this release:
 ## Controls
 
 - Flick the right stick up: sprint on or off, once sprint is on in VR Setup.
+- Flick the right stick down: bullet time on or off, once bullet time is on in VR Setup.
 - Hold the right stick down for 0.8 seconds: third person on or off.
-- Press the right stick in: bullet time on or off, once bullet time is on in VR Setup. Until then, and in third person, it is plain zoom.
+- Press the right stick in: zoom, in bullet time as well.
 - There is no magazine eject on the stick. Reload with X, or take a magazine from your left hip with your left hand.
-- A flick down does nothing, so looking around never sets anything off.
-- A push on a diagonal while you turn is ignored.
+- A push on a diagonal while you turn is ignored, so looking around does not set it off.
 - One click of the left stick while sprinting slides you the whole way, once the slide is on. Click again to stop early.
 - Each toggle shows a label on the HUD.
 

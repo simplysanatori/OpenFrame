@@ -95,8 +95,9 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Left stick click | Crouch. While sprinting, slide (once you turn on the slide) |
 | Right stick, left and right | Turn, in steps or smoothly |
 | Right stick, flick up | Sprint on or off (once you turn on sprint) |
+| Right stick, flick down | Bullet time on or off (once you turn on bullet time) |
 | Right stick, held down 0.8 seconds | Third person on or off |
-| Right stick, pressed in | Bullet time on or off, once you turn on bullet time. Until then, and in third person, in a vehicle and online, it is plain zoom |
+| Right stick, pressed in | Zoom, always, in bullet time as well |
 | **A** | Jump |
 | **B** | Melee. A hard swing of the right controller melees too |
 | **X** | Action and reload. Hold to pick up a weapon |
@@ -115,14 +116,14 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Either hand pushed into a control | Press it |
 | Both grips on a Ghost's handles or a Warthog's wheel | Steer it |
 
-The features that come from moistman42069's mod (below) are each off until you turn them on in VR Setup: sprint, bullet time, slide, wall jump and wall run, fists, weapon pull, prop throw, hand swap, the wrist HUD and the comfort vignette. Holding the right stick down for 0.8 seconds turns the third-person view on or off, and needs no setting. Until bullet time is on, pressing the right stick in is plain zoom. The right stick has no magazine eject: reload with **X**, or take a magazine from your left hip. A flick down does nothing, and a push on a diagonal while you turn is ignored, so looking around never sets anything off. Each toggle shows a label on the HUD.
+The features that come from moistman42069's mod (below) are each off until you turn them on in VR Setup: sprint, bullet time, slide, wall jump and wall run, fists, weapon pull, prop throw, hand swap, the wrist HUD and the comfort vignette. Holding the right stick down for 0.8 seconds turns the third-person view on or off, and needs no setting. The right stick has no magazine eject: reload with **X**, or take a magazine from your left hip. A push on a diagonal while you turn is ignored, so looking around does not set anything off. Each toggle shows a label on the HUD.
 
 ### The added features
 
 These come from moistman42069's Halo VR mod, rewritten for OpenH1. Each is off until you turn it on in VR Setup, under **MOVEMENT AND COMFORT...**, **HANDS AND WEAPONS...** or **HUD...**. They play offline: the campaign, not online games.
 
 - **Sprint** (SPRINT in MOVEMENT AND COMFORT...). Flick the right stick up to start and again to stop. Or set it to arm swing and swing your arms as you run. Crouching pauses it.
-- **Bullet time** (BULLET TIME on, in MOVEMENT AND COMFORT...). Press the right stick in. The world slows to 40 % and your head and hands keep full speed. Your own body slows with the world, so jumps float.
+- **Bullet time** (BULLET TIME on, in MOVEMENT AND COMFORT...). Flick the right stick down. The world slows to 40 % and your head and hands keep full speed. Your own body slows with the world, so jumps float.
 - **Third person.** Hold the right stick down for 0.8 seconds, with no setting turned on first. The view moves behind your body; you still aim with the controller. Not in vehicles or multiplayer.
 - **Slide** (PARKOUR on). While sprinting, click the left stick once and you slide about a second. Click again to stop early.
 - **Wall jump** (PARKOUR on). In the air beside a wall, press A again.
