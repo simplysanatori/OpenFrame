@@ -8,13 +8,13 @@ You need the maps from your own Xbox disc of Halo: Combat Evolved. No game data 
 
 ## Status
 
-Version 1.0.0, the first release. I play the campaign on my Steam Frame at 90 Hz, both eyes at 0.9 of SteamVR's recommended resolution with eye-tracked foveation, and firefights average 88 to 89 frames a second with no dropped frames. The menus and the HUD open in front of you and fit the Frame's view.
+Version 1.0.0, the first release. I play the campaign on my Steam Frame at 90 Hz, both eyes at 0.9 of SteamVR's recommended resolution with eye-tracked foveation, and the first level's firefights hold the display's 90 Hz most of the time. The menus and the HUD open in front of you and fit the Frame's view.
 
-**Compared with OpenH1's own Frame build.** OpenH1 ignored SteamVR's recentre, so the menu could sit off to one side and the view could start outside your body. The HUD's corners sat partly outside the Frame's view. The world froze for one to two seconds each time a level moved on to its next section, and the first level took about 17 seconds to load. Here recentring works and the game recentres itself at each level start, the HUD fits, a section change is a short hitch, and the first level loads in 4 to 8 seconds. In the heaviest firefight of the first level, OpenH1's resolution and foveation averaged about 77 fps; mine average 86 to 89. That is less work for the GPU every frame.
+**Compared with OpenH1's own Frame build.** OpenH1 ignored SteamVR's recentre, so the menu could sit off to one side and the view could start outside your body. The HUD's corners sat partly outside the Frame's view. The world froze for one to two seconds each time a level moved on to its next section, and the first level took about 17 seconds to load. Here recentring works and the game recentres itself at each level start, the HUD fits, a section change is a short hitch, and the first level loads in about 5 seconds. In the heaviest firefight of the first level, OpenH1's resolution and foveation averaged about 77 fps; mine average 86 to 89. That is less work for the GPU every frame.
 
 Known issues:
 
-- Big fights with a lot of explosions can dip into the 70s for a few seconds.
+- Big fights with many explosions fall into the 60s for as long as the fight lasts.
 - The first few seconds after a level loads run slower.
 - The campaign has one save slot. Starting a new game overwrites it (see [Files](#files)).
 - In bullet time the sound plays at normal speed.
@@ -166,13 +166,13 @@ Measured on my Frame from the session logs, at the defaults, in the first level:
 |---|---|
 | Display | 90 Hz, 1554 x 1554 per eye (0.9 of SteamVR's 1728) |
 | Foveation | Eye-tracked, about a third of a full eye's pixels drawn |
-| Firefights | 88.5 fps average over two rooms, 82 % of seconds at 88 or more, none below 70 |
+| Firefights | 88.5 fps average over two rooms of the first level. The heaviest fights, with many explosions, fall into the 60s while they last |
 | The heaviest firefight | 86 to 89 fps average (OpenH1's resolution and foveation: about 77) |
 | GPU per frame | 7.2 ms median of the 11.1 ms a frame at 90 Hz |
-| Dropped frames | none in play |
+| Dropped frames | a handful over a session |
 | Frames SteamVR filled in | about one in ten over a session (OpenH1's resolution and foveation: about one in three) |
 | A section change | about 0.4 s of preparation, a short hitch (OpenH1: a freeze of one to two seconds) |
-| Loading a level | 4 to 8 seconds (OpenH1: about 17 for the first level) |
+| Loading a level | about 5 seconds (OpenH1: about 17 for the first level) |
 
 What the build does, so you know what the numbers mean:
 

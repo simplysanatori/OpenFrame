@@ -70,6 +70,7 @@ These come from moistman42069's Halo VR mod, rewritten for OpenH1's renderer and
 
 - Big fights with many explosions fall into the 60s for as long as the fight lasts.
 - The first few seconds after a level loads run slower.
+- The campaign has one save slot per profile. Starting a new game, or any level, overwrites it. Copy the saves folder aside first if you want to come back.
 - In bullet time the sound plays at normal speed.
 - The launch wrapper can only set SteamVR's refresh rate and smoothing when the game starts from the Steam library.
 
