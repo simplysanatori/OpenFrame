@@ -385,7 +385,7 @@ VR_SCREENS["vr_comfort"] = {
          [(f"{scale:g}X", f"{scale:g}") for scale in (0.5, 0.75, 1, 1.25, 1.5)],
          "How strong a jump off a wall is.", None),
         ("BULLET TIME:", "vr.bullet_time", ON_OFF,
-         "Offline: press in the turning stick to slow the\nworld, again to end it (see GESTURES).",
+         "Offline: flick the turning stick down and let go to\nslow the world, again to end it (GESTURES: others).",
          None),
         ("BULLET TIME SPEED:", "vr.bullet_time_scale",
          [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],

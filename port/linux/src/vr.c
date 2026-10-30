@@ -801,7 +801,7 @@ static struct
 	struct stick_diag down_diag;
 	/* whether the game allows bullet time now (halo_vr_bullet_time_able) */
 	int bullet_able;
-	/* the turning stick's click (the default bullet time binding): pressed
+	/* the turning stick's click (the "stick_click" bullet time binding): pressed
 	last frame, and this press taken (the zoom is not given it) */
 	int bullet_click_was;
 	int bullet_click_taken;
@@ -1814,7 +1814,8 @@ hand they are for (hand_haptic), and the first-person weapon and hands are
 drawn mirrored (port/linux/game/vr_render.c). The buttons stay where they
 are, as the game's prompts name them (A, B, X, Y, the bumpers, the d-pad,
 View and Menu); the sticks swap as vr.swap_sticks says, the move's and the
-turn's, each with its click (the crouch, the zoom or bullet time's toggle).
+turn's, each with its click (the crouch, or the zoom; bullet time's toggle with
+vr.bullet_time_binding = "stick_click" or "click_hold").
 debug.vr_test_hands mirrors its poses
 (test_hands_apply). */
 static void hands_assign_views(void)

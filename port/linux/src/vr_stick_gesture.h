@@ -369,8 +369,8 @@ static inline int stick_double_update(struct stick_double *d, int gesture, int e
 	return STICK_ACT_NONE;
 }
 
-/* The turning stick's click with vr.bullet_time_binding = "click_hold" (the
-default), where the click is both the zoom and bullet time's: a click let go
+/* The turning stick's click with vr.bullet_time_binding = "click_hold" (not
+the default), where the click is both the zoom and bullet time's: a click let go
 before CLICK_HOLD_SECONDS is the zoom (told at its release: the caller gives
 the game one press then), one held that long is bullet time (told once, the
 moment the threshold is reached; its release is nothing). It is told only

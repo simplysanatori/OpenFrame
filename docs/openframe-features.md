@@ -394,7 +394,7 @@ local player (`vr_sprint_speed_scale`).
   enabled and `vr.bullet_time_binding = "double_flick"`, two quick
   flicks up toggle bullet time instead of sprint twice (the second undoes the
   first's toggle); with the default `"flick_down"` (or `"click_hold"`, `"stick_click"` or `"double_flick_down"`)
-  a flick up is sprint's alone and bullet time is on the stick's down (or the click). The two multiply (bullet time's entry). The sprint stays on as you stop or crouch (a crouch pauses it:
+  a flick up is sprint's alone and bullet time is on the stick's down (or, with another binding, the click). The two multiply (bullet time's entry). The sprint stays on as you stop or crouch (a crouch pauses it:
   `bipeds.c` sprints standing), and ends by itself only off foot (a vehicle,
   death; half a second of it, the menus aside). The HUD says "Sprint" and
   "Sprint off" at every change; the right controller pulses. The gesture is
