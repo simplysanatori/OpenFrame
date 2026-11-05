@@ -2452,6 +2452,34 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 	if (abs(value) > abs(pad->sThumbRY)) pad->sThumbRY = value;
 }
 
+#ifdef HALO_VR
+/* (OpenFrame) a gamepad SDL lists that is used in the headset, said once a
+run for each (by its name): every gamepad's input is merged with the
+OpenXR controllers' there (the loop below), so on the Steam Frame this
+log shows whether Steam's own gamepads (Steam Input's "Steam Virtual
+Gamepad", or the "Steam Frame Controllers" device) bring the hands' input
+a second time */
+static void vr_gamepad_heard(SDL_Gamepad *gamepad)
+{
+	static char heard[4][64];
+	const char *name = SDL_GetGamepadName(gamepad);
+	int slot;
+
+	if (!name || gamepad_idle(gamepad))
+		return;
+	for (slot = 0; slot < 4 && heard[slot][0]; slot++)
+	{
+		if (!strncmp(heard[slot], name, sizeof(heard[slot]) - 1))
+			return;
+	}
+	if (slot == 4)
+		return;
+	snprintf(heard[slot], sizeof(heard[slot]), "%s", name);
+	platform_log("vr: the gamepad \"%s\" (%04x:%04x) is used too, beside the OpenXR controllers", name,
+		(unsigned)SDL_GetGamepadVendor(gamepad), (unsigned)SDL_GetGamepadProduct(gamepad));
+}
+#endif
+
 /* the back paddles held (controller_remap_paddles' bits: the left, the
 right, the second left, the second right; a Steam Deck's L4, R4, L5, R5),
 which only a custom layout's actions take (Button Remapping) */
@@ -3290,6 +3318,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 				if (other > 0 || !port_gamepad(gamepads, count, 0))
 					sdl_gamepad_state(gamepads[other], &state->Gamepad);
 				back = back || SDL_GetGamepadButton(gamepads[other], SDL_GAMEPAD_BUTTON_BACK);
+				vr_gamepad_heard(gamepads[other]);
 			}
 		}
 		halo_vr_gamepad(&state->Gamepad);

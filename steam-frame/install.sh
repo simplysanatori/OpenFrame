@@ -32,7 +32,11 @@
 # folder, the refresh rate, and update.auto = false: OpenH1's self-updater would replace this fork with
 # OpenH1's own release). Running install.sh again sets those keys and leaves the rest of the file alone.
 # The shortcut is made with OpenVR=1, AllowOverlay=1 and AllowDesktopConfig=1, and is updated, not
-# duplicated, when it exists. The library art (art/) is written when it holds images.
+# duplicated, when it exists.
+# Steam Input is left as Steam has it for a new shortcut (on, no layout of OpenFrame's): the controls come
+# from OpenXR (the game's suggested bindings for the Frame's controllers, which SteamVR takes 1:1), the
+# Steam and system buttons stay SteamOS's, and nothing of Steam's needs closing. (OpenH1's own installer
+# turns Steam Input off for its flat Steam Deck shortcut only, for the gyro and back buttons; never for VR.) The library art (art/) is written when it holds images.
 set -e
 HERE=$(cd "$(dirname "$0")" && pwd)
 export PYTHONDONTWRITEBYTECODE=1
@@ -55,7 +59,8 @@ SCRATCH=
 cleanup() { [ -n "$SCRATCH" ] && rm -rf "$SCRATCH"; return 0; }
 trap cleanup EXIT
 
-# ---- where the files come from: ROOT holds openframe.sh, tools/, art/, brokers.txt; BIN_DIR holds halo and libSDL3.so.0
+# ---- where the files come from: ROOT holds openframe.sh, tools/, art/, brokers.txt, prepared.records; BIN_DIR holds
+# halo, libSDL3.so.0 and openh1.assets (the build's own: the game reads it beside itself, and has no menus without it)
 if [ "$DEV" = 1 ]; then
     NAME=${NAME:-OpenFrame (dev)}
     APP=${OPENFRAME_APP:-$HOME/Games/OpenFrame/app-dev}
@@ -63,6 +68,7 @@ if [ "$DEV" = 1 ]; then
     [ -x "$BIN_DIR/halo" ] || { echo "no halo in $BIN_DIR (build with steam-frame/build.sh first)" >&2; exit 1; }
     ROOT=$HERE
     BROKERS=$HERE/../port/assets/network/brokers.txt
+    RECORDS=$HERE/../port/assets/prepared/prepared.records
 else
     NAME=${NAME:-OpenFrame}
     APP=${OPENFRAME_APP:-$HOME/Games/OpenFrame/app}
@@ -90,8 +96,10 @@ else
     BIN_DIR=$ROOT
     [ -x "$BIN_DIR/halo" ] && [ -f "$ROOT/openframe.sh" ] || { echo "$ROOT is not an OpenFrame release (halo and openframe.sh expected)" >&2; exit 1; }
     BROKERS=$ROOT/brokers.txt
+    RECORDS=$ROOT/prepared.records
 fi
 [ -f "$BIN_DIR/libSDL3.so.0" ] || { echo "no libSDL3.so.0 beside halo in $BIN_DIR" >&2; exit 1; }
+[ -f "$BIN_DIR/openh1.assets" ] || { echo "no openh1.assets beside halo in $BIN_DIR (the build writes it; without it the game has no menus)" >&2; exit 1; }
 [ -f "$ROOT/openframe.sh" ] && [ -f "$ROOT/tools/vrtiming.py" ] || { echo "openframe.sh or tools/vrtiming.py missing in $ROOT" >&2; exit 1; }
 case $NAME in *\'* | *\\*) echo "the shortcut name cannot hold a quote or backslash" >&2; exit 2 ;; esac
 if [ -z "$OPENFRAME_SKIP_STEAM" ] && [ -z "$OPENFRAME_STEAM_DIR" ]; then
@@ -121,13 +129,21 @@ echo "installing into $APP"
 mkdir -p "$APP/tools" "$OFHOME"
 cp "$BIN_DIR/halo" "$APP/halo.new" && mv "$APP/halo.new" "$APP/halo"
 cp "$BIN_DIR/libSDL3.so.0" "$APP/libSDL3.so.0.new" && mv "$APP/libSDL3.so.0.new" "$APP/libSDL3.so.0"
+# (the game's assets and the stock maps' shipped preparation records, read beside halo: install_layout.c)
+cp "$BIN_DIR/openh1.assets" "$APP/openh1.assets.new" && mv "$APP/openh1.assets.new" "$APP/openh1.assets"
+if [ -f "$RECORDS" ]; then cp "$RECORDS" "$APP/prepared.records.new" && mv "$APP/prepared.records.new" "$APP/prepared.records"; fi
 chmod +x "$APP/halo"
 cp "$ROOT/openframe.sh" "$APP/openframe.sh"
 cp "$ROOT/tools/vrtiming.py" "$APP/tools/vrtiming.py"
 cp "$ROOT/steam-cef.py" "$APP/tools/steam-cef.py"
 for f in install.sh uninstall.sh collect-logs.sh; do [ -f "$ROOT/$f" ] && cp "$ROOT/$f" "$APP/tools/$f"; done
 chmod +x "$APP/openframe.sh" "$APP/tools/"*.sh "$APP/tools/steam-cef.py" 2> /dev/null || true
-for f in README.md README.upstream.md CREDITS.md LICENSE THIRD-PARTY-NOTICES.md NOTICE.md; do [ -f "$ROOT/$f" ] && cp "$ROOT/$f" "$APP/$f"; done
+for f in README.md README.upstream.md CREDITS.md LICENSE THIRD-PARTY-NOTICES.md NOTICE.md VERSION; do [ -f "$ROOT/$f" ] && cp "$ROOT/$f" "$APP/$f"; done
+# (a dev install's VERSION: the build tree's commit)
+if [ "$DEV" = 1 ]; then
+    { echo "openframe dev"; echo "commit $(git -C "$HERE/.." rev-parse HEAD 2> /dev/null || echo unknown)"
+      echo "installed $(date -u '+%Y-%m-%d %H:%M UTC')"; } > "$APP/VERSION"
+fi
 if [ -d "$ROOT/licenses" ]; then rm -rf "$APP/licenses"; cp -r "$ROOT/licenses" "$APP/licenses"; fi
 
 # ---- the data folder: brokers.txt (internet play's MQTT brokers; the game reads the one beside config.toml)
@@ -244,5 +260,7 @@ Installed in $APP.
 $([ "$APPID" != none ] && echo "Steam library entry \"$NAME\" (appid $APPID) runs $EXE through $APP/openframe.sh.")
 $([ "$NMAPS" -gt 0 ] || echo "Before you play: install.sh --maps <the maps folder of your Xbox Halo: Combat Evolved disc>")
 Launch it from the library with SteamVR running.
+The game keeps the Xbox maps unpacked in $OFHOME/saves/z: every stock map once played or
+unpacked in the background, about 3 GB (Settings > PROFILES > MAP STORAGE: DISK SPACE SAVER keeps 730 MB).
 Logs: $OFHOME/sessions/latest/ (launch.log, stdout.log, debug.txt, vrtiming.log)
 MSG

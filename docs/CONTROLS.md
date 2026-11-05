@@ -37,6 +37,7 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 
 ## The turning stick's gestures
 
+- OpenFrame binds nothing to holding a stick click or to pressing it twice quickly (the left click crouches while it is held, the right click zooms once for each press), so those stay free for passthrough tools such as [Frame Passthrough Shortcuts](https://github.com/KominoVR/frame-passthrough-shortcuts), which use them on either stick.
 - A flick counts when the stick goes within about 34 degrees of straight up or down. While the stick is inside that cone, turning pauses, so a flick never turns you. A diagonal push only turns you.
 - Flick up: sprint on or off, at the moment of the push.
 - Flick down and let go within 0.8 seconds: bullet time on or off. It switches as you let go, and rests half a second between switches.

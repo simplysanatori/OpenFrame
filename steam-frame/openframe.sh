@@ -12,6 +12,9 @@
 # What it hands the game (OpenH1's settings, port/linux/README.md "Settings"):
 #   HALO_CONFIG_FILE   $OPENFRAME_HOME/config.toml (the installer writes it; paths.data names the
 #                      folder with maps/, which is $OPENFRAME_HOME)
+#                      The game keeps its maps unpacked in $OPENFRAME_HOME/saves/z (the map cache,
+#                      game.map_cache_megabytes: about 3 GB with every stock map) and reads its
+#                      openh1.assets and prepared.records beside halo (the app folder).
 #   HALO_UPDATE_AUTO   false, always: OpenH1's self-updater would replace this fork with OpenH1's own
 #                      release. Update OpenFrame by installing a newer OpenFrame release.
 #   HALO_VR_REFRESH_RATE  only when OPENFRAME_REFRESH_HZ is given; otherwise the game reads vr.refresh_rate
@@ -65,6 +68,9 @@ elif [ $# -gt 0 ]; then CMD=("$@")
 else CMD=("$HERE/halo"); fi
 EXE=${CMD[${#CMD[@]}-1]}
 [ -x "$EXE" ] || { log "REFUSING TO START: no game binary at $EXE (run install.sh)"; exit 1; }
+# (the game's menus, HUD and text pictures: the build's openh1.assets beside it, or none of its menus)
+[ -f "$(dirname "$EXE")/openh1.assets" ] || [ -f "$OFHOME/openh1.assets" ] ||
+    log "WARNING: no openh1.assets beside $EXE: the game has no menus (install the whole release again)"
 
 # The game's settings.
 export HALO_CONFIG_FILE=$OFHOME/config.toml

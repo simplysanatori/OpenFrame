@@ -411,7 +411,7 @@ VR_SCREENS["vr_comfort"] = {
          [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
          "How fast the world runs in bullet time.", None),
         ("GESTURES...", None, VR_GESTURES,
-         "Which press or stick gesture starts bullet time and\nswitches the third person (for a Steam Input script).",
+         "Which press or stick gesture starts bullet time and\nswitches the third person (beside a passthrough tool).",
          None),
     ],
 }
@@ -426,7 +426,7 @@ VR_SCREENS["vr_gestures"] = {
     "rows": [
         ("BULLET TIME BINDING:", "vr.bullet_time_binding",
          [("FLICK DOWN", "flick_down"), ("CLICK, HELD", "click_hold"), ("STICK CLICK", "stick_click"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("DOUBLE FLICK UP", "double_flick"), ("HOLD UP", "hold"), ("OFF", "off")],
-         "Flick down: flick the turning stick down, let go before 0.8 s (a hold is the third person; the click is always the zoom). Click, held: the click zooms, held 0.4 s it is bullet time. Stick click: the click is bullet time, no zoom. Up is sprint.",
+         "Flick down: flick the turning stick down, let go before 0.8 s (a hold is the third person; the click is always the zoom). Click, held: the click zooms, held 0.4 s it is bullet time (a passthrough tool's held click fires too). Stick click: the click is bullet time, no zoom. Up is sprint.",
          None),
         ("THIRD PERSON BINDING:", "vr.third_person_binding",
          [("HOLD", "hold"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("OFF", "off")],

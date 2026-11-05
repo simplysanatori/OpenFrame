@@ -4,15 +4,21 @@
 #   steam-frame/release.sh [--version VER] [--build DIR] [--out DIR]
 #
 #   --version VER the release version, e.g. 1.0.0 (default: the VERSION line below)
-#   --build DIR   the build folder (default <repo>/build/linux_arm64): halo and libSDL3.so.0
+#   --build DIR   the build folder (default <repo>/build/linux_arm64): halo, libSDL3.so.0 and openh1.assets
 #   --out DIR     where the tarball and SHA256SUMS go (default <repo>/steam-frame/release)
 #   --stage DIR   only stage the file set into DIR (created if missing) and stop: no tarball, no checks.
 #                 install.sh --from-build uses this to install straight from a build tree.
 #
 # The tarball is openframe-<version>-linux-arm64.tar.gz, with no top level folder: halo,
-# libSDL3.so.0, openframe.sh, install.sh, uninstall.sh, collect-logs.sh, steam-cef.py,
+# libSDL3.so.0, openh1.assets (the menus', HUD's and text's pictures, out of the game since OpenH1's
+# #631: the game reads them beside itself and stops without its menus if they are missing or another
+# build's), prepared.records (the stock maps' shipped preparation records, #629; the flat window's,
+# the VR eyes prepare apart), openframe.sh, install.sh, uninstall.sh, collect-logs.sh, steam-cef.py,
 # tools/vrtiming.py, brokers.txt, art/ (the Steam library images, when there are any), README.md,
-# README.upstream.md, CREDITS.md, LICENSE, THIRD-PARTY-NOTICES.md and the libraries' licence files.
+# README.upstream.md, CREDITS.md, LICENSE, THIRD-PARTY-NOTICES.md, VERSION and the libraries' licence
+# files (FFmpeg's among them: it is built into halo for the Bink movies). The same game files as
+# OpenH1's tools/frame_package.py packs for its own Frame package (its halo-vr.sh launcher, installer
+# and updater are not OpenFrame's).
 # Never the maps, a config.toml, a save or a log. Then steam-frame/tools/privacy-check.sh runs on the
 # tarball, and SHA256SUMS is written beside it. Any failure deletes the tarball again.
 set -euo pipefail
@@ -37,6 +43,7 @@ done
 NAME=openframe-$VERSION-linux-arm64
 [[ -x $build/halo ]] || fail "no $build/halo (build with steam-frame/build.sh first)"
 [[ -f $build/libSDL3.so.0 ]] || fail "no $build/libSDL3.so.0"
+[[ -f $build/openh1.assets ]] || fail "no $build/openh1.assets (ninja linux_arm64 writes it beside halo)"
 # a VR build: the strings host_vr.c carries (as OpenH1's tools/frame_package.py checks)
 grep -q -a xrNegotiateLoaderRuntimeInterface "$build/halo" && grep -q -a XR_KHR_vulkan_enable2 "$build/halo" ||
     fail "$build/halo is not a VR build (python3 configure.py --vr, then ninja linux_arm64)"
@@ -44,7 +51,9 @@ for f in README.md README.upstream.md CREDITS.md LICENSE THIRD-PARTY-NOTICES.md 
          steam-frame/openframe.sh steam-frame/install.sh steam-frame/uninstall.sh steam-frame/collect-logs.sh \
          steam-frame/steam-cef.py steam-frame/tools/vrtiming.py steam-frame/tools/privacy-check.sh \
          port/third_party/mbedtls/LICENSE port/third_party/miniupnpc/LICENSE port/assets/fonts/Overpass-OFL.txt \
-         port/third_party/expat/COPYING port/third_party/opus/COPYING port/assets/icons/lucide/LICENSE; do
+         port/third_party/expat/COPYING port/third_party/opus/COPYING port/assets/icons/lucide/LICENSE \
+         port/assets/fonts/Hack-LICENSE.txt port/assets/fonts/OpenCE-OFL.txt port/third_party/ffmpeg/COPYING.LGPLv2.1 \
+         port/assets/prepared/prepared.records; do
     [[ -f $repo/$f ]] || fail "missing $f"
 done
 
@@ -65,6 +74,8 @@ fi
 echo "release: staging"
 install -m 0755 "$build/halo" "$stage/halo"
 install -m 0755 "$build/libSDL3.so.0" "$stage/libSDL3.so.0"
+install -m 0644 "$build/openh1.assets" "$stage/openh1.assets"
+install -m 0644 "$repo/port/assets/prepared/prepared.records" "$stage/prepared.records"
 [[ -f $build/third_party/SDL3/LICENSE.txt ]] && install -m 0644 "$build/third_party/SDL3/LICENSE.txt" "$stage/SDL3-LICENSE.txt"
 for f in openframe.sh install.sh uninstall.sh collect-logs.sh steam-cef.py; do install -m 0755 "$here/$f" "$stage/$f"; done
 mkdir -p "$stage/tools" "$stage/art"
@@ -80,6 +91,9 @@ install -m 0644 "$repo/port/assets/fonts/Overpass-OFL.txt" "$stage/licenses/Over
 install -m 0644 "$repo/port/third_party/expat/COPYING" "$stage/licenses/expat-COPYING.txt"
 install -m 0644 "$repo/port/third_party/opus/COPYING" "$stage/licenses/opus-COPYING.txt"
 install -m 0644 "$repo/port/assets/icons/lucide/LICENSE" "$stage/licenses/lucide-LICENSE.txt"
+install -m 0644 "$repo/port/assets/fonts/Hack-LICENSE.txt" "$stage/licenses/Hack-LICENSE.txt"
+install -m 0644 "$repo/port/assets/fonts/OpenCE-OFL.txt" "$stage/licenses/OpenCE-OFL.txt"
+install -m 0644 "$repo/port/third_party/ffmpeg/COPYING.LGPLv2.1" "$stage/licenses/ffmpeg-COPYING.LGPLv2.1.txt"
 [[ -f $stage/SDL3-LICENSE.txt ]] && mv "$stage/SDL3-LICENSE.txt" "$stage/licenses/SDL3-LICENSE.txt"
 # VERSION: what the tarball was built from
 {

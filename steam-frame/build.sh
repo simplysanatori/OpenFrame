@@ -4,9 +4,11 @@
 #
 #   steam-frame/build.sh [ninja targets...]       (default target: linux_arm64)
 #
-# Result: build/linux_arm64/halo with libSDL3.so.0 beside it. The first configure downloads the pinned
-# guest LLVM (about 1.5 GB, about 700 MB kept in ~/.cache/openh1), musl, SDL3 and the Vulkan and
-# OpenXR headers, so it needs the network. Builds are slow the first time (30 minutes or more on the
+# Result: build/linux_arm64/halo with libSDL3.so.0 and openh1.assets (the menus', HUD's and text's
+# pictures, which the game reads beside itself) beside it. The first configure downloads the pinned
+# guest LLVM (about 1.5 GB, about 700 MB kept in ~/.cache/openh1), musl, SDL3, FFmpeg's sources (the
+# Bink movies' decoders, built into halo: tools/ffmpeg_fetch.py) and the Vulkan and OpenXR headers,
+# so it needs the network. Package it with steam-frame/release.sh (or install.sh --from-build). Builds are slow the first time (30 minutes or more on the
 # Frame's five CPUs) and fast afterwards, because ccache keeps the host objects.
 #
 # Environment:

@@ -118,11 +118,13 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 
 A flick counts when the right stick goes within about 34 degrees of straight up or down; while it is inside that cone, turning pauses, so a flick never turns you, and a diagonal push only turns you. A flick down switches bullet time as you let go. There is no magazine eject on the stick: reload with **X**, or take a magazine from your left hip. Sprint, bullet time and the third person show a label on the HUD when they switch.
 
+OpenFrame binds nothing to holding a stick click or to pressing it twice quickly (the left click crouches while it is held, the right click zooms once for each press), so those stay free for passthrough tools such as [Frame Passthrough Shortcuts](https://github.com/KominoVR/frame-passthrough-shortcuts), which use them on either stick.
+
 Sprint, bullet time, parkour, fists, weapon pull, prop throw and hand swap come from moistman42069's mod and are each off until you turn them on in VR Setup. The third person needs no setting. [docs/CONTROLS.md](docs/CONTROLS.md) explains how each one is used, and [docs/openframe-features.md](docs/openframe-features.md) has every setting.
 
 ## Settings
 
-Most settings are in the headset: **Settings > Controls > VR SETUP**, the last row. It appears while the game plays in VR, and also at the foot of the player profile menu. Its pages are **DISPLAY...**, **HUD...**, **PLAYER...**, **MOVEMENT AND COMFORT...** and **HANDS AND WEAPONS...**. The HUD page opens **HUD LAYOUT...**, with sliders to bring the corners in and to move or resize each one.
+Most settings are in the headset: **Settings > Controls > VR SETUP**, under CONTROLLER. It appears while the game plays in VR, and also at the foot of the player profile menu. Its pages are **DISPLAY...**, **HUD...**, **PLAYER...**, **MOVEMENT AND COMFORT...** and **HANDS AND WEAPONS...**. The HUD page opens **HUD LAYOUT...**, with sliders to bring the corners in and to move or resize each one.
 
 Everything is also in `~/.local/share/OpenFrame/config.toml`, with a comment on each line. A line commented out follows the default. Every setting has a `HALO_*` environment variable too, which wins over the file. The ones that matter most on the Frame:
 
