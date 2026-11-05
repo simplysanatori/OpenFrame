@@ -416,3 +416,80 @@ The decompilation's upstream, punpckhdq/halo, is AGPL 3.0 from 17 October
 | [tools/stagekit/README.md](tools/stagekit/README.md) | Scenarios staged and instrumented on the real engine, no retail assets |
 | `port/third_party/*/README.md` | Each vendored library |
 | [AUTHORS.md](AUTHORS.md) | Art credits |
+
+## Steam Frame port (OpenFrame)
+
+This section holds the technical detail of the Steam Frame port, moved out of the README. The user-facing detail is in [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
+
+OpenFrame is my Steam Frame version of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo: Combat Evolved. The game is the Xbox build's own code, compiled for Arm64 Linux, drawn with Vulkan, and shown in VR through the Frame's own SteamVR. You do not need an emulator, Lepton, an APK or a PC. On top of OpenH1 I added the Frame setup, faster loads, settings tuned for 90 Hz, controls made for the Frame controllers, and VR features from other people's Halo VR work.
+
+### Status
+
+Version 1.1.0, on OpenH1's `build-1615`. I play the campaign on my Steam Frame at 90 Hz, both eyes at 0.9 of SteamVR's recommended resolution with eye-tracked foveation. The menus and the HUD open in front of you and fit the Frame's view.
+
+**Compared with OpenH1's own Frame build when I started.** OpenH1 ignored SteamVR's recentre, so the menu could sit off to one side and the view could start outside your body. The HUD's corners sat partly outside the Frame's view. Here recentring works, the game recentres itself at each level start, and the HUD fits. In the heaviest firefight of the first level, OpenH1's resolution and foveation averaged about 77 fps; mine averaged 86 to 89 in 1.0.0. That is less work for the GPU every frame.
+
+### What this adds over OpenH1
+
+OpenH1 already plays Halo in VR on the Frame. OpenFrame began at OpenH1's `build-734` and is now on `build-1615`. I changed the setup around it, tuned it, and brought in features:
+
+- An installer, a Steam library entry and a launch wrapper that sets SteamVR's per-app settings at every launch: the refresh rate, no throttling, no motion smoothing.
+- Its own data folder, apart from OpenH1's, and OpenH1's self-updater switched off so it never swaps this build for OpenH1.
+- Defaults for the Frame: 0.9 resolution, a 0.4 foveation area, the GPU rendering straight to memory, the HUD's corners where the Frame's view can see them, and CROUCH WALK on.
+- Faster section changes and loads: the shader preparation for each section no longer walks every light, and Xbox maps get a larger texture cache.
+- Recentring that works, an automatic recentre at each level start, menus in front of you, and a cryo tube tutorial that counts head looks.
+- Right-stick gestures for sprint, third person and bullet time, made for the Frame controllers. No magazine eject on the stick.
+- VR Setup split into pages, with a HUD layout page of sliders, a GESTURES page and a refresh rate choice of 72, 90 or 120 Hz.
+- From moistman42069's Halo VR mod, rewritten for OpenH1: sprint, bullet time, third person on foot, slide, wall jump and wall run, fists with stagger and parry, weapon pull, prop throw, hand swap, the wrist HUD, and the comfort vignette on foot.
+
+### What came with OpenH1 build-1615
+
+OpenH1's own work up to `build-1615` is in this release. All of it is OpenH1's:
+
+- Smoother play: dynamic lights reach only what the game lights, and a closed door stops them. A pipeline that is not ready is built in the background instead of stalling the frame. A map's first frame also prepares its mirrors, fog and lens flares. Checkpoints are written on a thread of their own, and the menus open without a hitch.
+- Loading: the stock maps are kept unpacked in a cache, so no load waits for them. Crossing into a level's next section shows no loading screen. The loading screen is sharper. **MAP STORAGE** (Settings > PROFILES) sets how much room the cache takes.
+- Sound: the reverb as the Xbox ran it, the HRTF on any stereo output, and sounds muffled by walls judged from your head in VR.
+- The VR Tutorial, on the main menu in the headset.
+- Fixes in play, among them the flashlight, the needler's reload and picking up a second weapon in multiplayer.
+- Multiplayer: your hits on other players show at once, bots that drive, fly and play Capture the Flag, Oddball and King of the Hill, relays for players whose networks keep them apart, and a server browser you can search.
+- Menus: a new Campaign screen, Profiles and Mods inside Settings, a gamma setting, and VR SETUP in the CONTROLLER section of Settings > CONTROLS.
+- Crouch: upstream's crouch walk, and a CROUCH setting to hold or toggle.
+- Builds that run on kernels with 16 KB and 64 KB pages.
+
+### Installer internals
+
+The installer copies the program to `~/Games/OpenFrame/app`, writes `~/.local/share/OpenFrame/config.toml`, and adds **OpenFrame** to your Steam library as a non-Steam shortcut with its OpenVR flag on, or updates the entry if it is there. It talks to Steam through its local debugging port, which SteamOS has on by default.
+
+The installer changes nothing outside `~/Games/OpenFrame`, `~/.local/share/OpenFrame`, the Steam shortcut and SteamVR's settings for that shortcut.
+
+FrameDrop unpacks the zip on the Frame and adds its own library entry, which runs the `run.sh` in the zip. The first time it runs, and again after an update, `run.sh` runs `install.sh` with the Steam shortcut step turned off, so you get FrameDrop's entry and no second one from the installer, and then starts OpenFrame through its launch wrapper.
+
+### Performance internals
+
+What the build does, so you know what the numbers in [docs/USER_GUIDE.md](docs/USER_GUIDE.md#performance) mean:
+
+- Both eyes are drawn in one pass, foveated around where you look.
+- The game runs at its own 30 ticks a second, and frames are drawn between ticks at the display's rate.
+- The launch wrapper sets the GPU to render straight to memory. In the same rooms, tiled rendering was about 10 fps slower.
+
+### Build from source
+
+[steam-frame/dev/DEV.md](steam-frame/dev/DEV.md) has the build, the install of a build for testing, the wrapper and the release. The first build downloads about 1.5 GB of toolchain. `steam-frame/tools/privacy-check.sh` checks the tree, the history and a release tarball for personal data before publishing.
+
+### Licence detail
+
+Third-party parts keep their own licences: see [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). `steam-frame/tools/vrtiming.py` and `privacy-check.sh` come from Moonlight XR Native's tools, which are GPLv3. No Halo game data is included.
+
+### Credits detail
+
+- [OpenH1](https://github.com/OpenH1/OpenH1) and its team: the game, the Vulkan renderer, the netcode and the VR mode this is built on, made on a Steam Frame.
+- [HaloCE-DecompRemix-VR](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android) by moistman42069: sprint, bullet time, third person, slide, wall jump and wall run, fists, weapon pull, prop throw, hand swap, the wrist HUD and the vignette on foot are ported from it. Its own credits carry over: LivingFray's HaloCEVR, jcompto95-tech's OpenCE fork, Cesarus85's Mjolnir VR and others.
+- [HaloCE-VR](https://github.com/astromaddie/HaloCE-VR) by astromaddie, the OpenXR VR work for Halo on the Frame that moistman42069's fork builds on.
+- [OpenCE](https://github.com/OpenCommunityEdition/OpenCE) and halo-ce-universal (MrBruh and contributors), the port OpenH1 forks, and startupfoundry's Arm64 Linux and Steam Frame VR work in it.
+- [SDL3](https://github.com/libsdl-org/SDL), the [OpenXR SDK](https://github.com/KhronosGroup/OpenXR-SDK), and Mesa's Turnip driver.
+
+### How this was made
+
+I wanted Halo in VR on my Frame without an emulator or a PC. OpenH1 already had a native Arm64 build with an OpenXR VR mode, so I forked it and set it up for the Frame: the install and launch, recentring, the HUD, faster loads and section changes, resolution and foveation for 90 Hz, and controls made for the Frame controllers. Then I brought in the VR features from moistman42069's mod that I wanted to play with.
+
+I started this project and used AI (Claude) to speed up development. I write, review and fix code by hand all the way through, keep the AI's work checked and reined in, and aim to keep the port as lightweight as possible. I test it on my own Steam Frame.
