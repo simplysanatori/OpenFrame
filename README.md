@@ -78,6 +78,14 @@ To update, install a newer tarball the same way. Your maps, saves and settings s
 
 The installer changes nothing outside `~/Games/OpenFrame`, `~/.local/share/OpenFrame`, the Steam shortcut and SteamVR's settings for that shortcut. To remove OpenFrame, run `~/Games/OpenFrame/app/tools/uninstall.sh`. It keeps your data folder unless you pass `--purge`.
 
+## Install with Frametanium
+
+If you use [Frametanium](https://github.com/Cogential/frametanium), add `simplysanatori/OpenFrame` there. It downloads the release, runs its `install.sh` and updates it when I publish a new version. Copy the 24 `.map` files of your Xbox disc into `~/.local/share/OpenFrame/maps` yourself; the installer sets up the settings file for that folder. Without maps it still installs and says so.
+
+## Install with FrameDrop
+
+[FrameDrop](https://framedropvr.com) can install this too: [Install with FrameDrop](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Fsimplysanatori%2FOpenFrame%2Freleases%2Flatest%2Fdownload%2Fopenframe.framedrop.json). The release has a `openframe-<version>-framedrop-linux-arm64.zip` and a `openframe.framedrop.json` for it. FrameDrop unpacks the zip on the Frame and adds its own library entry, which runs the `run.sh` in the zip. The first time it runs, and again after an update, `run.sh` runs `install.sh` with the Steam shortcut step turned off, so you get FrameDrop's entry and no second one from the installer, and then starts OpenFrame through its launch wrapper. Copy the maps of your own Xbox disc into `~/.local/share/OpenFrame/maps` first, or run `install.sh --maps DIR` once.
+
 ## First run
 
 On the first start the game makes your profile in `~/.local/share/OpenFrame/saves`, and unpacks the maps into its cache in `saves/z`, about 3 GB in all.
@@ -256,6 +264,6 @@ OpenH1's own README is kept as [README.upstream.md](README.upstream.md).
 
 I wanted Halo in VR on my Frame without an emulator or a PC. OpenH1 already had a native Arm64 build with an OpenXR VR mode, so I forked it and set it up for the Frame: the install and launch, recentring, the HUD, faster loads and section changes, resolution and foveation for 90 Hz, and controls made for the Frame controllers. Then I brought in the VR features from moistman42069's mod that I wanted to play with.
 
-This is vibe coded, with manual review throughout. I wrote it with Claude Code running on the Frame itself. If you buy me a coffee, it pays for the Claude API credits these ports are built with, spent as carefully as I can.
+I made this with partial assistance from Claude. If you buy me a coffee, it pays for the Claude API credits these ports are built with, spent as carefully as I can.
 
 Developer notes are in [steam-frame/dev/DEV.md](steam-frame/dev/DEV.md).
