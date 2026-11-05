@@ -56,8 +56,8 @@ const char *host_app_documents_folder(void)
 void host_metal_background(int away);
 static NSString *config_path_setting(const char *name);
 static double config_number_setting(const char *name, double fallback);
-/* display.render_scale's default (port/linux/src/port_config.c's) */
-#define RENDER_SCALE_DEFAULT 1.0
+/* display.render_scale's default, 0: the device's (render_scale_for_device) */
+#define RENDER_SCALE_DEFAULT 0.0
 /* port/ios/data_import.m */
 void host_app_game_data(const char *documents);
 
@@ -102,7 +102,7 @@ void host_app_background_wait(void)
 
 /* ---------- the sound's route */
 
-/* (port/android/host/host_audio_route.c, its thread: audio.spatial "auto")
+/* (port/android/host/host_audio_route.c, its thread: the sound's log)
 what the audio session plays on: 1 headphones (wired, AirPods and other
 Bluetooth headphones), 0 the speaker or another, -1 none */
 int host_app_audio_headphones(void)
@@ -142,10 +142,33 @@ int host_app_audio_output_latency(void)
 
 /* ---------- the render scale and the device's temperature */
 
+/* the render scale a device draws at by default: a phone whose screen has
+three pixels to the point draws two of them (2/3 each way, under half the
+pixels), sharp at a phone's distance and inside the 120 Hz frame where all
+of them were not (an iPhone 15 Pro Max: 8 to 10 ms of GPU a frame at 3x,
+so 60 Hz); an iPad and a 2x phone draw all of theirs */
+static float render_scale_for_device(void)
+{
+	__block float scale = 1.0f;
+
+	void (^choose)(void) = ^{
+		if ([UIDevice currentDevice].userInterfaceIdiom == UIUserInterfaceIdiomPhone &&
+			[UIScreen mainScreen].nativeScale >= 2.5)
+		{
+			scale = 2.0f / 3.0f;
+		}
+	};
+	if ([NSThread isMainThread])
+		choose();
+	else
+		dispatch_sync(dispatch_get_main_queue(), choose);
+	return scale;
+}
+
 /* display.render_scale (HALO_RENDER_SCALE): the game draws at this fraction
 of the screen's pixels each way, and the display scales the picture up
 (port/android/host/host_sdl.c gives the game the window's pixels times it;
-host_metal.m makes the layer's drawables that size) */
+host_metal.m makes the layer's drawables that size); 0, the device's */
 float host_app_render_scale(void)
 {
 	static float scale;
@@ -155,6 +178,8 @@ float host_app_render_scale(void)
 		const char *value = getenv("HALO_RENDER_SCALE");
 
 		scale = value ? (float)atof(value) : (float)config_number_setting("display.render_scale", RENDER_SCALE_DEFAULT);
+		if (scale == 0.0f)
+			scale = render_scale_for_device();
 		if (!(scale >= 0.25f && scale <= 1.0f))
 			scale = 1.0f;
 		host_logf(HOST_LOG_INFO, "render scale: %.2f", scale);
@@ -279,6 +304,32 @@ void host_app_start(void)
 
 			[files removeItemAtPath:copy error:NULL];
 			[files copyItemAtPath:brokers toPath:copy error:NULL];
+		}
+		/* ...and the stock maps' preparations' records (port/linux/src/
+		prepared_shipped.h), the same way */
+		{
+			NSString *records = [bundle pathForResource:@"prepared" ofType:@"records"];
+
+			if (records)
+			{
+				NSString *copy = [documents_folder stringByAppendingPathComponent:@"prepared.records"];
+
+				[files removeItemAtPath:copy error:NULL];
+				[files copyItemAtPath:records toPath:copy error:NULL];
+			}
+		}
+		/* ...and the textures', fonts' and menus' bytes (port/linux/src/
+		embedded_assets.h), the same way */
+		{
+			NSString *assets = [bundle pathForResource:@"openh1" ofType:@"assets"];
+
+			if (assets)
+			{
+				NSString *copy = [documents_folder stringByAppendingPathComponent:@"openh1.assets"];
+
+				[files removeItemAtPath:copy error:NULL];
+				[files copyItemAtPath:assets toPath:copy error:NULL];
+			}
 		}
 
 		saves = [documents_folder stringByAppendingPathComponent:@"saves"];

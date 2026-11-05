@@ -19,8 +19,8 @@ _Static_assert(sizeof(struct xgpu_metal_combiner) == 160, "the combiner's config
 
 int xgpu_metal_combiner_draws(const struct xgpu_pixel_program *program)
 {
-	return !program->per_pixel_lighting && !program->dynamic_lights && !program->alpha_test_samples &&
-		!program->multiview && !program->hdr;
+	return !program->per_pixel_lighting && !program->dynamic_lights && !program->ambient_occlusion &&
+		!program->alpha_test_samples && !program->multiview && !program->hdr;
 }
 
 static uint32_t input_bits(const struct xgpu_combiner_input *input)
@@ -118,7 +118,7 @@ const char xgpu_metal_combiner_source[] =
 	"\tfloat4 blend_constant;\n"
 	"\tfloat4 texture_border[4];\n"
 	"\tfloat4 texture_border_linear;\n"
-	"\tfloat4 model_lights[12];\n"
+	"\tfloat4 model_lights[13];\n"
 	"};\n"
 	"struct xgpu_combiner_general { uint inputs[2]; uint control[2]; };\n"
 	"struct xgpu_combiner\n"

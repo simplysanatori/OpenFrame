@@ -1993,6 +1993,10 @@ static void effect_generate_particles(
 					particles->scale_b_flags,
 					_effect_particle_distribution_radius_bit);
 
+				/* port: zeroed: a particle not attached to the object has no
+				node, which was whatever the stack held, kept in its datum
+				(particle_new) */
+				csmemset(&data, 0, sizeof(data));
 				local_random_direction3d(&random_offset);
 				matrix4x3_transform_vector(
 					&instance->matrix,
@@ -2261,8 +2265,13 @@ static void effect_update(
 						attachment_index < attachment_count;
 						attachment_index++)
 					{
-						if (object->object.attachment_indices[attachment_index] ==
-							effect_index)
+						/* port: only an effect's slot: another type's
+						index is of another array (a light's, a contrail's:
+						the frames'), and may be the same number */
+						if (object->object.attachment_types[attachment_index] ==
+								_object_attachment_type_effect &&
+							object->object.attachment_indices[attachment_index] ==
+								effect_index)
 						{
 							object->object.attachment_indices[attachment_index] =
 								NONE;

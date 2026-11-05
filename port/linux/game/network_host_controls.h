@@ -64,6 +64,27 @@ enum
 	MAXIMUM_HOST_CONTROLS_BANS = 128,
 };
 
+/* the BOTS tab's rows (network_host_controls_bot_rows) */
+enum
+{
+	_host_bot_row_count,
+	_host_bot_row_skill,
+	_host_bot_row_teams,
+	_host_bot_row_balance,
+	_host_bot_row_tactics,
+	NUMBER_OF_HOST_BOT_ROWS,
+	/* bots.skill's, easy to legendary */
+	HOST_BOT_SKILLS = 4,
+};
+
+/* the BOTS choices' kinds (network_host_controls_bot_choice) */
+enum
+{
+	_host_bots_none,
+	_host_bots_add,
+	_host_bots_fill,
+};
+
 /* the world behind Host Controls, dimmed (pixel32: black, three quarters
 over it) */
 #define NETWORK_HOST_CONTROLS_BACKDROP 0xC0000000
@@ -160,6 +181,29 @@ short network_host_controls_restart_step(short stage, struct host_controls_resta
 short network_host_controls_maximum_step(short const *values, short count, short current, short present,
 	short step);
 boolean network_host_controls_ban_parse(char const *line, struct host_controls_ban *ban);
+/* BOTS stepped (no wrapping round): no fewer than none, no more than
+BOTS_MAXIMUM or than the game holds (most_players) beside its players; the
+count left once the host takes out a bot of those playing (one fewer than
+play, or than were asked for); bots.skill's name (in either case), else
+NONE */
+long network_host_controls_bot_count_step(long count, short step, long humans, long most_players);
+long network_host_controls_bot_count_removed(long count, long playing);
+/* the BOTS choices (the lobby's BOTS, Host Controls' BOTS, in this order):
+NONE; ADD n (bots.count n, bots.make_room off: the bots stay, and a network
+game takes as many more players); FILL TO n (bots.make_room on, bots.fill_to
+n, bots.count BOTS_MAXIMUM: bots fill the game's empty places to n players
+and bots, and leave as players join). n goes one at a time to 16, then by 4s
+to BOTS_MAXIMUM, FILL TO's from 2. Their count; a choice's kind
+(_host_bots_*) and n; its words ("NONE", "ADD 4", "FILL TO 8"); the choice
+settings make (of their kind, the most not past them: settings written by
+hand fall between the choices); a choice stepped (-1 or 1), at the ends no
+further (never round from the most to none) */
+short network_host_controls_bot_choice_count(void);
+short network_host_controls_bot_choice(short choice, long *number);
+void network_host_controls_bot_choice_words(short choice, wchar_t *text, short size);
+short network_host_controls_bot_choice_of(long count, boolean make_room, long fill_to);
+short network_host_controls_bot_choice_step(short choice, short step);
+short network_host_controls_bot_skill_named(char const *text);
 /* whether a listed player is the one chosen: a game's by its datum index, a
 lobby's (player_index NONE) by its slot, machine and name (12 characters) */
 boolean network_host_controls_same_player(struct host_controls_player const *player, long player_index, long slot,
@@ -205,18 +249,39 @@ boolean network_host_controls_unban(char const *line);
 /* (the host) OpenCE players may join the game from now on (an OpenH1 game's) */
 boolean network_host_controls_opence_joins(void);
 void network_host_controls_set_opence_joins(boolean allowed);
-/* the bots' rows of Game (bots.c's host-owned bots of a network game:
-BOTS, BOT SKILL, BOT TEAMS, MAKE ROOM FOR PLAYERS and, with it on, FILL TO;
-none in a gametype the bots do not play), their texts, and a row's value
-stepped (left -1, right or A 1), written to config.toml */
-short network_host_controls_bot_rows(void);
+/* the BOTS tab (bots.c's host-owned bots of a network game): whether the
+host has it (Host Controls', not in co-op), and whether the game's gametype
+is one the bots play (the rows apply to the next one that is); its rows
+(_host_bot_row_*: BALANCE TEAMS in a team game whose teams may be
+arranged), their texts, and a row's value stepped (left -1,
+right or A 1) and written to config.toml, which the game takes at once:
+FALSE if it cannot be (BOTS at its ends, a matchmaking game's count, room and
+fill, BALANCE TEAMS, which is Host Controls' own) */
+boolean network_host_controls_bots_tab(void);
+boolean network_host_controls_bots_play(void);
+short network_host_controls_bot_rows(short *rows, short maximum);
 void network_host_controls_bot_row(short row, wchar_t *label, wchar_t *value, wchar_t *help, short size);
-void network_host_controls_bot_row_step(short row, short step);
+boolean network_host_controls_bot_row_step(short row, short step);
+/* (the host) bots.count and bots.skill set (the console's host_bots and
+host_bot_skill): FALSE past the game's limits, in a matchmaking game (the
+count), or without the BOTS tab */
+boolean network_host_controls_set_bots(long count);
+/* the BOTS choice the settings make now (a matchmaking game's playlist's
+too), and a choice's settings written (any n of its kind up to
+BOTS_MAXIMUM: the console's host_bots; a game of this machine alone's lobby
+too): FALSE in a matchmaking game, or if they cannot be written */
+short network_host_controls_bots_chosen(void);
+boolean network_host_controls_choose_bots(short kind, long number);
+boolean network_host_controls_set_bot_skill(short skill);
+/* the bots of the game (or the lobby) as the Players tab lists them */
+short network_host_controls_bots(struct host_controls_player *bots, short maximum);
+/* (a bot taken out by the host) bots.count one fewer than play */
+void network_host_controls_bots_one_fewer(void);
 /* Host Controls opened on the Players tab, the player chosen (NONE: none),
 for the local player (the scoreboard's "Host controls...", the console's
 host_controls) */
 boolean network_host_controls_open(long player_index, short tab);
-/* the console's host_controls: its tab ("players", "game", "maps", "playlist", "bans"; none:
+/* the console's host_controls: its tab ("players", "game", "maps", "playlist", "bans", "bots", "rules"; none:
 Players) and a player chosen by their name's start; or "end" and "restart",
 Game's End game now and Restart round; or "unban <players or address>" */
 boolean network_host_controls_open_command(char const *text);

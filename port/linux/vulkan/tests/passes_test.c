@@ -17,12 +17,22 @@ the window: a lost surface made again, the app in the background, the
 present mode of the swap interval, frames turned for the display; the
 pipeline cache written only when pipelines were made; and the VR effects'
 passes that sample their depth: begun after the depth's writes, storing no
-depth or stencil, ended by a draw or clear that writes them.
+depth or stencil, ended by a draw or clear that writes them. And
+HALO_VULKAN_DISCARDS: the passes recorded into secondary command buffers
+and begun at the submission, their stores chosen from what came after them,
+the frame-end discards learned over DISCARD_FRAMES frames and their count
+started again, the resolves made in the pass, the transient multisampled
+images, and what is done where the device lacks a part. And the passes put
+aside before the pass they interrupt, whose pieces are one rendering, what
+keeps the order drawn, and the buffers renamed rather than written in
+order (but not the lights' block, which the draws' set names, and not the
+lights' cells' upload put aside before a draw that reads them).
 */
 
 #include "../xgpu_vulkan.c"
 #include "../xgpu_vulkan_post.c"
 #include "../xgpu_vulkan_post_shaders.c"
+#include "../xgpu_vulkan_world_ao.c"
 #include <assert.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -532,13 +542,17 @@ static void VKAPI_CALL fake_copy_lights(VkCommandBuffer command, VkBuffer source
 	light_copies++;
 }
 
+/* (the cells and the clusters' masks, 17 slices from 0; or the world, its
+whole slices from 17) */
+static uint32_t light_image_z, light_image_depth;
+
 static void VKAPI_CALL fake_copy_cells(VkCommandBuffer command, VkBuffer source, VkImage destination,
 	VkImageLayout layout, uint32_t count, const VkBufferImageCopy *regions)
 {
 	(void)source; (void)destination;
 	assert(layout == VK_IMAGE_LAYOUT_GENERAL && count == 1);
 	assert(regions[0].imageExtent.width == 32 && regions[0].imageExtent.height == 32 &&
-		regions[0].imageExtent.depth == 16);
+		regions[0].imageOffset.z == (int32_t)light_image_z && regions[0].imageExtent.depth == light_image_depth);
 	assert(regions[0].imageSubresource.baseArrayLayer == 0 && regions[0].imageSubresource.layerCount == 1);
 	assert(command == light_commands);
 	light_image_copies++;
@@ -551,7 +565,8 @@ static void dynamic_lights_test(void)
 {
 	static struct xgpu_vulkan_buffer block;
 	static struct xgpu_vulkan_image cells;
-	static unsigned char ring[6192 + 32 * 32 * 16 * 16 + 64], data[6192], grid[32 * 32 * 16 * 16];
+	static unsigned char ring[6192 + 32 * 32 * 17 * 16 + 64], data[6192], grid[32 * 32 * 17 * 16];
+	static uint32_t world[1500][4];
 
 	reset();
 	vk.slot->main = (VkCommandBuffer)(uintptr_t)1;
@@ -563,11 +578,13 @@ static void dynamic_lights_test(void)
 	cells.description.type = XGPU_VULKAN_IMAGE_3D;
 	cells.description.format = XGPU_VULKAN_FORMAT_RGBA32_UINT;
 	cells.description.width = cells.description.height = 32;
-	cells.description.depth_or_layers = 16;
+	cells.description.depth_or_layers = 17 + 240;
 	cells.description.levels = 1;
 	cells.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 	vk.lights_block = &block;
 	vk.lights_cells = &cells;
+	light_image_z = 0;
+	light_image_depth = 17;
 	data[0] = 7;
 	grid[sizeof(grid) - 1] = 9;
 	vkCmdCopyBuffer = fake_copy_lights;
@@ -582,6 +599,13 @@ static void dynamic_lights_test(void)
 	xgpu_vulkan_dynamic_lights_upload(data, sizeof(data), grid);
 	assert(light_copies == 2 && light_image_copies == 2 && light_commands == vk.slot->main);
 	assert(vk.statistics.uploads_ordered == 2);
+	/* the world: its 1500 texels in two whole slices past the clusters' */
+	world[1499][3] = 11;
+	light_image_z = 17;
+	light_image_depth = 2;
+	vk.ring_head = 0;
+	xgpu_vulkan_dynamic_lights_world(world, 1500);
+	assert(light_image_copies == 3 && ring[1499 * 16 + 12] == 11 && ring[1500 * 16] == 0);
 }
 
 static void VKAPI_CALL fake_copy_buffer(VkCommandBuffer command, VkBuffer source, VkBuffer destination,
@@ -737,6 +761,7 @@ static VkImageCopy post_copied;
 static VkImageView post_attachments[4];
 static VkRenderingAttachmentInfo post_began[4];
 static uint32_t post_begins, post_draws, post_updates, post_masks[4], post_pipelines;
+static VkSampleCountFlagBits post_pipeline_samples[4];
 static VkDescriptorImageInfo post_sampled[4][4];
 static VkViewport post_viewports[4];
 static VkRect2D post_scissors[4];
@@ -817,7 +842,7 @@ static VkResult VKAPI_CALL post_pipeline(VkDevice device, VkPipelineCache cache,
 	assert(!info->pColorBlendState->pAttachments[0].blendEnable);
 	assert(rendering->colorAttachmentCount == 1 && rendering->pColorAttachmentFormats[0] == VK_FORMAT_B8G8R8A8_UNORM);
 	assert(rendering->depthAttachmentFormat == VK_FORMAT_UNDEFINED && !rendering->viewMask);
-	assert(info->pMultisampleState->rasterizationSamples == VK_SAMPLE_COUNT_1_BIT);
+	post_pipeline_samples[post_pipelines] = info->pMultisampleState->rasterizationSamples;
 	post_masks[post_pipelines] = info->pColorBlendState->pAttachments[0].colorWriteMask;
 	*pipeline = (VkPipeline)(uintptr_t)(200 + post_pipelines++);
 	return VK_SUCCESS;
@@ -956,6 +981,8 @@ static void post_test(void)
 	assert(xgpu_vulkan_post_anti_alias(1, &target, 0, corners));
 	assert(!strcmp(post_events, "CXBcDEXBcDEXBlD"));
 	assert(post_pipelines == 3 && post_masks[0] == 15 && post_masks[1] == 15 && post_masks[2] == 7);
+	for (index = 0; index < 3; index++)
+		assert(post_pipeline_samples[index] == VK_SAMPLE_COUNT_1_BIT);
 	assert(post_copied.srcSubresource.baseArrayLayer == 0 && post_copied.dstSubresource.baseArrayLayer == 0);
 	assert(post_copied.srcOffset.x == 8 && post_copied.srcOffset.y == 4 && post_copied.dstOffset.x == 8);
 	assert(post_copied.dstOffset.y == 4 && post_copied.extent.width == 32 && post_copied.extent.height == 40);
@@ -1032,6 +1059,60 @@ static void post_test(void)
 		free(images[index]->attachments);
 		images[index]->attachments = NULL;
 	}
+	memset(&post, 0, sizeof(post));
+	recording.descriptor_pools = NULL;
+	recording.descriptor_pool_count = 0;
+	reset();
+}
+
+/* display.panini over a multisampled target: its resolved pixels copied,
+and the pass drawn into its samples, by a pipeline of as many samples (drawn
+into the resolved pixels alone, it would be lost to the frame's resolve of
+the samples, which the HUD is drawn into after); over a target of one
+sample, into the target; never from samples */
+static void panini_post_test(void)
+{
+	static struct xgpu_vulkan_image target, color, samples;
+	static const int32_t corners[4] = { 0, 0, 64, 48 };
+	static const float projection[8] = { 0.5f, 0.0f, 1.0f, 0.0f, -1.0f, 1.0f, 0.75f, -0.75f };
+	uint32_t index;
+
+	post_reset();
+	post_image(&target, 1, XGPU_VULKAN_FORMAT_BGRA8, 64, 48);
+	post_image(&color, 2, XGPU_VULKAN_FORMAT_BGRA8, 64, 48);
+	post_image(&samples, 3, XGPU_VULKAN_FORMAT_BGRA8, 64, 48);
+	samples.description.samples = 4;
+	memset(&post, 0, sizeof(post));
+	post.vertex = (VkShaderModule)(uintptr_t)1;
+	for (index = 0; index < XGPU_VULKAN_POST_PROGRAM_COUNT; index++)
+		post.pixel[index] = (VkShaderModule)(uintptr_t)(2 + index);
+	post.sampler = (VkSampler)(uintptr_t)5;
+	post.color = &color;
+	post.width = 64;
+	post.height = 48;
+	post.format = XGPU_VULKAN_FORMAT_BGRA8;
+	post_pipelines = 0;
+
+	assert(xgpu_vulkan_post_panini(&target, &samples, 0, corners, projection));
+	assert(!strcmp(post_events, "CXBlD"));
+	assert(post_copied.extent.width == 64 && post_copied.extent.height == 48);
+	assert(post_pipelines == 1 && post_pipeline_samples[0] == VK_SAMPLE_COUNT_4_BIT && post_masks[0] == 15);
+	assert(post_attachments[0] == samples.attachments[0] && vk.color == &samples);
+	assert(post_sampled[0][0].imageView == color.sampled);
+
+	post_reset();
+	assert(xgpu_vulkan_post_panini(&target, &target, 0, corners, projection));
+	assert(!strcmp(post_events, "CXBlD"));
+	assert(post_pipelines == 2 && post_pipeline_samples[1] == VK_SAMPLE_COUNT_1_BIT);
+	assert(post_attachments[0] == target.attachments[0]);
+
+	post_reset();
+	assert(!xgpu_vulkan_post_panini(&samples, &samples, 0, corners, projection) && !post_events[0]);
+
+	free(target.attachments);
+	free(color.attachments);
+	free(samples.attachments);
+	target.attachments = color.attachments = samples.attachments = NULL;
 	memset(&post, 0, sizeof(post));
 	recording.descriptor_pools = NULL;
 	recording.descriptor_pool_count = 0;
@@ -2143,8 +2224,10 @@ static VkResult VKAPI_CALL hdr_formats(VkPhysicalDevice physical, VkSurfaceKHR s
 	return VK_SUCCESS;
 }
 
-static void hdr_display(int hdr, float headroom)
+static void hdr_display(int hdr, float headroom, float white_nits, int white_reported)
 {
+	(void)white_nits;
+	(void)white_reported;
 	assert(hdr_tells < 8);
 	hdr_told[hdr_tells][0] = hdr;
 	hdr_told_headroom[hdr_tells] = headroom;
@@ -2206,35 +2289,62 @@ static void hdr_window_test(void)
 
 	/* the frames HDR: HDR10 (A2B10G10R10, PQ) where the surface has both
 	(not Windows), the frame encoded for it and that blitted; paper white
-	200 nits (SDL's 2.5 times 80) in PQ's units, the peak the headroom */
-	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_PUNCHY, 100);
+	the system's SDR white (SDL's 2.5 times 80, 200 nits), which a Wayland
+	compositor shows PQ's reference white at: BT.2408's 203 nits in PQ's
+	units; the peak the headroom */
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_PUNCHY, 0, 100, 0);
 	assert(window_present_frame() && window_swapchains == 2);
 	assert(window_made.imageFormat == VK_FORMAT_A2B10G10R10_UNORM_PACK32);
 	assert(window_made.imageColorSpace == VK_COLOR_SPACE_HDR10_ST2084_EXT);
 	assert(hdr_encodes == 1 && hdr_encoded_format == XGPU_VULKAN_FORMAT_RGB10A2 && window_blit_source == hdr_encoded.image);
 	assert(hdr_encoded_frame.output == XGPU_HDR_OUTPUT_PQ && hdr_encoded_frame.mode == XGPU_HDR_MODE_PUNCHY);
-	assert(fabsf(hdr_encoded_frame.paper_white - 0.02f) < 1e-6f && hdr_encoded_frame.peak == 4.0f);
+	assert(fabsf(hdr_encoded_frame.paper_white - 0.0203f) < 1e-6f && hdr_encoded_frame.peak == 4.0f);
 	assert(hdr_tells == 2);
 
 	/* paper white twice the system's: the peak in paper whites halved;
 	past the headroom, no brighter than it */
-	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 200);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 0, 200, 0);
 	xgpu_vulkan_hdr_frame(&frame);
-	assert(fabsf(frame.paper_white - 0.04f) < 1e-6f && frame.peak == 2.0f && frame.mode == XGPU_HDR_MODE_FAITHFUL);
-	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 500);
+	assert(fabsf(frame.paper_white - 0.0406f) < 1e-6f && frame.peak == 2.0f && frame.mode == XGPU_HDR_MODE_FAITHFUL);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 0, 500, 0);
 	xgpu_vulkan_hdr_frame(&frame);
-	assert(fabsf(frame.paper_white - 0.08f) < 1e-6f && frame.peak == 1.0f);
+	assert(fabsf(frame.paper_white - 0.0812f) < 1e-6f && frame.peak == 1.0f);
+	/* paper white in nits, whatever the system's white (the percent not
+	read: 300 nits is 1.5 of its 200, PQ's 304.5); past the headroom, no
+	brighter than it */
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 300, 50, 0);
+	xgpu_vulkan_hdr_frame(&frame);
+	assert(fabsf(frame.paper_white - 0.03045f) < 1e-6f && fabsf(frame.peak - 800.0f / 300.0f) < 1e-5f);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 1000, 100, 0);
+	xgpu_vulkan_hdr_frame(&frame);
+	assert(fabsf(frame.paper_white - 0.0812f) < 1e-6f && frame.peak == 1.0f);
+	/* the UI's white: paper white's (1) by default; in nits over paper
+	white's (400 over 200: twice), no brighter than the peak (800 nits:
+	4 times), on Linux relative to the system's white as paper white is */
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 0, 100, 0);
+	xgpu_vulkan_hdr_frame(&frame);
+	assert(frame.ui == 1.0f);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 0, 100, 400);
+	xgpu_vulkan_hdr_frame(&frame);
+	assert(fabsf(frame.ui - 2.0f) < 1e-6f && frame.peak == 4.0f && fabsf(frame.paper_white - 0.0203f) < 1e-6f);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 400, 100, 100);
+	xgpu_vulkan_hdr_frame(&frame);
+	assert(fabsf(frame.ui - 0.25f) < 1e-6f);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 100, 100, 1000);
+	xgpu_vulkan_hdr_frame(&frame);
+	assert(fabsf(frame.ui - 8.0f) < 1e-5f && fabsf(frame.peak - 8.0f) < 1e-5f);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 1000, 100, 0);
 	assert(window_present_frame() && window_swapchains == 2);
 
-	/* scRGB asked for: half floats in extended linear sRGB, paper white in
-	its units (80 nits) */
+	/* scRGB asked for: half floats in extended linear sRGB, paper white its
+	1.0, the reference white a Wayland compositor maps onto its own */
 	setenv("HALO_VULKAN_HDR_OUTPUT", "scrgb", 1);
-	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 100);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 0, 100, 0);
 	assert(window_present_frame() && window_swapchains == 3);
 	assert(window_made.imageFormat == VK_FORMAT_R16G16B16A16_SFLOAT);
 	assert(window_made.imageColorSpace == VK_COLOR_SPACE_EXTENDED_SRGB_LINEAR_EXT);
 	assert(hdr_encoded_format == XGPU_VULKAN_FORMAT_RGBA16F && hdr_encoded_frame.output == XGPU_HDR_OUTPUT_SCRGB);
-	assert(fabsf(hdr_encoded_frame.paper_white - 2.5f) < 1e-6f && hdr_encoded_frame.peak == 4.0f);
+	assert(fabsf(hdr_encoded_frame.paper_white - 1.0f) < 1e-6f && hdr_encoded_frame.peak == 4.0f);
 	unsetenv("HALO_VULKAN_HDR_OUTPUT");
 
 	/* the display's HDR off: told, and the swapchain SDR again, the frame
@@ -2257,7 +2367,7 @@ static void hdr_window_test(void)
 	hdr_window_reset();
 	vk.colorspaces = 0;
 	xgpu_vulkan_window_hdr(1, 2.5f, 4.0f);
-	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 100);
+	xgpu_vulkan_hdr_state(1, XGPU_HDR_MODE_FAITHFUL, 0, 100, 0);
 	assert(window_present_frame() && window_made.imageFormat == VK_FORMAT_B8G8R8A8_UNORM && !hdr_encodes);
 	assert(hdr_tells == 1 && !hdr_told[0][0]);
 	reset();
@@ -2344,6 +2454,1184 @@ static void half_test(void)
 	assert(half_byte(0x3800) == 128 && half_byte(0x0000) == 0);
 }
 
+/* ---------- HALO_VULKAN_DISCARDS: the passes in segments
+
+Each pass's draws go into a secondary command buffer that inherits its
+formats; its rendering is made at the submission, with the stores chosen
+from what came after it: not stored where a later pass clears it whole,
+stored where anything later loads or reads it, and the depth and samples
+of a frame's last pass not stored once the next frames have cleared them
+first for DISCARD_FRAMES frames. A resolve right after the pass that drew
+the samples is made in that pass. */
+
+#define DISCARDS_MAIN ((VkCommandBuffer)(uintptr_t)900)
+#define DISCARDS_EARLY ((VkCommandBuffer)(uintptr_t)901)
+
+struct discards_rendering
+{
+	VkCommandBuffer commands;
+	VkRenderingInfo info;
+	VkRenderingAttachmentInfo color, depth, stencil;
+	/* the secondary command buffer it executed */
+	VkCommandBuffer executed;
+};
+
+static struct discards_rendering discards_renderings[256];
+static unsigned int discards_rendering_count, discards_executions, discards_resolves, discards_buffers;
+static unsigned int discards_depth_image_clears;
+static VkCommandBufferInheritanceRenderingInfo discards_inherited;
+static VkFormat discards_inherited_color;
+static VkCommandBufferUsageFlags discards_begin_flags;
+static VkImageCreateInfo discards_image_info;
+static uint32_t discards_memory_type;
+static VkPhysicalDeviceDepthStencilResolveProperties discards_resolve_properties;
+static struct xgpu_vulkan_image discards_ms, discards_ms_depth, discards_resolved, discards_resolved_depth;
+
+static VkResult VKAPI_CALL discards_allocate(VkDevice device, const VkCommandBufferAllocateInfo *info,
+	VkCommandBuffer *buffers)
+{
+	uint32_t index;
+
+	(void)device;
+	assert(info->level == VK_COMMAND_BUFFER_LEVEL_SECONDARY);
+	for (index = 0; index < info->commandBufferCount; index++)
+		buffers[index] = (VkCommandBuffer)(uintptr_t)(2000 + discards_buffers++);
+	return VK_SUCCESS;
+}
+
+static VkResult VKAPI_CALL discards_begin_commands(VkCommandBuffer commands, const VkCommandBufferBeginInfo *info)
+{
+	(void)commands;
+	discards_begin_flags = info->flags;
+	if (info->pInheritanceInfo && info->pInheritanceInfo->pNext)
+	{
+		discards_inherited = *(const VkCommandBufferInheritanceRenderingInfo *)info->pInheritanceInfo->pNext;
+		discards_inherited_color = discards_inherited.colorAttachmentCount ?
+			discards_inherited.pColorAttachmentFormats[0] : VK_FORMAT_UNDEFINED;
+	}
+	return VK_SUCCESS;
+}
+
+static void VKAPI_CALL discards_begin(VkCommandBuffer commands, const VkRenderingInfo *info)
+{
+	struct discards_rendering *rendering = &discards_renderings[discards_rendering_count++];
+
+	assert(discards_rendering_count <= 256);
+	memset(rendering, 0, sizeof(*rendering));
+	rendering->commands = commands;
+	rendering->info = *info;
+	if (info->colorAttachmentCount)
+		rendering->color = info->pColorAttachments[0];
+	if (info->pDepthAttachment)
+		rendering->depth = *info->pDepthAttachment;
+	if (info->pStencilAttachment)
+		rendering->stencil = *info->pStencilAttachment;
+}
+
+static void VKAPI_CALL discards_execute(VkCommandBuffer commands, uint32_t count, const VkCommandBuffer *buffers)
+{
+	assert(commands == DISCARDS_MAIN && count == 1);
+	discards_executions++;
+	if (discards_rendering_count && discards_renderings[discards_rendering_count - 1].commands == DISCARDS_MAIN &&
+		!discards_renderings[discards_rendering_count - 1].executed)
+		discards_renderings[discards_rendering_count - 1].executed = buffers[0];
+}
+
+static void VKAPI_CALL discards_resolve(VkCommandBuffer commands, VkImage source, VkImageLayout source_layout,
+	VkImage destination, VkImageLayout destination_layout, uint32_t count, const VkImageResolve *regions)
+{
+	(void)commands; (void)source; (void)source_layout; (void)destination; (void)destination_layout;
+	(void)count; (void)regions;
+	discards_resolves++;
+}
+
+static void VKAPI_CALL discards_clear_depth_image(VkCommandBuffer commands, VkImage image, VkImageLayout layout,
+	const VkClearDepthStencilValue *value, uint32_t count, const VkImageSubresourceRange *ranges)
+{
+	(void)commands; (void)image; (void)layout; (void)value; (void)count; (void)ranges;
+	discards_depth_image_clears++;
+}
+
+static VkResult VKAPI_CALL discards_create_image(VkDevice device, const VkImageCreateInfo *info,
+	const VkAllocationCallbacks *allocator, VkImage *image)
+{
+	(void)device; (void)allocator;
+	discards_image_info = *info;
+	*image = (VkImage)(uintptr_t)800;
+	return VK_SUCCESS;
+}
+
+static void VKAPI_CALL discards_requirements(VkDevice device, VkImage image, VkMemoryRequirements *requirements)
+{
+	(void)device; (void)image;
+	requirements->size = 64u * 1024 * 1024;
+	requirements->alignment = 256;
+	requirements->memoryTypeBits = 3;
+}
+
+static VkResult VKAPI_CALL discards_allocate_memory(VkDevice device, const VkMemoryAllocateInfo *info,
+	const VkAllocationCallbacks *allocator, VkDeviceMemory *memory)
+{
+	(void)device; (void)allocator;
+	discards_memory_type = info->memoryTypeIndex;
+	*memory = (VkDeviceMemory)(uintptr_t)(810 + info->memoryTypeIndex);
+	return VK_SUCCESS;
+}
+
+static VkResult VKAPI_CALL discards_bind(VkDevice device, VkImage image, VkDeviceMemory memory, VkDeviceSize offset)
+{
+	(void)device; (void)image; (void)memory; (void)offset;
+	return VK_SUCCESS;
+}
+
+static void VKAPI_CALL discards_properties(VkPhysicalDevice physical, VkPhysicalDeviceProperties2 *properties)
+{
+	(void)physical;
+	assert(properties->pNext);
+	*(VkPhysicalDeviceDepthStencilResolveProperties *)properties->pNext = discards_resolve_properties;
+}
+
+static void discards_image(struct xgpu_vulkan_image *image, uintptr_t number, int depth, int samples)
+{
+	free(image->attachments);
+	memset(image, 0, sizeof(*image));
+	image->image = (VkImage)number;
+	image->number = number;
+	image->description.type = XGPU_VULKAN_IMAGE_2D;
+	image->description.format = depth ? XGPU_VULKAN_FORMAT_D24S8 : XGPU_VULKAN_FORMAT_BGRA8;
+	image->description.usage = XGPU_VULKAN_USAGE_SAMPLED | XGPU_VULKAN_USAGE_TARGET;
+	image->description.samples = (uint8_t)samples;
+	image->description.width = 64;
+	image->description.height = 48;
+	image->description.depth_or_layers = 1;
+	image->description.levels = 1;
+	image->format = depth ? VK_FORMAT_D24_UNORM_S8_UINT : VK_FORMAT_B8G8R8A8_UNORM;
+	image->aspect = depth ? VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+}
+
+static void discards_reset(int deferred)
+{
+	int index;
+
+	for (index = 0; index < SLOTS; index++)
+		free(vk.slots[index].secondaries);
+	free(vk.segments);
+	reset();
+	discards_image(&color_target, 60, 0, 0);
+	discards_image(&depth_target, 61, 1, 0);
+	discards_image(&discards_ms, 62, 0, 4);
+	discards_image(&discards_ms_depth, 63, 1, 4);
+	discards_image(&discards_resolved, 64, 0, 0);
+	discards_image(&discards_resolved_depth, 65, 1, 0);
+	vk.deferred = deferred;
+	vk.depth_resolve = 1;
+	vk.device = (VkDevice)(uintptr_t)1;
+	vk.recording = 0;
+	vk.slot = NULL;
+	for (index = 0; index < SLOTS; index++)
+	{
+		vk.slots[index].main = DISCARDS_MAIN;
+		vk.slots[index].early = DISCARDS_EARLY;
+		vk.slots[index].pool = (VkCommandPool)(uintptr_t)902;
+	}
+	vkResetCommandPool = fake_reset_pool;
+	vkBeginCommandBuffer = discards_begin_commands;
+	vkEndCommandBuffer = window_end_commands;
+	vkAllocateCommandBuffers = discards_allocate;
+	vkQueueSubmit = window_submit;
+	vkGetSemaphoreCounterValue = fake_counter;
+	vkCmdBeginRendering = discards_begin;
+	vkCmdExecuteCommands = discards_execute;
+	vkCmdResolveImage = discards_resolve;
+	vkCmdClearDepthStencilImage = discards_clear_depth_image;
+	discards_rendering_count = discards_executions = discards_resolves = 0;
+	memset(&discards_inherited, 0, sizeof(discards_inherited));
+	discards_begin_flags = 0;
+}
+
+/* the whole of the bound targets cleared, as a frame's first draws do,
+in a pass of its own */
+static void discards_clear(uint32_t parts)
+{
+	static const int32_t whole[1][4] = { { 0, 0, 64, 48 } };
+	static const float black[4] = { 0.0f, 0.0f, 0.0f, 1.0f };
+	struct xgpu_vulkan_image *color = vk.color, *depth = vk.depth;
+
+	xgpu_vulkan_set_targets(NULL, NULL, 0);
+	xgpu_vulkan_set_targets(color, depth, 0);
+	xgpu_vulkan_clear(whole, 1, parts, black, 1.0f, 0);
+}
+
+/* drawn over part of the targets (a pass that loads them), in a pass of its
+own */
+static void discards_draw_over(void)
+{
+	static const int32_t part[1][4] = { { 4, 4, 8, 8 } };
+	static const float grey[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
+	struct xgpu_vulkan_image *color = vk.color, *depth = vk.depth;
+
+	xgpu_vulkan_set_targets(NULL, NULL, 0);
+	xgpu_vulkan_set_targets(color, depth, 0);
+	xgpu_vulkan_clear(part, 1, XGPU_VULKAN_CLEAR_COLOR | XGPU_VULKAN_CLEAR_CHANNELS | XGPU_VULKAN_CLEAR_DEPTH |
+		XGPU_VULKAN_CLEAR_STENCIL, grey, 0.5f, 1);
+}
+
+#define DISCARDS_ALL (XGPU_VULKAN_CLEAR_COLOR | XGPU_VULKAN_CLEAR_CHANNELS | XGPU_VULKAN_CLEAR_DEPTH | \
+	XGPU_VULKAN_CLEAR_STENCIL)
+
+/* the renderings made in the main command buffer (the passes) */
+static unsigned int discards_main_renderings(void)
+{
+	unsigned int index, count = 0;
+
+	for (index = 0; index < discards_rendering_count; index++)
+		count += discards_renderings[index].commands == DISCARDS_MAIN;
+	return count;
+}
+
+/* a frame of the bound targets: cleared whole first (or drawn over), then
+drawn over; its last pass's rendering returned */
+static struct discards_rendering *discards_frame(int cleared)
+{
+	discards_rendering_count = 0;
+	if (cleared)
+		discards_clear(DISCARDS_ALL);
+	else
+		discards_draw_over();
+	discards_draw_over();
+	xgpu_vulkan_frame_end(NULL, 0);
+	assert(discards_main_renderings() == 2 && discards_renderings[1].commands == DISCARDS_MAIN);
+	return &discards_renderings[1];
+}
+
+static void discards_test(void)
+{
+	struct discards_rendering *first, *second;
+	unsigned int index;
+
+	/* without discards: each pass begun in the main command buffer as it is
+	drawn, every attachment stored, no secondary command buffers */
+	discards_reset(0);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	discards_clear(DISCARDS_ALL);
+	assert(discards_rendering_count == 1 && discards_renderings[0].commands == DISCARDS_MAIN);
+	assert(discards_renderings[0].info.flags == 0);
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_fence();
+	assert(discards_rendering_count == 2 && !discards_executions && !discards_buffers);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+
+	/* with them: nothing begun until the submission; then each pass's
+	rendering of secondary command buffers, executing the one its draws
+	went into, which inherited its formats */
+	discards_reset(1);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	discards_clear(DISCARDS_ALL);
+	assert(!discards_rendering_count && vk.pass_commands != DISCARDS_MAIN);
+	assert(discards_begin_flags & VK_COMMAND_BUFFER_USAGE_RENDER_PASS_CONTINUE_BIT);
+	assert(discards_inherited.colorAttachmentCount == 1 && discards_inherited_color == VK_FORMAT_B8G8R8A8_UNORM);
+	assert(discards_inherited.depthAttachmentFormat == VK_FORMAT_D24_UNORM_S8_UINT);
+	assert(discards_inherited.stencilAttachmentFormat == VK_FORMAT_D24_UNORM_S8_UINT);
+	assert(discards_inherited.rasterizationSamples == VK_SAMPLE_COUNT_1_BIT);
+	/* a later pass that clears all of it whole: the first pass stores
+	nothing (the clear writes over all of it) */
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_fence();
+	assert(discards_rendering_count == 2 && discards_executions == 2);
+	first = &discards_renderings[0];
+	second = &discards_renderings[1];
+	assert(first->commands == DISCARDS_MAIN && first->info.flags == VK_RENDERING_CONTENTS_SECONDARY_COMMAND_BUFFERS_BIT);
+	assert(first->executed && second->executed && first->executed != second->executed);
+	assert(first->color.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR);
+	assert(first->color.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	assert(first->depth.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	assert(first->stencil.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	/* (the last: stored, as the next submission may use them) */
+	assert(second->color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(second->depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(vk.statistics.stores_discarded == 3);
+
+	/* a later piece of the same targets that loads them (the pass ended
+	by something outside it, as an upload or a copy does): stored */
+	discards_reset(1);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	discards_clear(DISCARDS_ALL);
+	(void)main_commands();
+	discards_draw_over();
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_fence();
+	assert(discards_main_renderings() == 3);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[0].stencil.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[1].color.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD);
+	assert(discards_renderings[1].color.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	/* (the outside work between them executed between them) */
+	assert(discards_executions == 4);
+
+	/* depth cleared whole, stencil loaded: depth alone not stored */
+	discards_reset(1);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	discards_clear(DISCARDS_ALL);
+	discards_clear(XGPU_VULKAN_CLEAR_DEPTH);
+	xgpu_vulkan_fence();
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	assert(discards_renderings[0].stencil.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+
+	/* sampled, copied or read after the pass, before the clear: stored */
+	discards_reset(1);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	discards_clear(DISCARDS_ALL);
+	pass_end();
+	image_use(&color_target);
+	image_use(&depth_target);
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_fence();
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[0].stencil.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+
+	/* a "whole" clear of a pass smaller than its depth (a depth larger than
+	the colour), or of one layer of several: not all of it, stored */
+	discards_reset(1);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	depth_target.description.width = 128;
+	discards_clear(DISCARDS_ALL);
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_fence();
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	discards_reset(1);
+	color_target.description.type = XGPU_VULKAN_IMAGE_2D_ARRAY;
+	color_target.description.depth_or_layers = 2;
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	discards_clear(DISCARDS_ALL);
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_fence();
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+
+	/* an image destroyed before the submission: its pass stores as before */
+	discards_reset(1);
+	{
+		struct xgpu_vulkan_image *gone = calloc(1, sizeof(*gone));
+
+		assert(gone);
+		*gone = depth_target;
+		gone->attachments = NULL;
+		vk.color = &color_target;
+		vk.depth = gone;
+		discards_clear(DISCARDS_ALL);
+		xgpu_vulkan_image_destroy(gone);
+		assert(!vk.segments[0].depth.image);
+		xgpu_vulkan_fence();
+		assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	}
+
+	/* the frame's last pass: depth and stencil stored until the frames
+	have cleared them first for DISCARD_FRAMES frames, then not; the
+	colour (not multisampled: the frame's picture) stored always */
+	discards_reset(1);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	for (index = 1; index <= DISCARD_FRAMES; index++)
+	{
+		struct discards_rendering *last = discards_frame(1);
+		VkAttachmentStoreOp expected = index < DISCARD_FRAMES ? VK_ATTACHMENT_STORE_OP_STORE :
+			VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
+		assert(last->depth.storeOp == expected && last->stencil.storeOp == expected);
+		assert(last->color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+		/* (the frame's first pass: its stores read by its second) */
+		assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	}
+	assert(vk.statistics.frame_end_discards == 2 && depth_target.discarded[0] && depth_target.discarded[1]);
+	second = discards_frame(1);
+	assert(second->depth.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	/* any other first use (a load): logged once, and counted again from
+	nothing, so stored for DISCARD_FRAMES frames more */
+	vk.discard_logged = 0;
+	second = discards_frame(0);
+	assert(vk.discard_logged == 1 && !depth_target.clears[0] && !depth_target.clears[1]);
+	assert(second->depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	for (index = 1; index <= DISCARD_FRAMES; index++)
+	{
+		struct discards_rendering *last = discards_frame(1);
+
+		assert(last->depth.storeOp == (index < DISCARD_FRAMES ? VK_ATTACHMENT_STORE_OP_STORE :
+			VK_ATTACHMENT_STORE_OP_DONT_CARE));
+	}
+	/* a use in the same frame after the discard (as a later submission of
+	it would make): checked as a first use, so counted again */
+	assert(depth_target.discarded[0] && !depth_target.first_use_frame);
+	image_use(&depth_target);
+	assert(!depth_target.clears[0]);
+	/* frames whose first use is a read, never discarded: the negative
+	control of the learning */
+	discards_reset(1);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	for (index = 0; index < 2 * DISCARD_FRAMES; index++)
+		assert(discards_frame(0)->depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	/* stencil not cleared whole each frame: depth alone discarded */
+	discards_reset(1);
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+	for (index = 1; index <= DISCARD_FRAMES; index++)
+	{
+		discards_rendering_count = 0;
+		discards_clear(XGPU_VULKAN_CLEAR_DEPTH | XGPU_VULKAN_CLEAR_COLOR | XGPU_VULKAN_CLEAR_CHANNELS);
+		xgpu_vulkan_frame_end(NULL, 0);
+	}
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	assert(discards_renderings[0].stencil.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	/* not the frame's last submission (a readback's, a fence's): stored */
+	discards_rendering_count = 0;
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_fence();
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+
+	/* MSAA: the resolve right after the pass that drew the samples, in that
+	pass (colour's average, depth's and stencil's first sample), and no
+	vkCmdResolveImage; the samples then discarded at the frame's end once
+	learned */
+	discards_reset(1);
+	vk.color = &discards_ms;
+	vk.depth = &discards_ms_depth;
+	discards_clear(DISCARDS_ALL);
+	assert(discards_inherited.rasterizationSamples == VK_SAMPLE_COUNT_4_BIT);
+	xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+	xgpu_vulkan_image_resolve(&discards_ms_depth, &discards_resolved_depth);
+	assert(vk.statistics.resolves_in_pass == 2 && !discards_resolves);
+	xgpu_vulkan_fence();
+	assert(discards_rendering_count == 1 && !discards_resolves);
+	assert(discards_renderings[0].color.resolveMode == VK_RESOLVE_MODE_AVERAGE_BIT);
+	assert(discards_renderings[0].color.resolveImageView == discards_resolved.attachments[0]);
+	assert(discards_renderings[0].depth.resolveMode == VK_RESOLVE_MODE_SAMPLE_ZERO_BIT);
+	assert(discards_renderings[0].stencil.resolveMode == VK_RESOLVE_MODE_SAMPLE_ZERO_BIT);
+	assert(discards_renderings[0].depth.resolveImageView == discards_resolved_depth.attachments[0]);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	for (index = 1; index <= DISCARD_FRAMES; index++)
+	{
+		discards_rendering_count = 0;
+		discards_clear(DISCARDS_ALL);
+		xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+		xgpu_vulkan_frame_end(NULL, 0);
+		assert(discards_rendering_count == 1 && discards_renderings[0].color.resolveImageView);
+		assert(discards_renderings[0].color.storeOp == (index < DISCARD_FRAMES ? VK_ATTACHMENT_STORE_OP_STORE :
+			VK_ATTACHMENT_STORE_OP_DONT_CARE));
+	}
+	/* resolved again with nothing drawn since (the stream resolves a target
+	it bound and did not draw into): not made again, as the samples were
+	discarded at the frame's end; made where the image resolved into was
+	written since, or the samples drawn */
+	{
+		uint32_t skipped = vk.statistics.resolves_skipped;
+
+		discards_resolves = 0;
+		discards_rendering_count = 0;
+		xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+		assert(vk.statistics.resolves_skipped == skipped + 1 && !discards_resolves);
+		image_written(&discards_resolved);
+		xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+		assert(vk.statistics.resolves_skipped == skipped + 1 && discards_resolves == 1);
+		xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+		assert(vk.statistics.resolves_skipped == skipped + 2 && discards_resolves == 1);
+		discards_draw_over();
+		xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+		assert(vk.statistics.resolves_skipped == skipped + 2 && vk.statistics.resolves_in_pass);
+		xgpu_vulkan_fence();
+	}
+	/* (the image resolved into: never discarded) */
+	assert(!discards_resolved.clears[0] && !image_discardable(&discards_resolved));
+	/* drawing over the samples again after the resolve (the HUD over the
+	3D view): the pass with the resolve stores them */
+	discards_rendering_count = 0;
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+	discards_draw_over();
+	xgpu_vulkan_frame_end(NULL, 0);
+	assert(discards_renderings[0].color.resolveImageView);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+
+	/* not right after the pass (work outside it between them), or the
+	image resolved into sampled in the pass, or a pass of part of the
+	image: resolved outside it as before, its samples stored */
+	discards_reset(1);
+	vk.color = &discards_ms;
+	vk.depth = &discards_ms_depth;
+	discards_clear(DISCARDS_ALL);
+	(void)main_commands();
+	xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+	assert(!vk.statistics.resolves_in_pass && discards_resolves == 1);
+	xgpu_vulkan_fence();
+	assert(!discards_renderings[0].color.resolveImageView);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	discards_reset(1);
+	vk.color = &discards_ms;
+	vk.depth = &discards_ms_depth;
+	discards_clear(DISCARDS_ALL);
+	image_use(&discards_resolved);
+	xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+	assert(!vk.statistics.resolves_in_pass && discards_resolves == 1);
+	discards_reset(1);
+	discards_resolved.description.width = discards_ms.description.width = 128;
+	vk.color = &discards_ms;
+	vk.depth = &discards_ms_depth;
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+	assert(!vk.statistics.resolves_in_pass && discards_resolves == 1);
+	/* no SAMPLE_ZERO resolve of depth and stencil: the depth's resolve pass
+	of its own, as without discards */
+	discards_reset(1);
+	vk.depth_resolve = 0;
+	vk.color = &discards_ms;
+	vk.depth = &discards_ms_depth;
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_image_resolve(&discards_ms_depth, &discards_resolved_depth);
+	assert(!vk.statistics.resolves_in_pass);
+	xgpu_vulkan_fence();
+	/* (the resolve pass, inline in the outside work's secondary buffer,
+	recorded as it was asked for; the pass that drew, at the submission) */
+	assert(discards_rendering_count == 2 && discards_renderings[0].commands != DISCARDS_MAIN);
+	assert(discards_renderings[0].depth.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD);
+	assert(discards_renderings[0].depth.resolveMode == VK_RESOLVE_MODE_SAMPLE_ZERO_BIT);
+	assert(discards_renderings[1].commands == DISCARDS_MAIN && !discards_renderings[1].depth.resolveImageView);
+	assert(discards_renderings[1].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+
+	/* a transient image's samples resolved outside a pass: by a pass that
+	loads them, not vkCmdResolveImage (which a transient image cannot be) */
+	discards_reset(1);
+	discards_ms.transient = 1;
+	vk.color = &discards_ms;
+	vk.depth = NULL;
+	discards_clear(XGPU_VULKAN_CLEAR_COLOR | XGPU_VULKAN_CLEAR_CHANNELS);
+	(void)main_commands();
+	xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+	assert(!discards_resolves && discards_rendering_count == 1);
+	assert(discards_renderings[0].color.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_NONE);
+	assert(discards_renderings[0].color.resolveMode == VK_RESOLVE_MODE_AVERAGE_BIT);
+	xgpu_vulkan_fence();
+
+	/* what the device has: discards on unless turned off; depth resolved in
+	passes where it has SAMPLE_ZERO for both; transient images where it
+	has lazily allocated memory (HALO_VULKAN_TRANSIENT=0 none, =force
+	without it) */
+	discards_reset(0);
+	vkGetPhysicalDeviceProperties2 = discards_properties;
+	vk.memory_properties.memoryTypeCount = 2;
+	vk.memory_properties.memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	vk.memory_properties.memoryTypes[1].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT |
+		VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+	discards_resolve_properties.supportedDepthResolveModes = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
+	discards_resolve_properties.supportedStencilResolveModes = VK_RESOLVE_MODE_SAMPLE_ZERO_BIT;
+	unsetenv("HALO_VULKAN_DISCARDS");
+	unsetenv("HALO_VULKAN_TRANSIENT");
+	discards_choose();
+	assert(vk.deferred && vk.depth_resolve && vk.transient == 1);
+	setenv("HALO_VULKAN_DISCARDS", "0", 1);
+	discards_choose();
+	assert(!vk.deferred && !vk.transient && !vk.depth_resolve);
+	setenv("HALO_VULKAN_DISCARDS", "1", 1);
+	discards_choose();
+	assert(vk.deferred && vk.depth_resolve && vk.transient == 1);
+	discards_resolve_properties.supportedStencilResolveModes = 0;
+	discards_choose();
+	assert(vk.deferred && !vk.depth_resolve);
+	setenv("HALO_VULKAN_TRANSIENT", "0", 1);
+	discards_choose();
+	assert(!vk.transient);
+	vk.memory_properties.memoryTypeCount = 1;
+	unsetenv("HALO_VULKAN_TRANSIENT");
+	discards_choose();
+	assert(!vk.transient);
+	setenv("HALO_VULKAN_TRANSIENT", "force", 1);
+	discards_choose();
+	assert(vk.transient == 2);
+	unsetenv("HALO_VULKAN_TRANSIENT");
+	unsetenv("HALO_VULKAN_DISCARDS");
+
+	/* a transient multisampled target: an attachment alone, in lazily
+	allocated memory, cleared by a pass of the early work; an ordinary
+	one (no transient, or one sample) as before */
+	discards_reset(1);
+	vk.transient = 1;
+	vk.memory_properties.memoryTypeCount = 2;
+	vk.memory_properties.memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	vk.memory_properties.memoryTypes[1].propertyFlags = VK_MEMORY_PROPERTY_LAZILY_ALLOCATED_BIT;
+	vkCreateImage = discards_create_image;
+	vkGetImageMemoryRequirements = discards_requirements;
+	vkAllocateMemory = discards_allocate_memory;
+	vkBindImageMemory = discards_bind;
+	{
+		struct xgpu_vulkan_image_description description;
+		struct xgpu_vulkan_image *made;
+
+		memset(&description, 0, sizeof(description));
+		description.type = XGPU_VULKAN_IMAGE_2D;
+		description.format = XGPU_VULKAN_FORMAT_D24S8;
+		description.usage = XGPU_VULKAN_USAGE_SAMPLED | XGPU_VULKAN_USAGE_TARGET;
+		description.samples = 4;
+		description.width = 64;
+		description.height = 48;
+		vk.depth_format = VK_FORMAT_D24_UNORM_S8_UINT;
+		discards_depth_image_clears = 0;
+		made = xgpu_vulkan_image_create(&description);
+		assert(made && made->transient);
+		assert(discards_image_info.usage == (VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT |
+			VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT));
+		assert(discards_memory_type == 1 && !discards_depth_image_clears);
+		assert(discards_rendering_count == 1 && discards_renderings[0].commands == DISCARDS_EARLY);
+		assert(discards_renderings[0].depth.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR);
+		assert(discards_renderings[0].depth.clearValue.depthStencil.depth == 1.0f);
+		xgpu_vulkan_image_destroy(made);
+		vk.transient = 0;
+		discards_rendering_count = 0;
+		made = xgpu_vulkan_image_create(&description);
+		assert(made && !made->transient && discards_depth_image_clears == 1 && !discards_rendering_count);
+		assert(discards_image_info.usage & VK_IMAGE_USAGE_TRANSFER_SRC_BIT);
+		xgpu_vulkan_image_destroy(made);
+		vk.transient = 1;
+		description.samples = 0;
+		made = xgpu_vulkan_image_create(&description);
+		assert(made && !made->transient);
+		xgpu_vulkan_image_destroy(made);
+	}
+
+	for (index = 0; index < SLOTS; index++)
+	{
+		free(vk.slots[index].secondaries);
+		vk.slots[index].secondaries = NULL;
+	}
+	free(vk.segments);
+	vk.segments = NULL;
+	free(discards_ms.attachments);
+	free(discards_ms_depth.attachments);
+	free(discards_resolved.attachments);
+	free(discards_resolved_depth.attachments);
+	memset(&discards_ms, 0, sizeof(discards_ms));
+	memset(&discards_ms_depth, 0, sizeof(discards_ms_depth));
+	memset(&discards_resolved, 0, sizeof(discards_resolved));
+	memset(&discards_resolved_depth, 0, sizeof(discards_resolved_depth));
+}
+
+/* Aside passes (with discards): a pass of other targets that draws colour
+alone, and the copies and uploads about it, played before the pass it
+interrupted, whose pieces are one rendering; each thing that must keep the
+order drawn (a piece sampled what is put aside writes, what is put aside
+reads the chain's targets, other work outside passes, a pass with depth, a
+resolve in the last piece, a piece that clears) keeps it; and a buffer the
+submission reads, written again, renamed rather than written in order. */
+
+static char aside_log[64];
+static unsigned int aside_log_count, aside_copies, aside_buffer_copies;
+static VkCommandBuffer aside_executed[64];
+static unsigned int aside_executed_count;
+static VkCommandBuffer aside_copy_commands;
+static VkBuffer aside_copy_source, aside_copy_destination;
+static struct xgpu_vulkan_image aside_target, aside_other, aside_other_depth;
+static unsigned int aside_buffers_made;
+static unsigned char aside_memory[4][256];
+static int aside_hold;
+
+/* the GPU's progress: held before the submission being recorded, else
+past it */
+static VkResult VKAPI_CALL aside_counter(VkDevice device, VkSemaphore semaphore, uint64_t *value)
+{
+	(void)device; (void)semaphore;
+	*value = aside_hold ? 0 : vk.serial;
+	return VK_SUCCESS;
+}
+
+static void VKAPI_CALL aside_begin(VkCommandBuffer commands, const VkRenderingInfo *info)
+{
+	discards_begin(commands, info);
+	assert(aside_log_count < sizeof(aside_log) - 1);
+	aside_log[aside_log_count++] = 'B';
+}
+
+static void VKAPI_CALL aside_execute(VkCommandBuffer commands, uint32_t count, const VkCommandBuffer *buffers)
+{
+	assert(commands == DISCARDS_MAIN && count == 1);
+	assert(aside_log_count < sizeof(aside_log) - 1 && aside_executed_count < 64);
+	aside_log[aside_log_count++] = 'X';
+	aside_executed[aside_executed_count++] = buffers[0];
+}
+
+static void VKAPI_CALL aside_end(VkCommandBuffer commands)
+{
+	assert(commands == DISCARDS_MAIN);
+	assert(aside_log_count < sizeof(aside_log) - 1);
+	aside_log[aside_log_count++] = 'E';
+}
+
+static void VKAPI_CALL aside_copy_image(VkCommandBuffer commands, VkImage source, VkImageLayout source_layout,
+	VkImage destination, VkImageLayout destination_layout, uint32_t count, const VkImageCopy *regions)
+{
+	(void)commands; (void)source; (void)source_layout; (void)destination; (void)destination_layout;
+	(void)count; (void)regions;
+	aside_copies++;
+}
+
+static void VKAPI_CALL aside_copy_buffer(VkCommandBuffer commands, VkBuffer source, VkBuffer destination,
+	uint32_t count, const VkBufferCopy *regions)
+{
+	(void)regions;
+	assert(count == 1);
+	aside_copy_commands = commands;
+	aside_copy_source = source;
+	aside_copy_destination = destination;
+	aside_buffer_copies++;
+}
+
+static unsigned int aside_cells_copies;
+
+static void VKAPI_CALL aside_copy_cells(VkCommandBuffer commands, VkBuffer source, VkImage destination,
+	VkImageLayout layout, uint32_t count, const VkBufferImageCopy *regions)
+{
+	(void)commands; (void)source; (void)destination; (void)layout; (void)regions;
+	assert(count == 1);
+	aside_cells_copies++;
+}
+
+static void VKAPI_CALL aside_bind_pipeline(VkCommandBuffer commands, VkPipelineBindPoint point, VkPipeline pipeline)
+{
+	(void)commands; (void)point; (void)pipeline;
+}
+
+static VkResult VKAPI_CALL aside_create_buffer(VkDevice device, const VkBufferCreateInfo *info,
+	const VkAllocationCallbacks *allocator, VkBuffer *buffer)
+{
+	(void)device; (void)allocator;
+	assert(info->size == 256);
+	*buffer = (VkBuffer)(uintptr_t)(700 + aside_buffers_made++);
+	return VK_SUCCESS;
+}
+
+static void VKAPI_CALL aside_buffer_requirements(VkDevice device, VkBuffer buffer, VkMemoryRequirements *requirements)
+{
+	(void)device; (void)buffer;
+	requirements->size = 256;
+	requirements->alignment = 16;
+	requirements->memoryTypeBits = 1;
+}
+
+static VkResult VKAPI_CALL aside_bind_buffer(VkDevice device, VkBuffer buffer, VkDeviceMemory memory,
+	VkDeviceSize offset)
+{
+	(void)device; (void)buffer; (void)memory; (void)offset;
+	return VK_SUCCESS;
+}
+
+static VkResult VKAPI_CALL aside_map(VkDevice device, VkDeviceMemory memory, VkDeviceSize offset, VkDeviceSize size,
+	VkMemoryMapFlags flags, void **mapped)
+{
+	(void)device; (void)memory; (void)offset; (void)size; (void)flags;
+	assert(aside_buffers_made <= 4);
+	*mapped = aside_memory[aside_buffers_made - 1];
+	return VK_SUCCESS;
+}
+
+static void aside_reset(int aside)
+{
+	discards_reset(1);
+	vk.aside = aside;
+	discards_image(&aside_target, 66, 0, 0);
+	discards_image(&aside_other, 67, 0, 0);
+	discards_image(&aside_other_depth, 68, 1, 0);
+	vkCmdBeginRendering = aside_begin;
+	vkCmdExecuteCommands = aside_execute;
+	vkCmdEndRendering = aside_end;
+	vkCmdCopyImage = aside_copy_image;
+	memset(aside_log, 0, sizeof(aside_log));
+	aside_log_count = aside_executed_count = aside_copies = 0;
+	vk.color = &color_target;
+	vk.depth = &depth_target;
+}
+
+/* drawn over part of these targets (a pass that loads them) */
+static void aside_draw(struct xgpu_vulkan_image *color, struct xgpu_vulkan_image *depth)
+{
+	static const int32_t part[1][4] = { { 4, 4, 8, 8 } };
+	static const float grey[4] = { 0.5f, 0.5f, 0.5f, 1.0f };
+
+	xgpu_vulkan_set_targets(color, depth, 0);
+	xgpu_vulkan_clear(part, 1, XGPU_VULKAN_CLEAR_COLOR | XGPU_VULKAN_CLEAR_CHANNELS |
+		(depth ? XGPU_VULKAN_CLEAR_DEPTH | XGPU_VULKAN_CLEAR_STENCIL : 0), grey, 0.5f, 1);
+}
+
+/* the view cleared, a pass of the aside target, the view drawn again (with
+work outside passes between, if asked for): the view's three secondary
+command buffers */
+static void aside_frame(VkCommandBuffer commands[3])
+{
+	discards_clear(DISCARDS_ALL);
+	commands[0] = vk.pass_commands;
+	aside_draw(&aside_target, NULL);
+	commands[1] = vk.pass_commands;
+}
+
+static void aside_test(void)
+{
+	VkCommandBuffer commands[6];
+
+	/* the aside target's pass played first, the view's two pieces one
+	rendering: begun with the first's clears, ended with the last's
+	stores */
+	aside_reset(1);
+	aside_frame(commands);
+	aside_draw(&color_target, &depth_target);
+	commands[2] = vk.pass_commands;
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXXE"));
+	assert(aside_executed[0] == commands[1] && aside_executed[1] == commands[0] && aside_executed[2] == commands[2]);
+	assert(discards_rendering_count == 2);
+	assert(discards_renderings[0].color.imageView == aside_target.attachments[0] && !discards_renderings[0].info.pDepthAttachment);
+	assert(discards_renderings[1].color.imageView == color_target.attachments[0]);
+	assert(discards_renderings[1].color.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR);
+	assert(discards_renderings[1].depth.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR);
+	assert(discards_renderings[1].stencil.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR);
+	assert(discards_renderings[1].color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(discards_renderings[1].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+	assert(vk.statistics.passes_continued == 1 && vk.statistics.passes_aside == 1);
+	assert(!vk.chain_head && !vk.segment_count);
+
+	/* the negative control: without aside passes, in the order drawn */
+	aside_reset(0);
+	aside_frame(commands);
+	aside_draw(&color_target, &depth_target);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEBXE"));
+	assert(!vk.statistics.passes_continued && !vk.statistics.passes_aside);
+
+	/* two passes put aside and a copy between them (of the aside target
+	into another image): all before the view's three pieces */
+	aside_reset(1);
+	aside_frame(commands);
+	xgpu_vulkan_image_copy(&aside_target, 0, 0, &aside_other, 0, 0);
+	assert(aside_copies == 1);
+	aside_draw(&color_target, &depth_target);
+	commands[2] = vk.pass_commands;
+	aside_draw(&aside_other, NULL);
+	commands[3] = vk.pass_commands;
+	aside_draw(&color_target, &depth_target);
+	commands[4] = vk.pass_commands;
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEXBXEBXXXE"));
+	assert(aside_executed[0] == commands[1] && aside_executed[2] == commands[3]);
+	assert(aside_executed[3] == commands[0] && aside_executed[4] == commands[2] && aside_executed[5] == commands[4]);
+	assert(vk.statistics.passes_continued == 2 && vk.statistics.passes_aside == 2);
+
+	/* a piece sampled the image the pass put aside would draw into: in
+	the order drawn (the aside target's pass then begins a chain of its
+	own, which the view's pass, with depth, ends) */
+	aside_reset(1);
+	discards_clear(DISCARDS_ALL);
+	image_use(&aside_target);
+	aside_draw(&aside_target, NULL);
+	aside_draw(&color_target, &depth_target);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEBXE") && !vk.statistics.passes_continued);
+	/* or that a copy put aside would write into */
+	aside_reset(1);
+	discards_clear(DISCARDS_ALL);
+	image_use(&aside_other);
+	aside_draw(&aside_target, NULL);
+	xgpu_vulkan_image_copy(&aside_target, 0, 0, &aside_other, 0, 0);
+	aside_draw(&color_target, &depth_target);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEXBXE") && !vk.statistics.passes_continued);
+
+	/* what is put aside reads the view (samples it, copies it): in order */
+	aside_reset(1);
+	aside_frame(commands);
+	image_use(&color_target);
+	aside_draw(&color_target, &depth_target);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEBXE") && !vk.statistics.passes_continued);
+	aside_reset(1);
+	aside_frame(commands);
+	xgpu_vulkan_image_copy(&color_target, 0, 0, &aside_other, 0, 0);
+	aside_draw(&color_target, &depth_target);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEXBXE") && !vk.statistics.passes_continued);
+
+	/* other work outside passes between: in order */
+	aside_reset(1);
+	aside_frame(commands);
+	(void)main_commands();
+	aside_draw(&color_target, &depth_target);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEXBXE") && !vk.statistics.passes_continued);
+
+	/* a pass with depth, or multisampled, between: in order */
+	aside_reset(1);
+	discards_clear(DISCARDS_ALL);
+	aside_draw(&aside_other, &aside_other_depth);
+	aside_draw(&color_target, &depth_target);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEBXE") && !vk.statistics.passes_continued);
+	aside_reset(1);
+	discards_clear(DISCARDS_ALL);
+	aside_draw(&discards_ms, NULL);
+	aside_draw(&color_target, &depth_target);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEBXE") && !vk.statistics.passes_continued);
+
+	/* the view's next pass clears it whole: not a piece, and the pass
+	before it stores nothing */
+	aside_reset(1);
+	aside_frame(commands);
+	xgpu_vulkan_set_targets(&color_target, &depth_target, 0);
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEBXE") && !vk.statistics.passes_continued);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	/* (its colour alone) */
+	aside_reset(1);
+	aside_frame(commands);
+	xgpu_vulkan_set_targets(&color_target, &depth_target, 0);
+	discards_clear(XGPU_VULKAN_CLEAR_COLOR | XGPU_VULKAN_CLEAR_CHANNELS);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEBXE") && !vk.statistics.passes_continued);
+	assert(discards_renderings[0].color.storeOp == VK_ATTACHMENT_STORE_OP_DONT_CARE);
+	assert(discards_renderings[0].depth.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
+
+	/* the last piece resolved in its pass: the chain's last */
+	aside_reset(1);
+	vk.color = &discards_ms;
+	vk.depth = &discards_ms_depth;
+	discards_clear(DISCARDS_ALL);
+	xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+	assert(vk.statistics.resolves_in_pass == 1);
+	aside_draw(&aside_target, NULL);
+	aside_draw(&discards_ms, &discards_ms_depth);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXEBXE") && !vk.statistics.passes_continued);
+	assert(discards_renderings[0].color.resolveImageView);
+
+	/* the pieces' resolve, after the last: in the one rendering */
+	aside_reset(1);
+	vk.color = &discards_ms;
+	vk.depth = &discards_ms_depth;
+	discards_clear(DISCARDS_ALL);
+	aside_draw(&aside_target, NULL);
+	aside_draw(&discards_ms, &discards_ms_depth);
+	xgpu_vulkan_image_resolve(&discards_ms, &discards_resolved);
+	xgpu_vulkan_fence();
+	assert(!strcmp(aside_log, "BXEBXXE") && vk.statistics.passes_continued == 1);
+	assert(discards_renderings[1].color.resolveImageView && discards_renderings[1].color.loadOp == VK_ATTACHMENT_LOAD_OP_CLEAR);
+
+	/* the view destroyed meanwhile: in order */
+	aside_reset(1);
+	{
+		struct xgpu_vulkan_image *gone = calloc(1, sizeof(*gone));
+
+		assert(gone);
+		*gone = aside_other;
+		gone->attachments = NULL;
+		vk.color = gone;
+		vk.depth = NULL;
+		discards_clear(XGPU_VULKAN_CLEAR_COLOR | XGPU_VULKAN_CLEAR_CHANNELS);
+		aside_draw(&aside_target, NULL);
+		assert(vk.chain_head == 1);
+		xgpu_vulkan_image_destroy(gone);
+		assert(!vk.chain_head);
+		xgpu_vulkan_fence();
+	}
+
+	/* a buffer the submission reads, written again: renamed, its old bytes
+	copied into the new one by the early commands and the write after
+	them, nothing in the main commands (which would end the chain); what
+	was recorded keeps the old buffer, a spare once the GPU passes it,
+	which the next rename takes */
+	aside_reset(1);
+	{
+		struct xgpu_vulkan_buffer buffer;
+		static unsigned char ring[4096];
+		unsigned char data[16] = { 5 };
+		VkBuffer first;
+
+		vk.ring_mapped = ring;
+		vk.memory_properties.memoryTypeCount = 1;
+		vk.memory_properties.memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		vkCreateBuffer = aside_create_buffer;
+		vkGetBufferMemoryRequirements = aside_buffer_requirements;
+		vkAllocateMemory = discards_allocate_memory;
+		vkBindBufferMemory = aside_bind_buffer;
+		vkMapMemory = aside_map;
+		vkCmdCopyBuffer = aside_copy_buffer;
+		aside_buffers_made = aside_buffer_copies = 0;
+		vkGetSemaphoreCounterValue = aside_counter;
+		aside_hold = 1;
+		memset(&buffer, 0, sizeof(buffer));
+		buffer.size = 256;
+		buffer.buffer = first = (VkBuffer)(uintptr_t)600;
+		buffer.mapped = aside_memory[3];
+		discards_clear(DISCARDS_ALL);
+		assert(xgpu_vulkan_buffer_handle(&buffer) == first);
+		aside_draw(&aside_target, NULL);
+		xgpu_vulkan_buffer_write(&buffer, 16, data, sizeof(data), 0);
+		assert(vk.statistics.buffers_renamed == 1 && aside_buffers_made == 1);
+		assert(buffer.buffer != first && buffer.renamed == vk.serial && !buffer.used);
+		assert(aside_buffer_copies == 2 && aside_copy_commands == DISCARDS_EARLY);
+		assert(aside_copy_destination == buffer.buffer && aside_copy_source != aside_copy_destination);
+		assert(vk.spare_count == 1 && vk.spares[0].buffer == first);
+		assert(!vk.statistics.uploads_ordered && vk.chain_head);
+		/* (not read since: written early, not renamed again) */
+		xgpu_vulkan_buffer_write(&buffer, 32, data, sizeof(data), 0);
+		assert(vk.statistics.buffers_renamed == 1 && aside_copy_commands == DISCARDS_EARLY);
+		/* (bytes no work reads, while the copy is still to be made: also
+		written after it) */
+		xgpu_vulkan_buffer_write(&buffer, 48, data, sizeof(data), 1);
+		assert(aside_memory[0][48] == 5 && aside_buffer_copies == 4 && aside_copy_commands == DISCARDS_EARLY);
+		aside_draw(&color_target, &depth_target);
+		xgpu_vulkan_fence();
+		assert(!strcmp(aside_log, "BXEBXXE"));
+		/* the next rename, once the GPU has passed the first: the spare */
+		aside_hold = 0;
+		recording_begin();
+		(void)xgpu_vulkan_buffer_handle(&buffer);
+		xgpu_vulkan_buffer_write(&buffer, 0, data, sizeof(data), 0);
+		assert(vk.statistics.buffers_renamed == 2 && buffer.buffer == first && aside_buffers_made == 1);
+		/* without aside passes: written in order, as before */
+		vk.aside = 0;
+		(void)xgpu_vulkan_buffer_handle(&buffer);
+		xgpu_vulkan_buffer_write(&buffer, 0, data, sizeof(data), 0);
+		assert(vk.statistics.buffers_renamed == 2 && vk.statistics.uploads_ordered == 1);
+		assert(aside_copy_commands != DISCARDS_EARLY);
+		xgpu_vulkan_fence();
+		free(vk.spares);
+		vk.spares = NULL;
+		vk.spare_count = vk.spare_capacity = 0;
+	}
+
+	/* the lights' block, bound into the draw set, which would go on
+	reading the buffer it was bound with (a set may not be written again
+	while a recording has it bound): read by a draw and written again,
+	never renamed but written in order, which ends the chain; and the
+	lights' cells, used by the draw in its pass, so that an upload into
+	them is not put aside before it */
+	aside_reset(1);
+	{
+		static struct xgpu_vulkan_buffer block;
+		static struct xgpu_vulkan_image cells;
+		static struct xgpu_vulkan_dynamic_state dynamic;
+		static unsigned char ring[4096 + 32 * 32 * 16 * 16], grid[32 * 32 * 16 * 16];
+		struct xgpu_vulkan_draw draw;
+		unsigned char data[256] = { 5 };
+		VkBuffer bound = (VkBuffer)(uintptr_t)610;
+		int stage;
+
+		vk.ring_mapped = ring;
+		/* (a rename would have its buffer) */
+		vk.memory_properties.memoryTypeCount = 1;
+		vk.memory_properties.memoryTypes[0].propertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+			VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		vkCreateBuffer = aside_create_buffer;
+		vkGetBufferMemoryRequirements = aside_buffer_requirements;
+		vkAllocateMemory = discards_allocate_memory;
+		vkBindBufferMemory = aside_bind_buffer;
+		vkMapMemory = aside_map;
+		vkCmdCopyBuffer = aside_copy_buffer;
+		vkCmdCopyBufferToImage = aside_copy_cells;
+		vkCmdBindPipeline = aside_bind_pipeline;
+		vkCmdBindDescriptorSets = fake_bind_sets;
+		vkCmdSetViewport = fake_viewport;
+		vkCmdSetScissor = fake_scissor;
+		vkCmdSetDepthBias = fake_bias;
+		vkCmdSetBlendConstants = fake_blend;
+		vkCmdSetStencilReference = fake_stencil;
+		vkCmdSetPrimitiveTopology = fake_topology;
+		vkCmdDraw = plain_draw;
+		aside_buffers_made = aside_buffer_copies = aside_cells_copies = 0;
+		memset(&block, 0, sizeof(block));
+		block.size = sizeof(data);
+		block.buffer = bound;
+		block.mapped = aside_memory[3];
+		block.named_by_set = 1;
+		memset(&cells, 0, sizeof(cells));
+		cells.description.type = XGPU_VULKAN_IMAGE_3D;
+		cells.description.format = XGPU_VULKAN_FORMAT_RGBA32_UINT;
+		cells.description.width = cells.description.height = 32;
+		cells.description.depth_or_layers = 16;
+		cells.description.levels = 1;
+		cells.aspect = VK_IMAGE_ASPECT_COLOR_BIT;
+		vk.lights_block = &block;
+		vk.lights_cells = &cells;
+		memset(&dynamic, 0, sizeof(dynamic));
+		dynamic.viewport[2] = 64;
+		dynamic.viewport[3] = 48;
+		dynamic.depth_range[1] = 1.0f;
+		memset(&draw, 0, sizeof(draw));
+		draw.pipeline = (VkPipeline)(uintptr_t)93;
+		draw.dynamic = &dynamic;
+		draw.count = 3;
+		draw.topology = XGPU_VULKAN_TOPOLOGY_TRIANGLES;
+		draw.dynamic_lights = 1;
+		for (stage = 0; stage < 4; stage++)
+			draw.textures[stage].kind = XGPU_VULKAN_IMAGE_2D;
+		/* (the view's pass, the chain's head, lit) */
+		discards_clear(DISCARDS_ALL);
+		vk.slot->descriptor_pools = &post_pool;
+		vk.slot->descriptor_pool_count = 1;
+		xgpu_vulkan_draw(&draw);
+		assert(vk.chain_head && block.used == vk.serial && cells.used == vk.serial);
+		assert(cells.aside_read == vk.chain_number);
+		/* (the cells written again: not put aside before the draw) */
+		xgpu_vulkan_image_upload(&cells, 0, 0, 0, 0, 0, 32, 32, 16, grid, 0, 0);
+		assert(aside_cells_copies == 1 && !vk.chain_head);
+		/* (the block written again while a chain is open: in order, which
+		ends it, not renamed) */
+		vk.ring_head = 0;
+		xgpu_vulkan_set_targets(&color_target, &depth_target, 0);
+		xgpu_vulkan_draw(&draw);
+		aside_draw(&aside_target, NULL);
+		assert(vk.chain_head);
+		xgpu_vulkan_buffer_write(&block, 0, data, sizeof(data), 0);
+		assert(!vk.statistics.buffers_renamed && !aside_buffers_made && !vk.spare_count);
+		assert(block.buffer == bound && block.ordered == vk.serial);
+		assert(aside_copy_destination == bound && aside_copy_commands != DISCARDS_EARLY);
+		assert(!vk.chain_head);
+		xgpu_vulkan_fence();
+		vk.lights_block = NULL;
+		vk.lights_cells = NULL;
+		vk.slot = NULL;
+	}
+
+	/* on with discards, unless HALO_VULKAN_ASIDE=0 */
+	discards_reset(0);
+	vkGetPhysicalDeviceProperties2 = discards_properties;
+	setenv("HALO_VULKAN_DISCARDS", "1", 1);
+	discards_choose();
+	assert(vk.aside);
+	setenv("HALO_VULKAN_ASIDE", "0", 1);
+	discards_choose();
+	assert(vk.deferred && !vk.aside);
+	unsetenv("HALO_VULKAN_ASIDE");
+	setenv("HALO_VULKAN_DISCARDS", "0", 1);
+	discards_choose();
+	assert(!vk.aside);
+	unsetenv("HALO_VULKAN_DISCARDS");
+	free(aside_target.attachments);
+	free(aside_other.attachments);
+	free(aside_other_depth.attachments);
+	memset(&aside_target, 0, sizeof(aside_target));
+	memset(&aside_other, 0, sizeof(aside_other));
+	memset(&aside_other_depth, 0, sizeof(aside_other_depth));
+}
+
 int main(void)
 {
 	static const int32_t full[1][4] = { { 0, 0, 64, 48 } };
@@ -2361,6 +3649,7 @@ int main(void)
 	submissions_test();
 	texture_sets_test();
 	post_test();
+	panini_post_test();
 	masked_clear_test();
 	window_test();
 	rotate_test();
@@ -2370,6 +3659,8 @@ int main(void)
 	hdr_window_test();
 	hdr_post_test();
 	half_test();
+	discards_test();
+	aside_test();
 	reset();
 	xgpu_vulkan_clear(full, 0, all, color, 0.75f, 0x123);
 	assert(!begins && !clears);

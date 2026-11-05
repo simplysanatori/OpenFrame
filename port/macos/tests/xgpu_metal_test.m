@@ -109,6 +109,11 @@ uint32_t host_memory_watch_serial(void)
 	return watch_generation;
 }
 
+uint64_t host_memory_watch_faults(void)
+{
+	return 0;
+}
+
 #ifdef TEST_STREAM
 void host_render_stream_gpu_completed(void)
 {
@@ -151,10 +156,12 @@ void host_render_stream_display_paced(int paced)
 	(void)paced;
 }
 
-void host_render_stream_display_hdr(int hdr, float headroom)
+void host_render_stream_display_hdr(int hdr, float headroom, float white_nits, int white_reported)
 {
 	(void)hdr;
 	(void)headroom;
+	(void)white_nits;
+	(void)white_reported;
 }
 
 uint64_t host_render_stream_frame_input(void)
@@ -732,7 +739,7 @@ static void test_visibility(void)
 	uint32_t samples = 0;
 	uint64_t frame, fence;
 	float black[4] = { 0, 0, 0, 1 };
-	volatile uint32_t output[XGPU_METAL_VISIBILITY_SLOTS];
+	volatile uint32_t output[XGPU_METAL_VISIBILITY_SLOTS * 2];
 
 	begin("visibility");
 	memset((void *)output, 0, sizeof(output));
@@ -747,11 +754,11 @@ static void test_visibility(void)
 	as it is) */
 	xgpu_metal_visibility_begin();
 	draw_rectangle(0, 0, 16, 16, 0.25f, 0xffffffff);
-	xgpu_metal_visibility_end(7, 1.0f);
+	xgpu_metal_visibility_end(7, 1.0f, 70);
 	/* behind the depth: none */
 	xgpu_metal_visibility_begin();
 	draw_rectangle(0, 0, 16, 16, 0.75f, 0xffffffff);
-	xgpu_metal_visibility_end(8, 1.0f);
+	xgpu_metal_visibility_end(8, 1.0f, 80);
 	/* across a change of targets: 8x8 here and 8x4 there */
 	xgpu_metal_visibility_begin();
 	draw_rectangle(32, 32, 40, 40, 0.25f, 0xffffffff);
@@ -760,21 +767,21 @@ static void test_visibility(void)
 	pipeline.depth_test = 0;
 	xgpu_metal_set_pipeline(&pipeline);
 	draw_rectangle(0, 0, 8, 4, 0.25f, 0xffffffff);
-	xgpu_metal_visibility_end(9, 1.0f);
+	xgpu_metal_visibility_end(9, 1.0f, 90);
 	/* a test begun before a clear that begins its pass, and a clear
 	inside it, which counts nothing */
 	xgpu_metal_set_targets(target, 0, 0, 0, 1);
 	xgpu_metal_visibility_begin();
 	xgpu_metal_clear((const int32_t (*)[4])(int32_t[1][4]){ { 0, 0, 8, 8 } }, 1, CLEAR_COLOR, black, 0, 0);
 	draw_rectangle(0, 0, 2, 2, 0.25f, 0xffffffff);
-	xgpu_metal_visibility_end(10, 1.0f);
+	xgpu_metal_visibility_end(10, 1.0f, 100);
 	/* multisampled: samples are counted, 4 a pixel */
 	xgpu_metal_set_targets(multisampled, 0, 0, 0, 1);
 	pipeline.samples = 4;
 	xgpu_metal_set_pipeline(&pipeline);
 	xgpu_metal_visibility_begin();
 	draw_rectangle(0, 0, 4, 4, 0.25f, 0xffffffff);
-	xgpu_metal_visibility_end(11, 1.0f);
+	xgpu_metal_visibility_end(11, 1.0f, 110);
 	fence = xgpu_metal_frame_end(0);
 	xgpu_metal_frame_wait(fence);
 	frame = xgpu_metal_visibility_result(7, &samples);
@@ -788,6 +795,9 @@ static void test_visibility(void)
 	xgpu_metal_visibility_result(11, &samples);
 	CHECK(samples == 64, "multisampled: %u", samples);
 	CHECK(output[7] == 256 && output[9] == 96, "written for the guest: %u %u", output[7], output[9]);
+	CHECK(output[XGPU_METAL_VISIBILITY_SLOTS + 7] == 70 && output[XGPU_METAL_VISIBILITY_SLOTS + 9] == 90,
+		"each count's test written for the guest: %u %u", output[XGPU_METAL_VISIBILITY_SLOTS + 7],
+		output[XGPU_METAL_VISIBILITY_SLOTS + 9]);
 	xgpu_metal_set_visibility_output(NULL);
 	xgpu_metal_texture_destroy(target);
 	xgpu_metal_texture_destroy(other);
@@ -1865,7 +1875,7 @@ static void test_stream_hdr(void)
 			float *values;
 
 			host_metal_hdr_override(peaks[peak]);
-			state = (struct xgpu_stream_hdr){ 0, 1, (uint32_t)mode, 100 };
+			state = (struct xgpu_stream_hdr){ 0, 1, (uint32_t)mode, 0, 100 };
 			backend->hdr(NULL, &state);
 			host_metal_hdr_frame(&frame);
 			backend->set_targets(NULL, &targets);
@@ -2001,7 +2011,40 @@ static void test_stream_hdr(void)
 		free(values);
 		backend->target_delete(NULL, 42);
 	}
-	state = (struct xgpu_stream_hdr){ 0, 0, 0, 100 };
+	{
+		/* paper white in nits (EDR's 1.0 100 nits), whatever the percent;
+		the percent of the system's white while it is 0; never past the
+		headroom */
+		struct xgpu_hdr_frame frame;
+
+		host_metal_hdr_override(4.0f);
+		state = (struct xgpu_stream_hdr){ 0, 1, XGPU_HDR_MODE_FAITHFUL, 200, 50 };
+		backend->hdr(NULL, &state);
+		host_metal_hdr_frame(&frame);
+		CHECK(frame.paper_white == 2.0f && frame.peak == 2.0f, "paper white 200 nits: %.3f, the peak %.3f",
+			(double)frame.paper_white, (double)frame.peak);
+		state = (struct xgpu_stream_hdr){ 0, 1, XGPU_HDR_MODE_FAITHFUL, 0, 150 };
+		backend->hdr(NULL, &state);
+		host_metal_hdr_frame(&frame);
+		CHECK(frame.paper_white == 1.5f, "paper white 150 percent of the system's: %.3f", (double)frame.paper_white);
+		state = (struct xgpu_stream_hdr){ 0, 1, XGPU_HDR_MODE_FAITHFUL, 500, 100 };
+		backend->hdr(NULL, &state);
+		host_metal_hdr_frame(&frame);
+		CHECK(frame.paper_white == 4.0f && frame.peak == 1.0f, "paper white past the headroom: %.3f",
+			(double)frame.paper_white);
+		/* the UI's white: paper white's by default; in nits over paper
+		white's; no brighter than the headroom */
+		CHECK(frame.ui == 1.0f, "the UI at paper white: %.3f", (double)frame.ui);
+		state = (struct xgpu_stream_hdr){ 0, 1, XGPU_HDR_MODE_FAITHFUL, 200, 100, 120 };
+		backend->hdr(NULL, &state);
+		host_metal_hdr_frame(&frame);
+		CHECK(fabsf(frame.ui - 0.6f) < 1e-6f, "the UI at 120 nits over 200: %.3f", (double)frame.ui);
+		state = (struct xgpu_stream_hdr){ 0, 1, XGPU_HDR_MODE_FAITHFUL, 200, 100, 500 };
+		backend->hdr(NULL, &state);
+		host_metal_hdr_frame(&frame);
+		CHECK(frame.ui == 2.0f, "the UI no brighter than the headroom: %.3f", (double)frame.ui);
+	}
+	state = (struct xgpu_stream_hdr){ 0, 0, 0, 0, 100 };
 	backend->hdr(NULL, &state);
 	host_metal_hdr_override(0.0f);
 	backend->target_delete(NULL, 41);
@@ -2225,6 +2268,46 @@ static void test_stream_dynamic_lights(void)
 		"lit green before the light: %08x (unlit %08x)", pixel(32, 32), unlit_middle);
 	CHECK(((pixel(32, 32) >> 8) & 0xff) > ((pixel(2, 2) >> 8) & 0xff) + 20,
 		"brighter near the light than far from it: %08x %08x", pixel(32, 32), pixel(2, 2));
+
+	/* a world whose BSP splits it at x = 32 (xgpu.h): the left half's leaf in
+	cluster 0, which the light reaches, the right half's in cluster 1, which it
+	does not: the left lit, the right not */
+	{
+		struct xgpu_stream_dynamic_lights_world world_record;
+		uint32_t world[5][4];
+		float plane[4] = { 1.0f, 0.0f, 0.0f, 32.0f };
+
+		memset(world, 0, sizeof(world));
+		world[0][0] = 1;           /* a node */
+		world[0][1] = 2;           /* the planes from texel 2 */
+		world[0][2] = 3;           /* the leaves' clusters from texel 3 */
+		world[0][3] = 2;           /* two leaves */
+		world[1][0] = 0;
+		world[1][1] = 0x80000000u; /* behind: leaf 0 */
+		world[1][2] = 0x80000001u; /* in front: leaf 1 */
+		memcpy(world[2], plane, sizeof(plane));
+		world[3][0] = 0;
+		world[3][1] = 1;
+		for (index = 0; index < XGPU_METAL_STREAM_DYNAMIC_LIGHT_CELLS_SIZE / 16; index++)
+			cells[index * 4] = index == 32 * 32 * 16 || index < 32 * 32 * 16;
+		world_record.header = XGPU_STREAM_HEADER(XGPU_STREAM_DYNAMIC_LIGHTS_WORLD, sizeof(world_record));
+		world_record.count = 5;
+		world_record.texels = guest_address(ring_put(ring, &position, world, sizeof(world)));
+		backend->dynamic_lights_world(NULL, &world_record);
+		upload->cells = guest_address(ring_put(ring, &position, cells, XGPU_METAL_STREAM_DYNAMIC_LIGHT_CELLS_SIZE));
+		backend->dynamic_lights_upload(NULL, upload);
+		LIT_DRAW();
+		LIT_READ();
+		CHECK(((pixel(31, 32) >> 8) & 0xff) > ((unlit_middle >> 8) & 0xff) + 20,
+			"lit in the light's cluster: %08x (unlit %08x)", pixel(31, 32), unlit_middle);
+		CHECK(near(pixel(33, 32), unlit_middle, 2), "unlit in a cluster the light does not reach, as near it: %08x",
+			pixel(33, 32));
+		/* (no world again: its header of no nodes) */
+		memset(world, 0, sizeof(world));
+		world_record.count = 1;
+		world_record.texels = guest_address(ring_put(ring, &position, world, 16));
+		backend->dynamic_lights_world(NULL, &world_record);
+	}
 
 	/* the next frame sent none: unlit again */
 	LIT_DRAW();

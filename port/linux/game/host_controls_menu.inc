@@ -18,24 +18,44 @@ network_host_game.c's, by the host's own ways: this file only shows it.
   machines all hear of it), MUTE... (then how long) or UNMUTE, those the
   player may have done to them (network_host_controls_player_actions).
 - GAME: End game now and Restart round (each pressed twice), CHANGE MAP...
-  (MAPS), Shuffle and Balance teams (pressed twice in a game, where the
+  (MAPS), CHANGE RULES... (RULES), Shuffle and Balance teams (pressed twice in a game, where the
   players moved die), Announce (typed: every machine's notice), Score limit
   and Time limit (left and right: the lobby's at once, else the next
   game's), Password (typed: a public internet game's, at once), Lock teams,
   Allow votekick, Listing (an internet game's), Max players (left and
   right: never fewer than are in it), Allow OpenCE players (an OpenH1
-  game's), then the bots' rows (network_host_controls_bot_rows).
-- MAPS: the gametype (left and right), then the multiplayer maps, the
+  game's).
+- MAPS: the gametype (left and right: first CURRENT, the game's own with
+  its score, time and rules, then the gametypes), then the multiplayer maps, the
   Xbox's and Custom Edition's; for the map chosen the panel's PLAY NOW
   (pressed twice in a game: it ends), AFTER THIS GAME and ADD TO PLAYLIST.
 - PLAYLIST: a change asked for, then network.host_playlist's games, the next
   marked; for the one chosen PLAY NOW, PLAY NEXT, REMOVE and CLEAR PLAYLIST
   (pressed twice), or a change's CANCEL.
 - BANS: bans.txt's lines (read again each second), and the panel's UNBAN.
+- RULES (GAME's CHANGE RULES..., in GAME's place on the strip; B goes back
+  to GAME): the gametype's rules (network_host_rules_rows: the vehicles,
+  starting weapons, weapon set, shields, motion tracker, infinite grenades,
+  invisible players), each stepped by left and right or A, in the game under
+  way or the lobby (network_host_rules.c), and SAVE AS GAMETYPE... (a name
+  typed: Enter saves).
+- BOTS (not in co-op, where the tab is hidden): the bots' rows
+  (network_host_controls_bot_rows: BOTS, the lobby's NONE, ADD n or FILL TO
+  n; SKILL, TEAMS, BALANCE TEAMS, TEAM TACTICS), each written to config.toml and
+  taken by the game at once, then the bots playing (their name, team and
+  score, as PLAYERS lists them), and for the bot chosen REMOVE BOT.
 
-A or a click on a player's, a map's, a playlist's or a ban's row chooses it
-and puts the focus on the panel's buttons; on a game's row it changes the
-row (left and right step it; a typed row's A begins and ends the typing,
+An admin of a dedicated server (network_admin.c) has them too, in the
+server's game: the screens show what the server tells the admin's machine,
+and each change is a request the server runs as its own command. It has
+PLAYERS, GAME (End game now, Restart round, CHANGE MAP..., Shuffle and
+Balance teams, Announce, Lock teams), MAPS (the server's gametypes; ADD TO
+PLAYLIST adds to its rotation), PLAYLIST (the server's rotation: PLAY NOW,
+AFTER THIS GAME, REMOVE) and BANS; the server's settings are its owner's.
+
+A or a click on a player's, a map's, a playlist's, a ban's or a bot's row
+chooses it and puts the focus on the panel's buttons; on a game's or a
+bots' setting's row it changes the row (left and right step it; a typed row's A begins and ends the typing,
 B leaves it as it was). What was done is said in the panel for a few
 seconds.
 */
@@ -65,15 +85,20 @@ enum
 	_host_tab_maps,
 	_host_tab_playlist,
 	_host_tab_bans,
-	NUMBER_OF_HOST_TABS
+	/* (last: hidden in co-op, leaving no gap in the strip) */
+	_host_tab_bots,
+	NUMBER_OF_HOST_TABS,
+	/* (GAME's CHANGE RULES...: no tab of the strip's, GAME's shown) */
+	_host_tab_rules = NUMBER_OF_HOST_TABS,
 };
 
-/* Game's rows (the bots' after them) */
+/* Game's rows */
 enum
 {
 	_host_game_end,
 	_host_game_restart,
 	_host_game_change_map,
+	_host_game_change_rules,
 	_host_game_shuffle_teams,
 	_host_game_balance_teams,
 	_host_game_announce,
@@ -86,9 +111,7 @@ enum
 	_host_game_maximum_players,
 	_host_game_opence,
 	NUMBER_OF_HOST_GAME_ROWS,
-	/* (the bots' rows: this and their row) */
-	_host_game_bot_first = NUMBER_OF_HOST_GAME_ROWS,
-	MAXIMUM_HOST_GAME_ROWS = NUMBER_OF_HOST_GAME_ROWS + 16,
+	MAXIMUM_HOST_GAME_ROWS = NUMBER_OF_HOST_GAME_ROWS,
 };
 
 /* the panel's buttons' actions: the player's (_host_controls_*), and the
@@ -116,9 +139,13 @@ enum
 	_host_button_entry_remove,
 	_host_button_playlist_clear,
 	_host_button_change_cancel,
+	/* (a bot's) */
+	_host_button_bot_remove,
 	/* (what a second press confirms: a game's row plus
-	MAXIMUM_HOST_GAME_ROWS, a button plus HOST_CONFIRM_BUTTON) */
+	MAXIMUM_HOST_GAME_ROWS, a bots' row plus HOST_CONFIRM_BOT_ROW, a button
+	plus HOST_CONFIRM_BUTTON) */
 	_host_confirm_none = NONE,
+	HOST_CONFIRM_BOT_ROW = 500,
 	HOST_CONFIRM_BUTTON = 1000,
 };
 
@@ -153,11 +180,19 @@ static struct
 	char chosen_map[HOST_GAME_MAP_SIZE];
 	short chosen_entry;
 	char chosen_ban[HOST_CONTROLS_BAN_LINE_SIZE];
+	/* (the BOTS tab's: a row of theirs, NONE; else the bot, as the players'
+	are chosen, if chosen_bot_valid) */
+	short chosen_bot_row;
+	boolean chosen_bot_valid;
+	struct host_controls_player chosen_bot;
+	/* (RULES': a row, NONE) */
+	short chosen_rule;
 	/* the panel's buttons asking how long (a _host_controls_ban or _mute;
 	NONE: not), and the ban's reason typed */
 	short choosing;
 	char reason[HOST_CONTROLS_REASON_LENGTH + 1];
-	/* the gametype the maps play (network_host_game_gametypes' index) */
+	/* the gametype the maps play (network_host_game_gametypes' index; NONE:
+	CURRENT, the game's own kept) */
 	short gametype;
 	/* the press a second confirms, and when it was asked */
 	short confirm;
@@ -170,6 +205,12 @@ static struct
 	short player_count;
 	short game_rows[MAXIMUM_HOST_GAME_ROWS];
 	short game_row_count;
+	short bot_rows[NUMBER_OF_HOST_BOT_ROWS];
+	short bot_row_count;
+	struct host_controls_player bots[BOTS_MAXIMUM];
+	short bot_count;
+	short rule_rows[NUMBER_OF_HOST_RULES];
+	short rule_row_count;
 	struct host_game_map const *maps;
 	short map_count;
 	struct host_controls_ban bans[MAXIMUM_HOST_CONTROLS_BANS];
@@ -187,6 +228,8 @@ static struct
 	boolean focus_first;
 	/* the tab the strip last showed */
 	short tab_shown;
+	/* (an admin's) when the server's lists were last asked for */
+	unsigned long lists_time;
 } host_menu;
 
 /* a Host Controls row's index (0 up), else NONE */
@@ -343,6 +386,117 @@ static struct host_controls_player *host_chosen_player(void)
 	return NULL;
 }
 
+/* ---- an admin's Host Controls (a dedicated server's: network_admin.c),
+whose game is the server's as it tells this machine, and whose changes are
+the server's commands, asked for */
+
+static boolean host_remote(void)
+{
+	return network_admin_remote();
+}
+
+/* whether this machine has Host Controls: the host's, or an admin's */
+static boolean host_available(void)
+{
+	return network_host_controls_available() || host_remote();
+}
+
+static boolean host_flag(short flag)
+{
+	struct network_admin_state state;
+
+	return network_admin_remote_state(&state) && TEST_FLAG(state.flags, flag);
+}
+
+/* whether the game is in its lobby */
+static boolean host_lobby(void)
+{
+	return host_remote() ? host_flag(_network_admin_flag_lobby) : network_host_controls_in_lobby();
+}
+
+/* a request to the server (its answer, if it refuses, in the panel) */
+static boolean host_ask(short verb, struct host_controls_player const *player, long number, char const *text)
+{
+	if (!network_admin_send(verb, player ? player->slot : NONE, player ? player->name : NULL, number, text))
+	{
+		host_notice(L"The server can't be asked now.", NULL);
+		return FALSE;
+	}
+	return TRUE;
+}
+
+static struct server_rotation const *host_playlist(void)
+{
+	return host_remote() ? network_admin_rotation() : host_playlist();
+}
+
+static long host_playlist_index(void)
+{
+	struct network_admin_state state;
+
+	if (network_admin_remote_state(&state))
+		return state.rotation_index;
+	return host_playlist_index();
+}
+
+static short host_gametypes(struct host_game_gametype const **gametypes)
+{
+	return host_remote() ? network_admin_gametypes(gametypes) : network_host_game_gametypes(gametypes);
+}
+
+/* an entry's text read (an admin's: the server's current or next game) */
+static boolean host_entry_read(char const *text, struct server_entry *entry)
+{
+	csmemset(entry, 0, sizeof(*entry));
+	if (!text[0] || !server_rotation_parse_entry(text, (int)strlen(text), entry))
+		return FALSE;
+	if (!entry->map_name[0])
+		csstrncpy(entry->map_name, entry->map, sizeof(entry->map_name) - 1);
+	return TRUE;
+}
+
+/* the next game: the host's change asked for, or the server's next */
+static boolean host_next(struct server_entry *entry, boolean *now)
+{
+	struct network_admin_state state;
+
+	if (network_admin_remote_state(&state))
+	{
+		*now = FALSE;
+		return host_entry_read(state.next, entry);
+	}
+	return network_host_game_next(entry, now);
+}
+
+/* what is done to a player, the host's way or asked of the server */
+static boolean host_kick(struct host_controls_player const *player, boolean ban, long seconds, char const *reason)
+{
+	if (host_remote())
+		return host_ask(ban ? _network_admin_ban : _network_admin_kick, player, seconds, reason);
+	return network_host_game_kick_player(player, ban, seconds, reason);
+}
+
+static boolean host_mute(struct host_controls_player const *player, short minutes)
+{
+	if (host_remote())
+		return host_ask(minutes ? _network_admin_mute : _network_admin_unmute, player, minutes, NULL);
+	return network_host_game_mute_player(player, minutes);
+}
+
+static short host_muted(struct host_controls_player const *player)
+{
+	if (host_remote())
+		return network_admin_player_muted((short)player->slot) ? 1 : 0;
+	return network_host_game_player_mute_minutes(player);
+}
+
+static boolean host_move(struct host_controls_player const *player)
+{
+	if (host_remote())
+		return host_ask(_network_admin_move_team, player, 0, NULL);
+	return network_host_game_move_player(player);
+}
+
 /* ---- the game's rows */
 
 /* the game this machine hosts (its record) */
@@ -358,6 +512,8 @@ static boolean host_game_teams(void)
 {
 	struct network_game *game = host_game();
 
+	if (host_remote())
+		return host_flag(_network_admin_flag_teams);
 	if (network_host_controls_in_lobby())
 		return game && game->variant.universal_variant.teams;
 	return game_engine_running() && game_engine_has_teams();
@@ -367,11 +523,44 @@ static boolean host_game_teams(void)
 static void host_game_rows_read(void)
 {
 	boolean teams = host_game_teams();
-	boolean playing = game_engine_running() && !network_host_controls_in_lobby();
-	short bots = network_host_controls_bot_rows();
+	boolean playing = game_engine_running() && !host_lobby();
 	short index;
 
 	host_menu.game_row_count = 0;
+	/* (an admin's: what the server's commands do) */
+	if (host_remote())
+	{
+		boolean remote_playing = host_flag(_network_admin_flag_playing);
+
+		for (index = 0; index < NUMBER_OF_HOST_GAME_ROWS; index++)
+		{
+			boolean shown = FALSE;
+
+			switch (index)
+			{
+			case _host_game_end:
+			case _host_game_restart:
+			case _host_game_announce:
+				shown = remote_playing;
+				break;
+			case _host_game_change_map:
+				shown = TRUE;
+				break;
+			case _host_game_shuffle_teams:
+			case _host_game_balance_teams:
+				shown = remote_playing && teams && host_flag(_network_admin_flag_team_moves);
+				break;
+			case _host_game_lock_teams:
+				shown = teams;
+				break;
+			default:
+				break;
+			}
+			if (shown)
+				host_menu.game_rows[host_menu.game_row_count++] = index;
+		}
+		return;
+	}
 	for (index = 0; index < NUMBER_OF_HOST_GAME_ROWS; index++)
 	{
 		boolean shown = TRUE;
@@ -384,6 +573,9 @@ static void host_game_rows_read(void)
 			break;
 		case _host_game_change_map:
 			shown = network_host_game_hosting();
+			break;
+		case _host_game_change_rules:
+			shown = network_host_rules_available();
 			break;
 		case _host_game_shuffle_teams:
 		case _host_game_balance_teams:
@@ -414,8 +606,6 @@ static void host_game_rows_read(void)
 		if (shown)
 			host_menu.game_rows[host_menu.game_row_count++] = index;
 	}
-	for (index = 0; index < bots && host_menu.game_row_count < MAXIMUM_HOST_GAME_ROWS; index++)
-		host_menu.game_rows[host_menu.game_row_count++] = (short)(_host_game_bot_first + index);
 }
 
 /* the score to win and the minutes of the lobby's game, or the ones that
@@ -440,7 +630,7 @@ static void host_game_row_text(short row, wchar_t *label, wchar_t *value, wchar_
 {
 	struct network_game *game = host_game();
 	boolean confirming = host_confirming((short)(row + MAXIMUM_HOST_GAME_ROWS));
-	boolean lobby = network_host_controls_in_lobby();
+	boolean lobby = host_lobby();
 	long score;
 	short minutes;
 	boolean waiting;
@@ -467,12 +657,17 @@ static void host_game_row_text(short row, wchar_t *label, wchar_t *value, wchar_
 		boolean now;
 
 		usnprintf(label, size - 1, L"CHANGE MAP...");
-		if (network_host_game_next(&next, &now))
+		if (host_next(&next, &now))
 			network_host_game_entry_shown(&next, value, size);
 		usnprintf(help, size - 1, lobby ? L"Pick the map and gametype this lobby plays, or build a playlist." :
 			L"Pick the next map and gametype: now, or after this game. Or build a playlist.");
 		break;
 	}
+	case _host_game_change_rules:
+		usnprintf(label, size - 1, L"CHANGE RULES...");
+		usnprintf(help, size - 1, lobby ? L"The vehicles, starting weapons, shields and more of the lobby's game." :
+			L"The vehicles, starting weapons, shields and more, while the game plays. Or save them as a gametype.");
+		break;
 	case _host_game_shuffle_teams:
 	case _host_game_balance_teams:
 		usnprintf(label, size - 1, row == _host_game_shuffle_teams ? L"SHUFFLE TEAMS" : L"BALANCE TEAMS");
@@ -519,7 +714,8 @@ static void host_game_row_text(short row, wchar_t *label, wchar_t *value, wchar_
 	}
 	case _host_game_lock_teams:
 		usnprintf(label, size - 1, L"LOCK TEAMS");
-		usnprintf(value, size - 1, network_host_controls_teams_locked() ? L"ON" : L"OFF");
+		usnprintf(value, size - 1, (host_remote() ? host_flag(_network_admin_flag_teams_locked) :
+			network_host_controls_teams_locked()) ? L"ON" : L"OFF");
 		usnprintf(help, size - 1, L"Players can't switch teams in the lobby. You can still move anyone, "
 			L"and yourself.");
 		break;
@@ -548,7 +744,6 @@ static void host_game_row_text(short row, wchar_t *label, wchar_t *value, wchar_
 			L"the game stay.");
 		break;
 	default:
-		network_host_controls_bot_row((short)(row - _host_game_bot_first), label, value, help, size);
 		break;
 	}
 	label[size - 1] = value[size - 1] = help[size - 1] = 0;
@@ -611,6 +806,12 @@ static void host_announce_done(char const *text)
 {
 	if (!text[0])
 		return;
+	if (host_remote())
+	{
+		if (host_ask(_network_admin_announce, NULL, 0, text))
+			host_notice(L"Everyone sees your message.", NULL);
+		return;
+	}
 	if (network_host_game_announce(text))
 		host_notice(L"Everyone sees your message.", NULL);
 	else
@@ -620,6 +821,57 @@ static void host_announce_done(char const *text)
 static void host_reason_done(char const *text)
 {
 	snprintf(host_menu.reason, sizeof(host_menu.reason), "%s", text);
+}
+
+/* (RULES' SAVE AS GAMETYPE's typing's end) the rules saved by that name */
+static void host_rules_save_done(char const *text)
+{
+	char reason[96];
+
+	if (!text[0])
+		return;
+	if (network_host_rules_save(text, reason, sizeof(reason)))
+		host_notice(L"Saved: MAPS and the playlist offer it.", NULL);
+	else
+		host_notice_text(reason);
+}
+
+/* the teams shuffled or balanced (_host_game_*), pressed twice in a game
+(those moved die): said in the panel */
+static void host_teams_arrange(short how, short confirm)
+{
+	short moved;
+
+	if (!host_lobby() && !host_confirmed(confirm))
+		return;
+	if (host_remote())
+	{
+		if (host_ask(how == _host_game_shuffle ? _network_admin_shuffle_teams : _network_admin_balance_teams, NULL, 0,
+			NULL))
+		{
+			host_notice(how == _host_game_shuffle ? L"The server shuffles the teams." :
+				L"The server balances the teams.", NULL);
+			ui_play_audio_feedback_sound(SOUND_FORWARD);
+		}
+		return;
+	}
+	moved = network_host_game_teams_arrange(how);
+	if (moved == NONE)
+	{
+		ui_play_audio_feedback_sound(SOUND_ERROR);
+		return;
+	}
+	if (moved == 0)
+		host_notice(L"The teams are even already.", NULL);
+	else
+	{
+		wchar_t count[16];
+
+		usnprintf(count, NUMBEROF(count) - 1, L"%d", moved);
+		count[NUMBEROF(count) - 1] = 0;
+		host_notice(moved == 1 ? L"%s player moved." : L"%s players moved.", count);
+	}
+	ui_play_audio_feedback_sound(SOUND_FORWARD);
 }
 
 /* a game's row stepped (left -1, right 1) or chosen (A: 0) */
@@ -633,7 +885,8 @@ static void host_game_row_change(struct widget_instance *row_widget, short row, 
 	case _host_game_restart:
 		if (step || !host_confirmed((short)(row + MAXIMUM_HOST_GAME_ROWS)))
 			return;
-		if (row == _host_game_end ? network_host_controls_end_game() : network_host_controls_restart())
+		if (host_remote() ? host_ask(row == _host_game_end ? _network_admin_end_game : _network_admin_restart, NULL, 0,
+			NULL) : row == _host_game_end ? network_host_controls_end_game() : network_host_controls_restart())
 		{
 			ui_play_audio_feedback_sound(SOUND_FORWARD);
 			/* (back to the game, which shows its scores) */
@@ -643,41 +896,23 @@ static void host_game_row_change(struct widget_instance *row_widget, short row, 
 			ui_play_audio_feedback_sound(SOUND_ERROR);
 		return;
 	case _host_game_change_map:
+	case _host_game_change_rules:
 		if (step)
 			return;
-		host_menu.tab = _host_tab_maps;
+		host_menu.tab = row == _host_game_change_map ? _host_tab_maps : _host_tab_rules;
+		host_menu.gametype = NONE;
 		host_menu.first = 0;
 		host_menu.confirm = _host_confirm_none;
 		host_menu.focus_first = TRUE;
 		break;
 	case _host_game_shuffle_teams:
 	case _host_game_balance_teams:
-	{
-		short moved;
-
-		/* (in a game, those moved die: pressed twice) */
-		if (step || (!network_host_controls_in_lobby() && !host_confirmed((short)(row + MAXIMUM_HOST_GAME_ROWS))))
-			return;
-		moved = network_host_game_teams_arrange(row == _host_game_shuffle_teams ? _host_game_shuffle :
-			_host_game_balance);
-		if (moved == NONE)
+		if (!step)
 		{
-			ui_play_audio_feedback_sound(SOUND_ERROR);
-			return;
+			host_teams_arrange(row == _host_game_shuffle_teams ? _host_game_shuffle : _host_game_balance,
+				(short)(row + MAXIMUM_HOST_GAME_ROWS));
 		}
-		if (moved == 0)
-			host_notice(L"The teams are even already.", NULL);
-		else
-		{
-			wchar_t count[16];
-
-			usnprintf(count, NUMBEROF(count) - 1, L"%d", moved);
-			count[NUMBEROF(count) - 1] = 0;
-			host_notice(moved == 1 ? L"%s player moved." : L"%s players moved.", count);
-		}
-		ui_play_audio_feedback_sound(SOUND_FORWARD);
 		return;
-	}
 	case _host_game_announce:
 	case _host_game_password:
 		if (step || !row_widget)
@@ -727,7 +962,10 @@ static void host_game_row_change(struct widget_instance *row_widget, short row, 
 		break;
 	}
 	case _host_game_lock_teams:
-		network_host_controls_lock_teams(!network_host_controls_teams_locked());
+		if (host_remote())
+			host_ask(_network_admin_lock_teams, NULL, !host_flag(_network_admin_flag_teams_locked), NULL);
+		else
+			network_host_controls_lock_teams(!network_host_controls_teams_locked());
 		break;
 	case _host_game_votekick:
 		if (!config_write("network.votekick", config_boolean("network.votekick") ? "false" : "true"))
@@ -766,33 +1004,179 @@ static void host_game_row_change(struct widget_instance *row_widget, short row, 
 		network_host_controls_set_opence_joins(!network_host_controls_opence_joins());
 		break;
 	default:
-		network_host_controls_bot_row_step((short)(row - _host_game_bot_first), (short)(step ? step : 1));
 		break;
 	}
 	ui_play_audio_feedback_sound(SOUND_CURSOR);
 }
 
+/* ---- the bots */
+
+/* a bots' row stepped (left -1, right 1) or chosen (A: 0): its setting
+written (network_host_controls.c), or the teams balanced */
+static void host_bot_row_change(short row, short step)
+{
+	if (row == _host_bot_row_balance)
+	{
+		if (!step)
+			host_teams_arrange(_host_game_balance, (short)(row + HOST_CONFIRM_BOT_ROW));
+		return;
+	}
+	if (!network_host_controls_bot_row_step(row, (short)(step ? step : 1)))
+	{
+		ui_play_audio_feedback_sound(SOUND_ERROR);
+		return;
+	}
+	ui_play_audio_feedback_sound(SOUND_CURSOR);
+}
+
+/* ---- the rules */
+
+/* a rule's row stepped (left -1, right 1) or chosen (A: 0): the rule
+changed (network_host_rules.c), or SAVE AS GAMETYPE's name typed */
+static void host_rule_change(struct widget_instance *row_widget, short rule, short step)
+{
+	if (rule == _host_rule_save)
+	{
+		if (step || !row_widget)
+			return;
+		if (text_field_editing(row_widget))
+		{
+			text_field_end(TRUE);
+			ui_play_audio_feedback_sound(SOUND_FORWARD);
+			return;
+		}
+		text_field_begin(row_widget, "", HOST_RULES_NAME_LENGTH, host_rules_save_done);
+		ui_play_audio_feedback_sound(SOUND_CURSOR);
+		return;
+	}
+	if (!network_host_rules_step(rule, (short)(step ? step : 1)))
+	{
+		ui_play_audio_feedback_sound(SOUND_ERROR);
+		return;
+	}
+	if (network_host_rules_waits(rule))
+		host_notice(L"It changes from the next game.", NULL);
+	ui_play_audio_feedback_sound(SOUND_CURSOR);
+}
+
+/* whether the bot is the one chosen */
+static boolean host_bot_chosen(struct host_controls_player const *bot)
+{
+	return host_menu.chosen_bot_valid && network_host_controls_same_player(bot, host_menu.chosen_bot.player_index,
+		host_menu.chosen_bot.slot, host_menu.chosen_bot.machine_index, host_menu.chosen_bot.name);
+}
+
+/* (the chosen bot's entry, else NULL) */
+static struct host_controls_player *host_chosen_bot(void)
+{
+	short index;
+
+	for (index = 0; index < host_menu.bot_count; index++)
+	{
+		if (host_bot_chosen(&host_menu.bots[index]))
+			return &host_menu.bots[index];
+	}
+	return NULL;
+}
+
 /* ---- the maps and the playlist */
 
-/* the gametype the maps play (its rotation name) */
+/* the gametype the maps play (its rotation name; NULL: CURRENT, the
+game's own) */
 static struct host_game_gametype const *host_gametype(void)
 {
 	struct host_game_gametype const *gametypes;
-	short count = network_host_game_gametypes(&gametypes);
+	short count = host_gametypes(&gametypes);
 
-	if (!count)
+	if (!count || host_menu.gametype == NONE)
+	{
+		host_menu.gametype = NONE;
 		return NULL;
+	}
 	host_menu.gametype = (short)PIN(host_menu.gametype, 0, count - 1);
 	return &gametypes[host_menu.gametype];
 }
 
-/* the map chosen with the gametype, as a playlist's entry's text */
-static boolean host_map_entry_text(struct host_game_map const *map, char *text, short size)
+/* the gametype stepped (left -1, right 1): CURRENT, then the list's */
+static void host_gametype_step(short step)
+{
+	struct host_game_gametype const *gametypes;
+	short count = host_gametypes(&gametypes);
+
+	host_gametype();
+	host_menu.gametype = (short)((host_menu.gametype + 1 + step + count + 1) % (count + 1) - 1);
+}
+
+/* the game's own gametype as shown (its variant's name) */
+static void host_current_gametype(wchar_t *text, short size)
+{
+	struct network_game *game = host_game();
+	short index;
+
+	/* (an admin's: the server's game's) */
+	if (host_remote())
+	{
+		static struct server_entry entry;
+		struct network_admin_state state;
+
+		text[0] = 0;
+		if (network_admin_remote_state(&state) && host_entry_read(state.current, &entry))
+			network_host_game_gametype_text(entry.gametype, text, size);
+		return;
+	}
+	for (index = 0; game && index < size - 1 &&
+		index < NUMBEROF(game->variant.human_readable_game_description) &&
+		game->variant.human_readable_game_description[index]; index++)
+	{
+		text[index] = game->variant.human_readable_game_description[index];
+	}
+	text[index] = 0;
+}
+
+/* the gametype as MAPS shows it ("CURRENT \x00B7 CTF", or the list's) */
+static void host_gametype_shown(wchar_t *text, short size)
+{
+	struct host_game_gametype const *gametype = host_gametype();
+	wchar_t current[HOST_GAME_GAMETYPE_SHOWN_SIZE];
+
+	if (gametype)
+		usnprintf(text, size - 1, L"%s", gametype->shown);
+	else
+	{
+		host_current_gametype(current, NUMBEROF(current));
+		usnprintf(text, size - 1, L"CURRENT \x00B7 %s", current);
+	}
+	text[size - 1] = 0;
+}
+
+/* the map chosen with the gametype, as an entry's text: CURRENT's the map
+alone (the game's gametype, score, time and rules kept: network_host_game_
+change), but a playlist's names the list's gametype the game's is (FALSE:
+none is) */
+static boolean host_map_entry_text(struct host_game_map const *map, boolean playlist, char *text, short size)
 {
 	struct host_game_gametype const *gametype = host_gametype();
 
-	if (!map || !gametype)
+	if (!map)
 		return FALSE;
+	if (!gametype && !playlist)
+	{
+		snprintf(text, size, "%s%s", map->custom ? "custom_maps\\" : "", map->name);
+		return TRUE;
+	}
+	if (!gametype)
+	{
+		struct host_game_gametype const *gametypes;
+		short count = host_gametypes(&gametypes);
+		wchar_t current[HOST_GAME_GAMETYPE_SHOWN_SIZE];
+		short index;
+
+		host_current_gametype(current, NUMBEROF(current));
+		index = network_host_game_gametype_find(gametypes, count, current);
+		if (index == NONE)
+			return FALSE;
+		gametype = &gametypes[index];
+	}
 	snprintf(text, size, "%s%s:%s", map->custom ? "custom_maps\\" : "", map->name, gametype->name);
 	return TRUE;
 }
@@ -815,6 +1199,14 @@ static boolean host_map_current(struct host_game_map const *map)
 {
 	struct network_game *game = host_game();
 
+	if (host_remote())
+	{
+		static struct server_entry entry;
+		struct network_admin_state state;
+
+		return network_admin_remote_state(&state) && host_entry_read(state.current, &entry) &&
+			!_stricmp(entry.map, map->name);
+	}
 	return game && !_stricmp(game->map.name, map->level);
 }
 
@@ -823,20 +1215,23 @@ the change asked for (TRUE), the one network_host_game_next gives when
 it is no playlist's next */
 static boolean host_change_asked(struct server_entry *entry)
 {
-	struct server_rotation const *playlist = network_host_game_playlist();
-	long next = network_host_game_playlist_after(playlist, network_host_game_playlist_index());
+	struct server_rotation const *playlist = host_playlist();
+	long next = network_host_game_playlist_after(playlist, host_playlist_index());
 	boolean now;
 
+	/* (an admin's: the server's rotation alone, its next marked) */
+	if (host_remote())
+		return FALSE;
 	if (!network_host_game_next(entry, &now))
 		return FALSE;
-	return next == NONE || strcmp(entry->text, playlist->entries[next].text) || now;
+	return next == NONE || !entry->gametype[0] || strcmp(entry->text, playlist->entries[next].text) || now;
 }
 
 static short host_playlist_entries(void)
 {
 	struct server_entry change;
 
-	return (short)(network_host_game_playlist()->count + (host_change_asked(&change) ? 1 : 0));
+	return (short)(host_playlist()->count + (host_change_asked(&change) ? 1 : 0));
 }
 
 /* the playlist's entry of the tab's (NONE, or HOST_PLAYLIST_CHANGE) */
@@ -864,6 +1259,10 @@ static short host_entry_count(void)
 		return (short)(host_menu.map_count + 1);
 	case _host_tab_playlist:
 		return host_playlist_entries();
+	case _host_tab_bots:
+		return (short)(host_menu.bot_row_count + host_menu.bot_count);
+	case _host_tab_rules:
+		return host_menu.rule_row_count;
 	default:
 		return host_menu.ban_count;
 	}
@@ -881,12 +1280,24 @@ static void host_tab_set(short tab)
 {
 	if (text_field_editing(NULL))
 		text_field_end(FALSE);
-	host_menu.tab = (short)((tab + NUMBER_OF_HOST_TABS) % NUMBER_OF_HOST_TABS);
+	/* (RULES, GAME's own; the host's of a gametype, else GAME) */
+	if (tab == _host_tab_rules)
+		tab = network_host_rules_available() ? _host_tab_rules : _host_tab_game;
+	else
+		tab = (short)((tab + NUMBER_OF_HOST_TABS) % NUMBER_OF_HOST_TABS);
+	/* (BOTS, not the host's in co-op: PLAYERS) */
+	if (tab == _host_tab_bots && !network_host_controls_bots_tab())
+		tab = _host_tab_players;
+	/* (MAPS: CURRENT, the game's own gametype) */
+	if (tab == _host_tab_maps && host_menu.tab != _host_tab_maps)
+		host_menu.gametype = NONE;
+	host_menu.tab = tab;
 	host_menu.first = 0;
 	host_menu.confirm = _host_confirm_none;
 	host_menu.choosing = NONE;
 	host_menu.bans_read = FALSE;
 	host_menu.focus_first = TRUE;
+	host_menu.lists_time = 0;
 }
 
 /* "port host init" (the list made): Players, nothing chosen */
@@ -897,8 +1308,12 @@ static boolean host_controls_initialize(void)
 	host_player_choose(NULL);
 	host_menu.chosen_game_row = NONE;
 	host_menu.chosen_map[0] = 0;
+	host_menu.gametype = NONE;
 	host_menu.chosen_entry = NONE;
 	host_menu.chosen_ban[0] = 0;
+	host_menu.chosen_bot_row = NONE;
+	host_menu.chosen_bot_valid = FALSE;
+	host_menu.chosen_rule = NONE;
 	host_menu.choosing = NONE;
 	host_menu.reason[0] = 0;
 	host_menu.confirm = _host_confirm_none;
@@ -907,6 +1322,7 @@ static boolean host_controls_initialize(void)
 	host_menu.focus_chosen = FALSE;
 	host_menu.focus_first = TRUE;
 	host_menu.tab_shown = NONE;
+	host_menu.lists_time = 0;
 	return TRUE;
 }
 
@@ -914,7 +1330,7 @@ static boolean host_controls_initialize(void)
 host's alone */
 static boolean host_controls_open(void)
 {
-	if (!network_host_controls_available())
+	if (!host_available())
 	{
 		ui_play_audio_feedback_sound(SOUND_ERROR);
 		return FALSE;
@@ -938,6 +1354,13 @@ static boolean host_controls_back(void)
 		ui_play_audio_feedback_sound(SOUND_CURSOR);
 		return FALSE;
 	}
+	/* (RULES: back to GAME) */
+	if (host_menu.tab == _host_tab_rules)
+	{
+		host_tab_set(_host_tab_game);
+		ui_play_audio_feedback_sound(SOUND_BACK);
+		return FALSE;
+	}
 	return TRUE;
 }
 
@@ -946,8 +1369,32 @@ static void host_entries_read(void)
 {
 	unsigned long now = system_milliseconds();
 
+	/* (an admin's: the server's, as it last told this machine; its lists
+	asked for as a tab that shows one opens, and every few seconds) */
+	if (host_remote())
+	{
+		host_menu.player_count = network_admin_players(host_menu.players, NUMBEROF(host_menu.players));
+		host_game_rows_read();
+		host_menu.bot_row_count = 0;
+		host_menu.bot_count = 0;
+		host_menu.rule_row_count = 0;
+		host_menu.map_count = network_admin_maps(&host_menu.maps);
+		host_menu.ban_count = network_admin_bans(host_menu.bans, host_menu.ban_lines, MAXIMUM_HOST_CONTROLS_BANS);
+		if ((host_menu.tab == _host_tab_maps || host_menu.tab == _host_tab_playlist || host_menu.tab == _host_tab_bans ||
+			host_menu.tab == _host_tab_game) && (!host_menu.lists_time || now - host_menu.lists_time >= 3000))
+		{
+			network_admin_send(_network_admin_lists, NONE, NULL, 0, NULL);
+			host_menu.lists_time = now ? now : 1;
+		}
+		return;
+	}
 	host_menu.player_count = network_host_controls_players(host_menu.players, NUMBEROF(host_menu.players));
 	host_game_rows_read();
+	host_menu.bot_row_count = network_host_controls_bot_rows(host_menu.bot_rows, NUMBEROF(host_menu.bot_rows));
+	host_menu.bot_count = host_menu.tab == _host_tab_bots ?
+		network_host_controls_bots(host_menu.bots, NUMBEROF(host_menu.bots)) : 0;
+	host_menu.rule_row_count = host_menu.tab == _host_tab_rules ?
+		network_host_rules_rows(host_menu.rule_rows, NUMBEROF(host_menu.rule_rows)) : 0;
 	if (host_menu.tab == _host_tab_maps)
 		host_menu.map_count = network_host_game_maps(&host_menu.maps);
 	if (host_menu.tab == _host_tab_bans && (!host_menu.bans_read || now - host_menu.bans_time >= HOST_CONTROLS_BANS_INTERVAL))
@@ -997,6 +1444,24 @@ static void host_choose(short entry)
 			host_menu.confirm = _host_confirm_none;
 		host_menu.chosen_entry = host_playlist_entry(entry);
 		break;
+	case _host_tab_bots:
+		if (entry < host_menu.bot_row_count)
+		{
+			if (host_menu.bot_rows[entry] != host_menu.chosen_bot_row)
+				host_menu.confirm = _host_confirm_none;
+			host_menu.chosen_bot_row = host_menu.bot_rows[entry];
+			host_menu.chosen_bot_valid = FALSE;
+			break;
+		}
+		if (!host_bot_chosen(&host_menu.bots[entry - host_menu.bot_row_count]))
+			host_menu.confirm = _host_confirm_none;
+		host_menu.chosen_bot_row = NONE;
+		host_menu.chosen_bot = host_menu.bots[entry - host_menu.bot_row_count];
+		host_menu.chosen_bot_valid = TRUE;
+		break;
+	case _host_tab_rules:
+		host_menu.chosen_rule = host_menu.rule_rows[entry];
+		break;
 	default:
 		if (strcmp(host_menu.ban_lines[entry], host_menu.chosen_ban))
 			host_menu.confirm = _host_confirm_none;
@@ -1018,6 +1483,10 @@ static short host_chosen_entry(void)
 			(host_menu.tab == _host_tab_maps && index > 0 &&
 				!strcmp(host_menu.maps[index - 1].level, host_menu.chosen_map)) ||
 			(host_menu.tab == _host_tab_playlist && host_playlist_entry(index) == host_menu.chosen_entry) ||
+			(host_menu.tab == _host_tab_rules && host_menu.rule_rows[index] == host_menu.chosen_rule) ||
+			(host_menu.tab == _host_tab_bots && (index < host_menu.bot_row_count ?
+				host_menu.bot_rows[index] == host_menu.chosen_bot_row :
+				host_bot_chosen(&host_menu.bots[index - host_menu.bot_row_count]))) ||
 			(host_menu.tab == _host_tab_bans && !strcmp(host_menu.ban_lines[index], host_menu.chosen_ban)))
 		{
 			return index;
@@ -1029,13 +1498,15 @@ static short host_chosen_entry(void)
 /* the column titles of the tab */
 static void host_headers_show(struct widget_instance *screen)
 {
-	static wchar_t const *const headers[NUMBER_OF_HOST_TABS][5] =
+	static wchar_t const *const headers[NUMBER_OF_HOST_TABS + 1][5] =
 	{
 		{ L"PLAYER", L"TEAM", L"SCORE", L"PING", L"" },
 		{ L"SETTING", L"", L"", L"", L"" },
 		{ L"MAP", L"", L"", L"", L"" },
 		{ L"MAP", L"", L"", L"", L"GAMETYPE" },
 		{ L"BANNED", L"", L"", L"", L"WHEN" },
+		{ L"BOTS", L"TEAM", L"SCORE", L"", L"" },
+		{ L"RULE", L"", L"", L"", L"" },
 	};
 	static char const *const names[5] = { "header_label", "header_team", "header_score", "header_ping",
 		"header_value" };
@@ -1100,13 +1571,54 @@ static void host_row_show(struct widget_instance *row, short row_index, short en
 		}
 		break;
 	}
+	case _host_tab_rules:
+		network_host_rules_row(host_menu.rule_rows[entry], label, value, help, HOST_CONTROLS_TEXT_LENGTH);
+		/* (SAVE AS GAMETYPE's name as it is typed) */
+		if (host_menu.rule_rows[entry] == _host_rule_save && text_field_editing(row))
+		{
+			typed = TRUE;
+			text_field_show(named(row, "host_item_value", 0), "", TRUE);
+		}
+		break;
+	case _host_tab_bots:
+		if (entry < host_menu.bot_row_count)
+		{
+			short bot_row = host_menu.bot_rows[entry];
+
+			network_host_controls_bot_row(bot_row, label, value, help, HOST_CONTROLS_TEXT_LENGTH);
+			if (bot_row == _host_bot_row_balance && host_confirming((short)(bot_row + HOST_CONFIRM_BOT_ROW)))
+				usnprintf(value, NUMBEROF(value) - 1, L"PRESS AGAIN");
+		}
+		else
+		{
+			struct host_controls_player const *bot = &host_menu.bots[entry - host_menu.bot_row_count];
+
+			ustrncpy(label, bot->name, NUMBEROF(label) - 1);
+			label[NUMBEROF(label) - 1] = 0;
+			if (host_game_teams() && bot->team != NONE)
+			{
+				usnprintf(team, NUMBEROF(team) - 1, L"%s", host_team_name(bot->team));
+				host_menu.row_teams[row_index] = (short)PIN(bot->team, 0, 1);
+			}
+			if (game_engine && bot->player_index != NONE)
+			{
+				wchar_t formatted[256];
+
+				formatted[0] = 0;
+				game_engine->format_player_score(bot->player_index, formatted);
+				ustrncpy(score, formatted, NUMBEROF(score) - 1);
+				score[NUMBEROF(score) - 1] = 0;
+			}
+		}
+		break;
 	case _host_tab_maps:
 		if (entry == 0)
 		{
-			struct host_game_gametype const *gametype = host_gametype();
+			wchar_t gametype[HOST_CONTROLS_TEXT_LENGTH];
 
+			host_gametype_shown(gametype, NUMBEROF(gametype));
 			usnprintf(label, NUMBEROF(label) - 1, L"GAMETYPE");
-			usnprintf(value, NUMBEROF(value) - 1, L"\x2039 %s \x203A", gametype ? gametype->shown : L"");
+			usnprintf(value, NUMBEROF(value) - 1, L"\x2039 %s \x203A", gametype);
 		}
 		else
 		{
@@ -1119,11 +1631,11 @@ static void host_row_show(struct widget_instance *row, short row_index, short en
 		break;
 	case _host_tab_playlist:
 	{
-		struct server_rotation const *playlist = network_host_game_playlist();
+		struct server_rotation const *playlist = host_playlist();
 		short index = host_playlist_entry(entry);
 		struct server_entry change;
 		struct server_entry const *shown;
-		long next = network_host_game_playlist_after(playlist, network_host_game_playlist_index());
+		long next = network_host_game_playlist_after(playlist, host_playlist_index());
 		wchar_t text[HOST_CONTROLS_TEXT_LENGTH];
 		wchar_t *dot;
 
@@ -1196,7 +1708,7 @@ static short host_buttons_of(struct host_controls_player const *player, short ch
 {
 	static short const order[] = { _host_controls_kick, _host_controls_ban, _host_controls_move_team,
 		_host_controls_mute };
-	boolean lobby = network_host_controls_in_lobby();
+	boolean lobby = host_lobby();
 	short shown = 0, index;
 
 	switch (host_menu.tab)
@@ -1223,13 +1735,13 @@ static short host_buttons_of(struct host_controls_player const *player, short ch
 		for (index = 0; index < NUMBEROF(order); index++)
 		{
 			if (TEST_FLAG(player->actions, order[index]))
-				buttons[shown++] = order[index] == _host_controls_mute && network_host_game_player_mute_minutes(player) ?
+				buttons[shown++] = order[index] == _host_controls_mute && host_muted(player) ?
 					_host_button_unmute : order[index];
 		}
 		break;
 	case _host_tab_maps:
 		/* (co-op plays the campaign's levels: no change) */
-		if (!host_chosen_map() || network_host_game_cooperative())
+		if (!host_chosen_map() || (!host_remote() && network_host_game_cooperative()))
 			break;
 		buttons[shown++] = _host_button_map_now;
 		if (!lobby)
@@ -1237,7 +1749,7 @@ static short host_buttons_of(struct host_controls_player const *player, short ch
 		buttons[shown++] = _host_button_map_add;
 		break;
 	case _host_tab_playlist:
-		if (chosen == NONE || network_host_game_cooperative())
+		if (chosen == NONE || (!host_remote() && network_host_game_cooperative()))
 			break;
 		if (host_menu.chosen_entry == HOST_PLAYLIST_CHANGE)
 		{
@@ -1248,11 +1760,17 @@ static short host_buttons_of(struct host_controls_player const *player, short ch
 		if (!lobby)
 			buttons[shown++] = _host_button_entry_next;
 		buttons[shown++] = _host_button_entry_remove;
-		buttons[shown++] = _host_button_playlist_clear;
+		/* (the server's rotation is never emptied) */
+		if (!host_remote())
+			buttons[shown++] = _host_button_playlist_clear;
 		break;
 	case _host_tab_bans:
 		if (chosen != NONE)
 			buttons[shown++] = _host_button_unban;
+		break;
+	case _host_tab_bots:
+		if (host_chosen_bot() && TEST_FLAG(host_chosen_bot()->actions, _host_controls_kick))
+			buttons[shown++] = _host_button_bot_remove;
 		break;
 	default:
 		break;
@@ -1263,7 +1781,7 @@ static short host_buttons_of(struct host_controls_player const *player, short ch
 /* a button's words */
 static void host_button_text(short action, struct host_controls_player const *player, wchar_t *text, short size)
 {
-	boolean lobby = network_host_controls_in_lobby();
+	boolean lobby = host_lobby();
 	boolean confirming = host_confirming((short)(action + HOST_CONFIRM_BUTTON));
 
 	text[0] = 0;
@@ -1334,6 +1852,9 @@ static void host_button_text(short action, struct host_controls_player const *pl
 	case _host_button_playlist_clear:
 		usnprintf(text, size - 1, confirming ? L"PRESS AGAIN" : L"CLEAR PLAYLIST");
 		break;
+	case _host_button_bot_remove:
+		usnprintf(text, size - 1, L"REMOVE BOT");
+		break;
 	default:
 		break;
 	}
@@ -1395,7 +1916,7 @@ static void host_panel_show(struct widget_instance *list, short chosen)
 	wchar_t title[HOST_CONTROLS_TEXT_LENGTH], where[HOST_CONTROLS_TEXT_LENGTH], status[HOST_CONTROLS_TEXT_LENGTH];
 	struct host_controls_player const *player = NULL;
 	boolean notice = host_menu.notice_time && system_milliseconds() - host_menu.notice_time < HOST_CONTROLS_NOTICE_TIME;
-	boolean lobby = network_host_controls_in_lobby();
+	boolean lobby = host_lobby();
 
 	title[0] = where[0] = status[0] = 0;
 	switch (host_menu.tab)
@@ -1436,8 +1957,8 @@ static void host_panel_show(struct widget_instance *list, short chosen)
 		else if (!lobby && game_engine_running() && game_engine_has_teams() &&
 			!TEST_FLAG(player->actions, _host_controls_move_team))
 		{
-			usnprintf(status, NUMBEROF(status) - 1, network_standard_hosting() ?
-				L"Players move teams only when everyone is on OpenH1." :
+			usnprintf(status, NUMBEROF(status) - 1, (host_remote() ? host_flag(_network_admin_flag_standard) :
+				network_standard_hosting()) ? L"Players move teams only when everyone is on OpenH1." :
 				L"Players can't move teams in a Legacy game.");
 		}
 		break;
@@ -1460,23 +1981,25 @@ static void host_panel_show(struct widget_instance *list, short chosen)
 	case _host_tab_maps:
 	{
 		struct host_game_map const *map = host_chosen_map();
-		struct host_game_gametype const *gametype = host_gametype();
+		wchar_t gametype[HOST_CONTROLS_TEXT_LENGTH];
 
+		host_gametype_shown(gametype, NUMBEROF(gametype));
 		if (!map)
 		{
 			usnprintf(title, NUMBEROF(title) - 1, L"Maps");
-			usnprintf(where, NUMBEROF(where) - 1, L"%s", gametype ? gametype->shown : L"");
-			if (network_host_game_maps_left_out())
+			usnprintf(where, NUMBEROF(where) - 1, L"%s", gametype);
+			if (!host_remote() && network_host_game_maps_left_out())
 				usnprintf(status, NUMBEROF(status) - 1, L"%ld more maps aren't listed: the list holds %d.",
 					network_host_game_maps_left_out(), MAXIMUM_HOST_GAME_MAPS);
 			else
-				usnprintf(status, NUMBEROF(status) - 1, L"Choose the gametype (left and right), then a map: play "
-					L"it now, after this game, or add it to the playlist.");
+				usnprintf(status, NUMBEROF(status) - 1, host_gametype() ? L"Choose the gametype (left and right), "
+					L"then a map: play it now, after this game, or add it to the playlist." :
+					L"CURRENT keeps this game's gametype, score, time and rules. Choose a map, or another gametype "
+					L"(left and right).");
 			break;
 		}
 		lobby_board_map_text(map->level, title, NUMBEROF(title));
-		usnprintf(where, NUMBEROF(where) - 1, L"%s%s", gametype ? gametype->shown : L"",
-			map->custom ? L"\r\nCustom Edition" : L"");
+		usnprintf(where, NUMBEROF(where) - 1, L"%s%s", gametype, map->custom ? L"\r\nCustom Edition" : L"");
 		if (host_confirming((short)(_host_button_map_now + HOST_CONFIRM_BUTTON)))
 			usnprintf(status, NUMBEROF(status) - 1, L"Press PLAY NOW again: this game ends, with no scores, and "
 				L"this one starts.");
@@ -1487,7 +2010,7 @@ static void host_panel_show(struct widget_instance *list, short chosen)
 	}
 	case _host_tab_playlist:
 	{
-		struct server_rotation const *playlist = network_host_game_playlist();
+		struct server_rotation const *playlist = host_playlist();
 
 		if (chosen == NONE)
 		{
@@ -1524,6 +2047,59 @@ static void host_panel_show(struct widget_instance *list, short chosen)
 			else
 				usnprintf(status, NUMBEROF(status) - 1, lobby ? L"Play it in this lobby, or take it out." :
 					L"Play it now or next, or take it out.");
+		}
+		break;
+	}
+	case _host_tab_rules:
+		if (chosen != NONE)
+		{
+			wchar_t label[HOST_CONTROLS_TEXT_LENGTH];
+
+			network_host_rules_row(host_menu.rule_rows[chosen], label, where, status, HOST_CONTROLS_TEXT_LENGTH);
+			ustrncpy(title, label, NUMBEROF(title) - 1);
+			title[NUMBEROF(title) - 1] = 0;
+		}
+		else
+		{
+			usnprintf(title, NUMBEROF(title) - 1, L"Rules");
+			usnprintf(status, NUMBEROF(status) - 1, lobby ? L"The lobby's game's rules. B goes back to GAME." :
+				L"Change the rules while the game plays. B goes back to GAME.");
+		}
+		break;
+	case _host_tab_bots:
+	{
+		struct host_controls_player const *bot = host_chosen_bot();
+
+		if (chosen != NONE && host_menu.chosen_bot_row != NONE)
+		{
+			wchar_t label[HOST_CONTROLS_TEXT_LENGTH];
+
+			network_host_controls_bot_row(host_menu.chosen_bot_row, label, where, status, HOST_CONTROLS_TEXT_LENGTH);
+			ustrncpy(title, label, NUMBEROF(title) - 1);
+			title[NUMBEROF(title) - 1] = 0;
+			if (host_menu.chosen_bot_row == _host_bot_row_balance &&
+				host_confirming((short)(host_menu.chosen_bot_row + HOST_CONFIRM_BOT_ROW)))
+			{
+				usnprintf(status, NUMBEROF(status) - 1, L"Press again: those who move die and respawn.");
+			}
+		}
+		else if (bot)
+		{
+			ustrncpy(title, bot->name, NUMBEROF(title) - 1);
+			title[NUMBEROF(title) - 1] = 0;
+			usnprintf(where, NUMBEROF(where) - 1, L"A bot%s%s%s", host_game_teams() && bot->team != NONE ?
+				L"\r\n" : L"", host_game_teams() && bot->team != NONE ? host_team_name(bot->team) : L"",
+				host_game_teams() && bot->team != NONE ? L" team" : L"");
+			usnprintf(status, NUMBEROF(status) - 1, TEST_FLAG(bot->actions, _host_controls_kick) ?
+				L"Take it out of the game: one bot fewer plays." : L"The matchmaking playlist keeps its bots.");
+		}
+		else
+		{
+			usnprintf(title, NUMBEROF(title) - 1, L"Bots");
+			usnprintf(status, NUMBEROF(status) - 1, !network_host_controls_bots_play() ?
+				L"Bots do not play Race: these apply from the next game." : lobby ?
+				L"Change the bots before the game starts. Choose a bot to take it out." :
+				L"Change the bots while the game plays. Choose a bot to take it out.");
 		}
 		break;
 	}
@@ -1575,6 +2151,14 @@ static void host_controls_update(struct widget_instance *list)
 	short opening_tab;
 	wchar_t text[HOST_CONTROLS_TEXT_LENGTH];
 
+	/* (an admin's request the server refused: why, in the panel) */
+	{
+		boolean ok;
+		char said[NETWORK_ADMIN_RESULT_SIZE];
+
+		if (network_admin_take_result(&ok, said, sizeof(said)) && !ok)
+			host_notice_text(said);
+	}
 	/* (an opening's tab and player: the scoreboard's, the console's) */
 	if (network_host_controls_take_opening(&opening_player, &opening_tab))
 	{
@@ -1583,6 +2167,11 @@ static void host_controls_update(struct widget_instance *list)
 		host_menu.chosen_player = opening_player;
 		host_menu.focus_chosen = opening_player != NONE;
 	}
+	/* (BOTS gone: co-op, or no longer the host's; RULES, back to GAME) */
+	if (host_menu.tab == _host_tab_bots && !network_host_controls_bots_tab())
+		host_tab_set(_host_tab_players);
+	if (host_menu.tab == _host_tab_rules && !network_host_rules_available())
+		host_tab_set(_host_tab_game);
 	host_entries_read();
 	/* (the player a ban's or mute's length, or a ban's reason, was being
 	chosen for gone: none of it kept for whoever comes next) */
@@ -1664,6 +2253,8 @@ static void host_controls_update(struct widget_instance *list)
 	{
 		text_field_end(FALSE);
 	}
+	if (text_field_editing(NULL) && host_menu.tab == _host_tab_rules && host_menu.chosen_rule != _host_rule_save)
+		text_field_end(FALSE);
 	/* (the focus off what is hidden: the first row, else the tabs) */
 	if (!focused || !focused->visible)
 	{
@@ -1675,34 +2266,50 @@ static void host_controls_update(struct widget_instance *list)
 	{
 		struct widget_instance *strip = named(list, "host_tabs", 0);
 
-		/* (a tab chosen by LB or RB, or opened on, takes the strip's focus) */
+		/* (a tab chosen by LB or RB, or opened on, takes the strip's focus;
+		RULES shows GAME's) */
+		short strip_tab = host_menu.tab == _host_tab_rules ? _host_tab_game : host_menu.tab;
+
 		if (strip && host_menu.tab_shown != host_menu.tab)
 		{
 			struct widget_instance *tab = strip->child;
 
-			for (index = 0; tab && index < host_menu.tab; index++)
+			for (index = 0; tab && index < strip_tab; index++)
 				tab = tab->next;
 			if (tab)
 			{
 				strip->focused_child = tab;
-				strip->parameters.list.selected_index = host_menu.tab;
+				strip->parameters.list.selected_index = strip_tab;
 			}
 		}
 		host_menu.tab_shown = host_menu.tab;
-		menu_tabs_show(strip, host_menu.tab);
+		menu_tabs_show(strip, strip_tab);
+		/* (BOTS, the last tab, the host's but in co-op) */
+		if (strip)
+		{
+			struct widget_instance *tab = strip->child;
+
+			for (index = 0; tab && index < _host_tab_bots; index++)
+				tab = tab->next;
+			visible_set(tab, network_host_controls_bots_tab());
+			focus_off_hidden(strip);
+		}
 	}
 	/* (the players, and the game's kind: its tick rate, or LEGACY; in the
 	lobby, so said) */
-	if (network_standard_hosting())
+	if (host_remote() ? host_flag(_network_admin_flag_standard) : network_standard_hosting())
 	{
+		struct network_admin_state state;
+		long rate = network_admin_remote_state(&state) ? state.rate : network_standard_server_rate(FALSE);
+
 		usnprintf(text, NUMBEROF(text) - 1, L"%d %s    %ld TICK%s", host_menu.player_count,
-			host_menu.player_count == 1 ? L"PLAYER" : L"PLAYERS", network_standard_server_rate(FALSE),
-			network_host_controls_in_lobby() ? L"    LOBBY" : L"");
+			host_menu.player_count == 1 ? L"PLAYER" : L"PLAYERS", rate,
+			host_lobby() ? L"    LOBBY" : L"");
 	}
 	else
 	{
 		usnprintf(text, NUMBEROF(text) - 1, L"%d %s    LEGACY%s", host_menu.player_count,
-			host_menu.player_count == 1 ? L"PLAYER" : L"PLAYERS", network_host_controls_in_lobby() ? L"    LOBBY" : L"");
+			host_menu.player_count == 1 ? L"PLAYER" : L"PLAYERS", host_lobby() ? L"    LOBBY" : L"");
 	}
 	text[NUMBEROF(text) - 1] = 0;
 	menu_text_box_fit(named(screen, "host_counts", 0), text, 0);
@@ -1710,7 +2317,7 @@ static void host_controls_update(struct widget_instance *list)
 	visible_set(named(screen, "host_empty", 0), count == 0);
 	if (!count)
 	{
-		menu_text_box_wrap(named(screen, "host_empty", 0), !network_host_controls_available() ?
+		menu_text_box_wrap(named(screen, "host_empty", 0), !host_available() ?
 			L"The game is over." : host_menu.tab == _host_tab_bans ? L"No one is banned." :
 			host_menu.tab == _host_tab_playlist ? L"No games yet: add them from MAPS." : L"Nothing here.", 3);
 	}
@@ -1722,7 +2329,19 @@ static boolean host_controls_tab(struct widget_instance *widget, short step)
 	/* (not while a row's words are typed: its keys are the typing's) */
 	if (text_field_editing(NULL))
 		return TRUE;
-	host_tab_set(step ? (short)(host_menu.tab + step) : sibling_index(widget));
+	if (step)
+	{
+		/* (from RULES, as from GAME) */
+		short from = host_menu.tab == _host_tab_rules ? _host_tab_game : host_menu.tab;
+		short tab = (short)((from + step + NUMBER_OF_HOST_TABS) % NUMBER_OF_HOST_TABS);
+
+		/* (BOTS hidden: past it) */
+		if (tab == _host_tab_bots && !network_host_controls_bots_tab())
+			tab = (short)((tab + step + NUMBER_OF_HOST_TABS) % NUMBER_OF_HOST_TABS);
+		host_tab_set(tab);
+	}
+	else
+		host_tab_set(sibling_index(widget));
 	ui_play_audio_feedback_sound(SOUND_CURSOR);
 	return TRUE;
 }
@@ -1765,13 +2384,19 @@ static boolean host_controls_row(struct widget_instance *row)
 		host_game_row_change(row, host_menu.game_rows[entry], 0);
 		return TRUE;
 	}
+	if (host_menu.tab == _host_tab_bots && entry < host_menu.bot_row_count)
+	{
+		host_bot_row_change(host_menu.bot_rows[entry], 0);
+		return TRUE;
+	}
+	if (host_menu.tab == _host_tab_rules)
+	{
+		host_rule_change(row, host_menu.rule_rows[entry], 0);
+		return TRUE;
+	}
 	if (host_menu.tab == _host_tab_maps && entry == 0)
 	{
-		struct host_game_gametype const *gametypes;
-		short gametype_count = network_host_game_gametypes(&gametypes);
-
-		if (gametype_count)
-			host_menu.gametype = (short)((host_menu.gametype + 1) % gametype_count);
+		host_gametype_step(1);
 		ui_play_audio_feedback_sound(SOUND_CURSOR);
 		return TRUE;
 	}
@@ -1792,13 +2417,24 @@ static boolean host_controls_step(struct widget_instance *row, short step)
 		return FALSE;
 	if (host_menu.tab == _host_tab_maps && entry == 0)
 	{
-		struct host_game_gametype const *gametypes;
-		short count = network_host_game_gametypes(&gametypes);
-
-		if (!count)
-			return FALSE;
-		host_menu.gametype = (short)((host_menu.gametype + step + count) % count);
+		host_gametype_step(step);
 		ui_play_audio_feedback_sound(SOUND_CURSOR);
+		return TRUE;
+	}
+	if (host_menu.tab == _host_tab_rules)
+	{
+		if (host_menu.rule_rows[entry] == _host_rule_save)
+			return FALSE;
+		host_choose(entry);
+		host_rule_change(row, host_menu.rule_rows[entry], step);
+		return TRUE;
+	}
+	if (host_menu.tab == _host_tab_bots)
+	{
+		if (entry >= host_menu.bot_row_count || host_menu.bot_rows[entry] == _host_bot_row_balance)
+			return FALSE;
+		host_choose(entry);
+		host_bot_row_change(host_menu.bot_rows[entry], step);
 		return TRUE;
 	}
 	if (host_menu.tab != _host_tab_game)
@@ -1809,6 +2445,7 @@ static boolean host_controls_step(struct widget_instance *row, short step)
 	case _host_game_end:
 	case _host_game_restart:
 	case _host_game_change_map:
+	case _host_game_change_rules:
 	case _host_game_shuffle_teams:
 	case _host_game_balance_teams:
 	case _host_game_announce:
@@ -1826,12 +2463,21 @@ static boolean host_play(char const *text, short when, long playlist_index)
 {
 	char reason[SERVER_REASON_SIZE];
 
+	/* (an admin's: the server's sv_map, or sv_map_after) */
+	if (host_remote())
+	{
+		if (!host_ask(when == _host_game_now ? _network_admin_map_now : _network_admin_map_after, NULL, 0, text))
+			return FALSE;
+		host_notice(host_lobby() ? L"The lobby plays it now." : when == _host_game_now ? L"The server plays it now." :
+			L"It plays after this game.", NULL);
+		return TRUE;
+	}
 	if (!network_host_game_change(text, when, playlist_index, reason, sizeof(reason)))
 	{
 		host_notice_text(reason);
 		return FALSE;
 	}
-	if (network_host_controls_in_lobby())
+	if (host_lobby())
 		host_notice(L"The lobby plays it now.", NULL);
 	else if (when == _host_game_now && !strncmp(reason, "now", 3))
 	{
@@ -1876,7 +2522,7 @@ static boolean host_controls_action(struct widget_instance *button)
 	switch (action)
 	{
 	case _host_controls_kick:
-		if (!player || !network_host_game_kick_player(player, FALSE, 0, NULL))
+		if (!player || !host_kick(player, FALSE, 0, NULL))
 			break;
 		host_notice(L"%s was kicked.", name);
 		ui_play_audio_feedback_sound(SOUND_FORWARD);
@@ -1893,7 +2539,7 @@ static boolean host_controls_action(struct widget_instance *button)
 	case _host_button_ban_hour:
 	case _host_button_ban_day:
 	case _host_button_ban_forever:
-		if (!player || !network_host_game_kick_player(player, TRUE, action == _host_button_ban_hour ? HOST_BAN_HOUR :
+		if (!player || !host_kick(player, TRUE, action == _host_button_ban_hour ? HOST_BAN_HOUR :
 			action == _host_button_ban_day ? HOST_BAN_DAY : 0, host_menu.reason))
 		{
 			break;
@@ -1910,7 +2556,7 @@ static boolean host_controls_action(struct widget_instance *button)
 	case _host_button_mute_short:
 	case _host_button_mute_hour:
 	case _host_button_mute_day:
-		if (!player || !network_host_game_mute_player(player, action == _host_button_mute_short ? HOST_MUTE_SHORT :
+		if (!player || !host_mute(player, action == _host_button_mute_short ? HOST_MUTE_SHORT :
 			action == _host_button_mute_hour ? HOST_MUTE_HOUR : HOST_MUTE_DAY))
 		{
 			break;
@@ -1921,7 +2567,7 @@ static boolean host_controls_action(struct widget_instance *button)
 		ui_play_audio_feedback_sound(SOUND_FORWARD);
 		return TRUE;
 	case _host_button_unmute:
-		if (!player || !network_host_game_mute_player(player, 0))
+		if (!player || !host_mute(player, 0))
 			break;
 		host_notice(L"%s can talk again.", name);
 		ui_play_audio_feedback_sound(SOUND_FORWARD);
@@ -1932,17 +2578,17 @@ static boolean host_controls_action(struct widget_instance *button)
 		ui_play_audio_feedback_sound(SOUND_CURSOR);
 		return TRUE;
 	case _host_controls_move_team:
-		if (!player || !network_host_game_move_player(player))
+		if (!player || !host_move(player))
 			break;
 		host_notice(player->team == 1 ? L"%s moves to Red." : L"%s moves to Blue.", name);
 		ui_play_audio_feedback_sound(SOUND_FORWARD);
 		return TRUE;
 	case _host_button_map_now:
 	case _host_button_map_after:
-		if (!host_map_entry_text(map, text, sizeof(text)))
+		if (!host_map_entry_text(map, FALSE, text, sizeof(text)))
 			break;
 		/* (now, in a game: pressed twice, as it ends) */
-		if (action == _host_button_map_now && !network_host_controls_in_lobby() &&
+		if (action == _host_button_map_now && !host_lobby() &&
 			!host_confirmed((short)(action + HOST_CONFIRM_BUTTON)))
 		{
 			return TRUE;
@@ -1952,8 +2598,23 @@ static boolean host_controls_action(struct widget_instance *button)
 		ui_play_audio_feedback_sound(SOUND_FORWARD);
 		return TRUE;
 	case _host_button_map_add:
-		if (!host_map_entry_text(map, text, sizeof(text)))
+		if (!map)
 			break;
+		/* (a playlist's entry names its gametype: CURRENT's, if the list has
+		it) */
+		if (!host_map_entry_text(map, TRUE, text, sizeof(text)))
+		{
+			host_notice(L"Choose a gametype (left and right) to add this map to the playlist.", NULL);
+			break;
+		}
+		if (host_remote())
+		{
+			if (!host_ask(_network_admin_rotation_add, NULL, 0, text))
+				break;
+			host_notice(L"Added to the server's rotation.", NULL);
+			ui_play_audio_feedback_sound(SOUND_FORWARD);
+			return TRUE;
+		}
 		if (!network_host_game_playlist_add(text, reason, sizeof(reason)))
 		{
 			host_notice_text(reason);
@@ -1962,7 +2623,7 @@ static boolean host_controls_action(struct widget_instance *button)
 		{
 			wchar_t count[16];
 
-			usnprintf(count, NUMBEROF(count) - 1, L"%d", network_host_game_playlist()->count);
+			usnprintf(count, NUMBEROF(count) - 1, L"%d", host_playlist()->count);
 			count[NUMBEROF(count) - 1] = 0;
 			host_notice(L"Added: the playlist has %s games.", count);
 		}
@@ -1971,11 +2632,11 @@ static boolean host_controls_action(struct widget_instance *button)
 	case _host_button_entry_now:
 	case _host_button_entry_next:
 	{
-		struct server_rotation const *playlist = network_host_game_playlist();
+		struct server_rotation const *playlist = host_playlist();
 
 		if (host_menu.chosen_entry < 0 || host_menu.chosen_entry >= playlist->count)
 			break;
-		if (action == _host_button_entry_now && !network_host_controls_in_lobby() &&
+		if (action == _host_button_entry_now && !host_lobby() &&
 			!host_confirmed((short)(action + HOST_CONFIRM_BUTTON)))
 		{
 			return TRUE;
@@ -1990,8 +2651,11 @@ static boolean host_controls_action(struct widget_instance *button)
 		return TRUE;
 	}
 	case _host_button_entry_remove:
-		if (!network_host_game_playlist_remove(host_menu.chosen_entry))
+		if (host_remote() ? !host_ask(_network_admin_rotation_remove, NULL, host_menu.chosen_entry, NULL) :
+			!network_host_game_playlist_remove(host_menu.chosen_entry))
+		{
 			break;
+		}
 		host_notice(L"Taken out of the playlist.", NULL);
 		host_menu.chosen_entry = NONE;
 		ui_play_audio_feedback_sound(SOUND_FORWARD);
@@ -2011,8 +2675,47 @@ static boolean host_controls_action(struct widget_instance *button)
 		host_menu.chosen_entry = NONE;
 		ui_play_audio_feedback_sound(SOUND_FORWARD);
 		return TRUE;
+	case _host_button_bot_remove:
+	{
+		struct host_controls_player *bot = host_chosen_bot();
+
+		if (!bot)
+			break;
+		ustrncpy(name, bot->name, NUMBEROF(name) - 1);
+		name[NUMBEROF(name) - 1] = 0;
+		if (!host_kick(bot, FALSE, 0, NULL))
+			break;
+		host_notice(L"%s left the game.", name);
+		host_menu.chosen_bot_valid = FALSE;
+		ui_play_audio_feedback_sound(SOUND_FORWARD);
+		return TRUE;
+	}
 	case _host_button_unban:
-		if (!host_menu.chosen_ban[0] || !network_host_controls_unban(host_menu.chosen_ban))
+		if (!host_menu.chosen_ban[0])
+			break;
+		/* (an admin's: the ban's number in the server's bans.txt) */
+		if (host_remote())
+		{
+			short index;
+
+			if (!host_ask(_network_admin_unban, NULL, atol(host_menu.chosen_ban), NULL))
+				break;
+			for (index = 0; index < host_menu.ban_count; index++)
+			{
+				if (!strcmp(host_menu.ban_lines[index], host_menu.chosen_ban))
+				{
+					wchar_t names[HOST_CONTROLS_TEXT_LENGTH];
+
+					text_to_wide(host_menu.bans[index].players[0] ? host_menu.bans[index].players :
+						host_menu.bans[index].address, names, HOST_CONTROLS_TEXT_LENGTH);
+					host_notice(L"%s can join again.", names);
+				}
+			}
+			host_menu.chosen_ban[0] = 0;
+			ui_play_audio_feedback_sound(SOUND_FORWARD);
+			return TRUE;
+		}
+		if (!network_host_controls_unban(host_menu.chosen_ban))
 			break;
 		{
 			struct host_controls_ban ban;

@@ -12,8 +12,12 @@ caught, and the tracking compares page contents instead
 (host_watch_hash.c).
 
 The guest names its ranges with guest addresses (host.h); the pages
-protected are the host's (4 KB on Linux and Android, 16 KB on macOS), so on
-a host with larger pages a write marks a little more than it touched.
+protected are the host's (the kernel's: 4 KB, or 16 KB on macOS, iOS and
+the Android and ARM Linux kernels that use them, 64 KB on some ARM Linux
+ones), so on a host with larger pages a write marks a little more than it
+touched. The guest asks the size (memory_watch_page_size): its vertex
+mirror (d3d8_device.c) watches pages of it, so that a page it uploads is one
+the tracking protects alone.
 
 The renderer's texture cache can be on the host's render thread
 (port/macos/xgpu_metal_textures.c), which protects pages and reads their
@@ -69,6 +73,13 @@ static uint64_t watch_page_size(void)
 	return watch_hashing ? WATCH_HASH_PAGE_SIZE : host_page_size();
 }
 
+/* memory_watch_page_size: the bytes each generation and protection covers
+(a host page, or the hashing's page) */
+uint32_t host_memory_watch_page_size(void)
+{
+	return (uint32_t)watch_page_size();
+}
+
 static uint64_t watch_page_count(void)
 {
 	return HALO_GUEST_WINDOW_SIZE / watch_page_size();
@@ -117,6 +128,15 @@ static void mark_written(uint64_t page)
 	mprotect(address, host_page_size(), host_memory_window_protection((uintptr_t)address));
 }
 
+/* the write tracking's faults taken (host_memory_watch_faults): each a
+signal through the kernel, cheap on a Mac, dear on an iPhone */
+static volatile uint64_t faults_taken;
+
+uint64_t host_memory_watch_faults(void)
+{
+	return __atomic_load_n(&faults_taken, __ATOMIC_RELAXED);
+}
+
 int host_memory_watch_fault(uintptr_t address)
 {
 	uint64_t guest;
@@ -136,6 +156,7 @@ int host_memory_watch_fault(uintptr_t address)
 	}
 	mark_written(watch_page(guest));
 	pages_unlock();
+	__atomic_add_fetch(&faults_taken, 1, __ATOMIC_RELAXED);
 	return 1;
 }
 
@@ -296,13 +317,19 @@ void host_memory_watch_protect(uint32_t address, uint32_t size)
 		return;
 	}
 	pages_lock();
+	/* (each run of pages not protected yet in one call: a call is a system
+	call and the other threads' address translations flushed, which page by
+	page took milliseconds for a load zone's structure, hundreds of pages) */
 	for (page = first; page <= last; page++)
 	{
-		if (!page_protected[page])
-		{
-			page_protected[page] = 1;
-			mprotect(page_address(page), host_page_size(), PROT_READ);
-		}
+		uint64_t run;
+
+		if (page_protected[page])
+			continue;
+		for (run = page; run <= last && !page_protected[run]; run++)
+			page_protected[run] = 1;
+		mprotect(page_address(page), (size_t)(run - page) * host_page_size(), PROT_READ);
+		page = run - 1;
 	}
 	pages_unlock();
 }
@@ -349,10 +376,24 @@ void host_memory_watch_prepare_write(uint32_t address, uint32_t size)
 	if (last >= watch_page_count())
 		last = watch_page_count() - 1;
 	pages_lock();
+	/* (each run of protected pages of one protection let go of in one call,
+	as host_memory_watch_protect protects them) */
 	for (page = first; page <= last; page++)
 	{
-		if (page_protected[page])
-			mark_written(page);
+		uint64_t run;
+		int protection;
+
+		if (!page_protected[page])
+			continue;
+		protection = host_memory_window_protection((uintptr_t)page_address(page));
+		for (run = page; run <= last && page_protected[run] &&
+			host_memory_window_protection((uintptr_t)page_address(run)) == protection; run++)
+		{
+			page_generation[run] = __sync_add_and_fetch(&current_generation, 1);
+			page_protected[run] = 0;
+		}
+		mprotect(page_address(page), (size_t)(run - page) * host_page_size(), protection);
+		page = run - 1;
 	}
 	pages_unlock();
 }

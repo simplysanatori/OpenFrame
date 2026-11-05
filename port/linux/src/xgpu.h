@@ -49,6 +49,10 @@ struct nv2a_vertex_lighting
 	the point lights, the same as theirs; world_found FALSE if none */
 	BOOL world_found;
 	unsigned long world_instruction, world_register;
+	/* (the backends': lit for each vertex, the ambient and distant lights'
+	sum and the point lights' handed on apart, for the pixel shader's
+	ambient occlusion: XGPU_AMBIENT_OCCLUSION_LIGHT_VERTEX) */
+	BOOL split;
 };
 
 /* the lights value of a structure's (the environment's) lightmap pass lit
@@ -158,6 +162,10 @@ struct nv2a_pixel_shader_key
 	model's lighting lit for each pixel in place of its two point lights; 0
 	none */
 	unsigned char dynamic_lights;
+	/* display.ambient_occlusion's occlusion multiplies the draw's ambient
+	light alone, not the light its lights add (XGPU_AMBIENT_OCCLUSION_LIGHT_*,
+	below); 0 none */
+	unsigned char ambient_occlusion;
 	/* the VR mode's effects (d3d8_device.c halo_vr_effect_depth, the
 	backend's xgpu_spirv.h XGPU_SPIRV_EFFECT_*): an effect drawn into both
 	eyes soft against the scene's depth (1), and thick (2); 0 none */
@@ -171,8 +179,131 @@ struct nv2a_pixel_shader_key
 their own (the vertex shader's 192 would pass the least fragment uniform
 space a GPU must have): [0] c[-82] (the translucency in z), [1] to [11] c[-79] to
 c[-69] (rasterizer_set_model_lighting's two point lights, two distant
-lights and the ambient light) */
-#define XGPU_MODEL_LIGHT_COUNT 12
+lights and the ambient light), [12] c[-57] (with the enhanced dynamic
+lights, the lights the model is not lit by: its object's own that say so,
+as four light indices, -1 none: halo_dynamic_lights.h) */
+#define XGPU_MODEL_LIGHT_COUNT 13
+#define XGPU_MODEL_LIGHT_OWN_LIGHTS 12
+
+/* ---------- display.ambient_occlusion in the light
+
+The occlusion (found from the 3D view's depth before its opaque surfaces
+shade: d3d8_device.c's halo_screen_ambient_occlusion_begin) is the share of
+the ambient light that reaches a pixel, so it multiplies that light alone,
+in the shaders that light the surfaces, never what a light adds (the
+flashlight, a plasma bolt's glow, the enhanced dynamic lights): the pixel
+key's ambient_occlusion, the occlusion read at the pixel from the
+backend's image of it (XGPU_SPIRV_BINDING_AMBIENT_OCCLUSION,
+XGPU_MSL_TEXTURE_AMBIENT_OCCLUSION; white where none is found):
+
+- XGPU_AMBIENT_OCCLUSION_LIGHT_MODEL: a model lit for each pixel
+  (per_pixel_lighting): its ambient and distant lights (the level's light
+  about it, sampled from the lightmap) by the occlusion, its two point
+  lights or the enhanced dynamic lights added after;
+- XGPU_AMBIENT_OCCLUSION_LIGHT_VERTEX: a model lit for each vertex, as the
+  Xbox lit it: the vertex shader lights it as its program does, but hands
+  on the ambient and distant lights' sum and the point lights' apart
+  (XGPU_LIGHTING_MODEL_SPLIT), and the pixel shader adds them, the first by
+  the occlusion; the program's own sum clamps each vertex's light, which
+  no pixel could take apart again;
+- XGPU_AMBIENT_OCCLUSION_LIGHT_LIGHTMAP: a structure's lightmap pass, its
+  light (the lightmap, before the textures multiply it) by the occlusion,
+  the enhanced dynamic lights added after. */
+enum
+{
+	XGPU_AMBIENT_OCCLUSION_LIGHT_NONE,
+	XGPU_AMBIENT_OCCLUSION_LIGHT_MODEL,
+	XGPU_AMBIENT_OCCLUSION_LIGHT_VERTEX,
+	XGPU_AMBIENT_OCCLUSION_LIGHT_LIGHTMAP,
+};
+
+/* ---------- display.ambient_occlusion "world" in the light
+
+The same three lights (XGPU_AMBIENT_OCCLUSION_LIGHT_*, the key's low bits:
+XGPU_AMBIENT_OCCLUSION_LIGHT_OF) multiplied by the occlusion found in the
+world at the pixel instead of GTAO's texel, where the key has
+XGPU_AMBIENT_OCCLUSION_WORLD (docs/world-ao.md, "Shading";
+port/linux/game/world_ao.c). The pixel's world position p and normal n
+(the lighting's: a model's, or the lightmap pass's own, XGPU_LIGHTING_
+ENVIRONMENT) read the window's block (xgpu_stream.h's struct
+xgpu_world_ao_block: XGPU_SPIRV_BINDING_WORLD_AO, XGPU_MSL_BUFFER_WORLD_AO)
+and the structure's distance field (XGPU_SPIRV_BINDING_WORLD_SDF,
+XGPU_MSL_TEXTURE_WORLD_SDF), and the draw's object its uniforms' world_ao
+(its owner slot among the proxies', -1 none; its reference):
+
+  A_sdf   = 1 - clamp(K sum_i 2^-i clamp((h_i - d(p + n h_i)) / h_i, 0, 1), 0, 1),
+            h_i = max(STEP, voxel) 2^(i-1), i = 1 to TAPS
+  A_obj   = mix(A_sdf, clamp(A_sdf / max(reference, REFERENCE_LEAST), 0, 1), reference_weight)
+  A_prox  = prod over the proxies of other owners within reach (1 - occlusion_i fade_i),
+            fade_i = clamp((reach_i - |p - c_i|) / (REACH_FADE reach_i), 0, 1), c_i its
+            centre (a sphere's and a box's a, a capsule's segment's middle); a box's
+            fade_i its bound's (world_proxy_box_fade), and none where that is 0;
+            the proxies those of the pixel's cell of the block's grid alone
+            (XGPU_WORLD_AO_GRID_*), lowest first: the same product
+  models:   A = mix(1, max(mix(1, A_obj, field_fade) A_prox, FLOOR), strength_objects)
+  lightmap: A = mix(1, max(A_prox, FLOOR), strength_level)          (never the field)
+
+d is the field's distance, read as world_sdf_sample reads it
+(world_sdf_bake.c): the field is sparse (world_sdf.h), a table of cells
+(XGPU_SPIRV_BINDING_WORLD_SDF_TABLE, XGPU_MSL_TEXTURE_WORLD_SDF_TABLE: RGBA8,
+an atlas brick's x, y, z and the cell's kind, XGPU_WORLD_SDF_CELL_*) of
+XGPU_WORLD_SDF_BRICK voxels' steps a side, and an atlas of bricks of
+XGPU_WORLD_SDF_BRICK_SPAN voxels a side, XGPU_WORLD_SDF_ATLAS by
+XGPU_WORLD_SDF_ATLAS a layer (the block's field[1].w layers); at p, in
+voxels c = clamp((p - field[0].xyz) field[0].w, 0, 8 field[1].xyz), its cell
+min(floor(c / 8), field[1].xyz - 1): a cell outside is +range, inside
+-range, a brick its texel at its place times 9 plus c - 8 cell plus a half,
+filtered, times range = RANGE_VOXELS / field[0].w. occlusion_i is
+world_proxy_occlusion's (world_proxies.c), reach_i world_proxy_reach's;
+world_ao.c's world_ao_occlusion is the whole of it on the CPU, line for
+line. With XGPU_AMBIENT_OCCLUSION_WORLD_VIEW too (debug.world_ao_view) the
+draw shows A in grey. */
+#define XGPU_AMBIENT_OCCLUSION_WORLD 0x10
+#define XGPU_AMBIENT_OCCLUSION_WORLD_VIEW 0x20
+#define XGPU_AMBIENT_OCCLUSION_LIGHT_OF(value) ((value) & 0x0f)
+#define XGPU_WORLD_AO_K 1.6f
+#define XGPU_WORLD_AO_STEP 0.15f
+#define XGPU_WORLD_AO_TAPS 5
+#define XGPU_WORLD_AO_REFERENCE_LEAST 0.25f
+#define XGPU_WORLD_AO_REACH_FADE 0.25f
+#define XGPU_WORLD_AO_FLOOR 0.2f
+/* the field's (world_sdf.h's WORLD_SDF_*: d3d8_device.c checks they agree) */
+#define XGPU_WORLD_SDF_BRICK 8
+#define XGPU_WORLD_SDF_BRICK_SPAN 9
+#define XGPU_WORLD_SDF_ATLAS 16
+#define XGPU_WORLD_SDF_RANGE_VOXELS 12
+#define XGPU_WORLD_SDF_CELL_OUTSIDE 0
+#define XGPU_WORLD_SDF_CELL_INSIDE 1
+#define XGPU_WORLD_SDF_CELL_BRICK 2
+/* (world_proxies.c's WORLD_PROXIES_PI) */
+#define XGPU_WORLD_AO_PI 3.14159265358979f
+/* the block as the emitters declare it (xgpu_stream.h's struct
+xgpu_world_ao_block, its XGPU_WORLD_AO_PROXIES_MAXIMUM and _PROXY_*: the
+emitters' copies of these headers have not that one; d3d8_device.c checks
+they agree): its members' offsets, the most proxies, their kinds */
+#define XGPU_WORLD_AO_BLOCK_FIELD 0
+#define XGPU_WORLD_AO_BLOCK_PARAMETERS 32
+#define XGPU_WORLD_AO_BLOCK_PROXIES 64
+#define XGPU_WORLD_AO_BLOCK_GRID 3136
+#define XGPU_WORLD_AO_BLOCK_CELLS 3168
+#define XGPU_WORLD_AO_SHAPES 64
+/* the proxies' grid (world_ao.h's WORLD_AO_GRID_*: world_ao_grid) and the
+least box occlusion computed, one over (world_proxies.c's
+WORLD_PROXIES_LEAST: world_proxy_box_fade) */
+#define XGPU_WORLD_AO_GRID_X 16
+#define XGPU_WORLD_AO_GRID_Y 16
+#define XGPU_WORLD_AO_GRID_Z 8
+#define XGPU_WORLD_AO_GRID_CELLS (XGPU_WORLD_AO_GRID_X * XGPU_WORLD_AO_GRID_Y * XGPU_WORLD_AO_GRID_Z)
+#define XGPU_WORLD_AO_LEAST 510.0f
+/* (world_proxies.c's WORLD_PROXIES_FAR: a box as its faces' patches past
+it, in half diagonals) */
+#define XGPU_WORLD_AO_FAR 6.0f
+#define XGPU_WORLD_AO_SPHERE 1
+#define XGPU_WORLD_AO_CAPSULE 2
+#define XGPU_WORLD_AO_BOX 3
+/* (a vehicle's occlusion field: its shape and the next two, read from the
+objects' atlas) */
+#define XGPU_WORLD_AO_FIELD 4
 
 /* ---------- enhanced dynamic lights
 
@@ -198,6 +329,38 @@ camera, where lights are seen large. */
 #define XGPU_DYNAMIC_LIGHTS_CORE 0.6
 #define XGPU_DYNAMIC_LIGHTS_UNIT 12
 #define XGPU_DYNAMIC_LIGHTS_BINDING 1
+
+/* Which lights reach which of the structure's clusters: a light reaches the
+clusters its sphere floods into through the structure's portals from where
+it is (structure_clusters_in_sphere, as the game gathers a light's surfaces
+for its own pass), and no other, so that a light on the far side of a wall
+does not light this side of it. Past the cells, at z = GRID_Z, the cells'
+texture has a slice of each cluster's 128-bit mask of the lights that reach
+it (XGPU_DYNAMIC_LIGHTS_CLUSTERS of them: the game's most), uploaded with
+the cells. Past it are the world's slices (XGPU_DYNAMIC_LIGHTS_WORLD_SLICES),
+uploaded when the structure changes: the structure's 3D BSP, which says in
+which leaf, and so cluster, a point is (bsp3d_test_point), as four words a
+texel, texel t at x = t % 32, y = t / 32 % 32, z = GRID_Z + 1 + t / 1024:
+texel 0 the header (the node count, the planes' first texel, the leaves'
+first texel, the leaf count), from texel 1 a node each (its plane, its
+children behind and in front: a child with the top bit set is a leaf, all
+bits set none), then the planes (their floats' bits: the normal, and its
+distance along it), then the leaves' clusters, four a texel (all bits set:
+none). A pixel finds its cluster from its point a little off its surface,
+along its normal, and its cell's lights are those its cluster's mask has; a
+world with no nodes (none uploaded, or too large) leaves the cells' lights as
+they are, as does a point the BSP puts in no cluster. */
+#define XGPU_DYNAMIC_LIGHTS_CLUSTERS 512
+#define XGPU_DYNAMIC_LIGHTS_WORLD_SLICES 240
+#define XGPU_DYNAMIC_LIGHTS_WORLD_TEXELS (XGPU_DYNAMIC_LIGHTS_WORLD_SLICES * 1024)
+/* the bytes uploaded each frame: the cells and the clusters' masks */
+#define XGPU_DYNAMIC_LIGHTS_CELLS_BYTES \
+	(XGPU_DYNAMIC_LIGHTS_GRID_X * XGPU_DYNAMIC_LIGHTS_GRID_Y * (XGPU_DYNAMIC_LIGHTS_GRID_Z + 1) * 16)
+/* how far off its surface a pixel's point is put, world units */
+#define XGPU_DYNAMIC_LIGHTS_CLUSTER_OFFSET 0.02f
+/* the most nodes a pixel walks down the BSP (bsp3d.c's
+MAXIMUM_BSP3D_TRAVERSAL_DEPTH) */
+#define XGPU_DYNAMIC_LIGHTS_WORLD_DEPTH 128
 enum
 {
 	XGPU_DYNAMIC_LIGHTS_ENVIRONMENT = 1,

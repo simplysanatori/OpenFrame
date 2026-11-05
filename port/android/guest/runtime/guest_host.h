@@ -47,6 +47,7 @@ void host_memory_watch_initialize(void);
 void host_memory_watch_protect(unsigned int address, unsigned int size);
 unsigned int host_memory_watch_generation(unsigned int address, unsigned int size);
 unsigned int host_memory_watch_serial(void);
+unsigned int host_memory_watch_page_size(void);
 void host_memory_watch_prepare_write(unsigned int address, unsigned int size);
 void host_memory_watch_forget(unsigned int address, unsigned int size);
 /* memory_watch_begin_frame (port/linux/src/platform.h) */
@@ -69,6 +70,7 @@ int host_sdl_set_relative_mouse(unsigned int window, int enabled);
 int host_sdl_poll_event(void *event);
 int host_sdl_set_clipboard_text(const char *text);
 void host_sdl_get_clipboard_text(char *buffer, unsigned int size);
+int host_sdl_open_url(const char *url);
 /* the keyboard's keys by name (the controls' bindings, xinput_sdl.c) */
 void host_sdl_scancode_name(int scancode, char *buffer, unsigned int size);
 int host_sdl_scancode_from_name(const char *name);
@@ -90,6 +92,11 @@ int host_sdl_gamepad_button(unsigned int gamepad, int button);
 int host_sdl_gamepad_type(unsigned int gamepad);
 int host_sdl_rumble_gamepad(unsigned int gamepad, unsigned int low, unsigned int high, unsigned int milliseconds);
 void host_sdl_close_gamepad(unsigned int gamepad);
+/* the gamepad's sensor (SDL_SensorType) there, and turned on or off; and
+whether the gamepad is Steam Input's virtual one (gyro aiming) */
+int host_sdl_gamepad_has_sensor(unsigned int gamepad, int type);
+int host_sdl_set_gamepad_sensor_enabled(unsigned int gamepad, int type, int enabled);
+int host_sdl_gamepad_steam(unsigned int gamepad);
 /* callback: void (*)(void *userdata, unsigned int stream, int additional, int total),
 called on the audio thread */
 unsigned int host_sdl_open_audio_stream(unsigned int device, const void *spec, unsigned int callback, unsigned int userdata);
@@ -108,7 +115,7 @@ int host_sdl_audio_stream_timing(unsigned int stream, char *driver, int driver_s
 
 /* ---------- the sound's output (host_audio_route.c)
 
-What the system's sound plays on, for audio.spatial (dsound_sdl.c): 1
+What the system's sound plays on, for the sound's log (dsound_sdl.c): 1
 headphones, 0 speakers, -1 not known; kept current by a thread of the
 host's, so asking costs nothing */
 int host_audio_headphones(void);
@@ -134,6 +141,11 @@ void host_gesture_insets(int *insets);
 /* display.orientation: asks the activity for the way up, 0 landscape, 1
 portrait (either way up), 2 whichever way the device is held */
 void host_orientation(int which);
+/* the system's keyboard for a menu's text field: brought up (one line, a
+password's hidden) or put away; whether it is up (closed by its own key, it
+is not) */
+void host_android_text_input(int show, int password);
+int host_android_text_input_active(void);
 
 /* ---------- the on-screen touch controls (host_touch.c, android_imports.list) */
 

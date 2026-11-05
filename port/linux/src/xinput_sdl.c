@@ -49,6 +49,9 @@ extern unsigned char network_aim_assist_block_mouse(void);
 #ifdef HALO_VR
 #include "vr.h"
 #endif
+#include "controller_buttons.h"
+#include "controller_remap.h"
+#include "gyro_aim.h"
 
 #include <SDL3/SDL.h>
 #include <math.h>
@@ -69,6 +72,8 @@ extern unsigned char network_chat_typing(void);
 /* ... and its on-screen keyboard is up, which takes the first controller
 and the touch controls' stick and look */
 extern unsigned char network_chat_keyboard_open(void);
+/* port/linux/game/network_votekick.c: the D-pad's left and right vote now */
+extern unsigned char network_vote_pad_open(void);
 /* port/linux/game/menu_functions.c: two or more players on this machine
 (co-op, or split screen in a network game) */
 extern unsigned char pc_menu_split_players(void);
@@ -175,6 +180,42 @@ static float mouse_sensitivity(void)
 	return sensitivity;
 }
 
+/* the game's own dead zone of each stick, of 32767 (source/input/input_xbox.c) */
+#define STICK_DEAD_RANGE 9000
+/* the most a stick's dead zone setting takes, in percent */
+#define STICK_DEAD_ZONE_MAXIMUM 50
+
+/* the deflection a stick reads as none, of 32767, for the game's sticks
+(stick 0 the left, 1 the right): input.left_stick_dead_zone and
+input.right_stick_dead_zone as a percentage, else the game's own */
+short halo_stick_dead_range(short stick)
+{
+	static const char *const settings[2] = { "input.left_stick_dead_zone", "input.right_stick_dead_zone" };
+	static short ranges[2] = { STICK_DEAD_RANGE, STICK_DEAD_RANGE };
+	static unsigned long read_at = (unsigned long)-1;
+	int index;
+
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		for (index = 0; index < 2; index++)
+		{
+			long percent = config_integer(settings[index]);
+
+			ranges[index] = percent < 0 || percent > STICK_DEAD_ZONE_MAXIMUM
+				? STICK_DEAD_RANGE : (short)(percent * 32767 / 100);
+		}
+	}
+	return ranges[stick ? 1 : 0];
+}
+
+/* whether a controller's look turns the other way side to side
+(input.invert_look_horizontal; the profile's INVERT LOOK is up and down) */
+int halo_look_horizontal_inverted(void)
+{
+	return config_boolean("input.invert_look_horizontal");
+}
+
 /* radians of yaw and pitch for the mouse motion since the last call: each
 count turns the view 0.022 degrees times the sensitivity, as CS2's does
 (mouse_sensitivity.h); the game adds these to the facing change of the
@@ -269,10 +310,10 @@ static void touch_used(void)
 
 /* ---------- the text chat's on-screen keyboard (halo_keyboard.h) */
 
-/* the first controller's buttons, as each read of it found them */
-static unsigned long chat_pad;
+/* Each controller's buttons, before the on-screen keyboard consumes them. */
+static unsigned long chat_pad[PORT_COUNT], chat_physical_pad[PORT_COUNT];
 
-static void chat_pad_record(const XINPUT_GAMEPAD *pad)
+static void chat_pad_record(short port, const XINPUT_GAMEPAD *pad)
 {
 	/* (an analog button pressed half way; the stick most of the way) */
 	enum { PRESSED = 0x80, PUSHED = 22000 };
@@ -291,12 +332,19 @@ static void chat_pad_record(const XINPUT_GAMEPAD *pad)
 	if (pad->sThumbLY < -PUSHED) buttons |= 1UL << HALO_CHAT_PAD_STICK_DOWN;
 	if (pad->sThumbLX < -PUSHED) buttons |= 1UL << HALO_CHAT_PAD_STICK_LEFT;
 	if (pad->sThumbLX > PUSHED) buttons |= 1UL << HALO_CHAT_PAD_STICK_RIGHT;
-	chat_pad = buttons;
+	chat_pad[port] = buttons;
+}
+
+extern short network_chat_controller(void);
+unsigned long halo_chat_pad_buttons_for_port(short port)
+{
+	return port >= 0 && port < PORT_COUNT ? chat_physical_pad[port] : 0;
 }
 
 unsigned long halo_chat_pad_buttons(void)
 {
-	return chat_pad;
+	short port = network_chat_controller();
+	return chat_pad[port >= 0 && port < PORT_COUNT ? port : 0];
 }
 
 int halo_chat_taps(float *x, float *y)
@@ -324,35 +372,35 @@ int halo_chat_touch_layout(void)
 B that closed it, the Start or the A that sent the line), which the game
 gets none of till each is let go: it would see a new press of it, a pause
 menu opened, a melee, a jump (the triggers are analog buttons too) */
-static WORD chat_held_buttons;
-static unsigned char chat_held_analog;
+static WORD chat_held_buttons[PORT_COUNT];
+static unsigned char chat_held_analog[PORT_COUNT];
 
-static void chat_pad_hold_over(XINPUT_GAMEPAD *pad)
+static void chat_pad_hold_over(short port, XINPUT_GAMEPAD *pad)
 {
 	int index;
 
-	if (network_chat_keyboard_open())
+	if (network_chat_controller() == port)
 	{
-		chat_held_buttons = pad->wButtons;
-		chat_held_analog = 0;
+		chat_held_buttons[port] = pad->wButtons;
+		chat_held_analog[port] = 0;
 		for (index = 0; index < 8; index++)
 		{
 			if (pad->bAnalogButtons[index])
-				chat_held_analog |= (unsigned char)(1 << index);
+				chat_held_analog[port] |= (unsigned char)(1 << index);
 		}
 		memset(pad, 0, sizeof(*pad));
 		return;
 	}
-	chat_held_buttons &= pad->wButtons;
-	pad->wButtons &= (WORD)~chat_held_buttons;
+	chat_held_buttons[port] &= pad->wButtons;
+	pad->wButtons &= (WORD)~chat_held_buttons[port];
 	for (index = 0; index < 8; index++)
 	{
-		if (!(chat_held_analog & (1 << index)))
+		if (!(chat_held_analog[port] & (1 << index)))
 			continue;
 		if (pad->bAnalogButtons[index])
 			pad->bAnalogButtons[index] = 0;
 		else
-			chat_held_analog &= (unsigned char)~(1 << index);
+			chat_held_analog[port] &= (unsigned char)~(1 << index);
 	}
 }
 
@@ -509,6 +557,25 @@ unsigned long halo_scoreboard_pad(short controller_index, int hold)
 	return pressed;
 }
 
+/* the first controller's D-pad left and right held as a vote took them,
+which the game gets none of till each is let go: else a vote's end would
+hand it a press (the Fishsticks layout switches grenades with left) */
+static WORD vote_held_buttons;
+
+static void vote_pad_hold_over(XINPUT_GAMEPAD *pad)
+{
+	const WORD sides = XINPUT_GAMEPAD_DPAD_LEFT | XINPUT_GAMEPAD_DPAD_RIGHT;
+
+	if (network_vote_pad_open())
+		vote_held_buttons |= (WORD)(pad->wButtons & sides);
+	else
+		vote_held_buttons &= pad->wButtons;
+	if (network_vote_pad_open())
+		pad->wButtons &= (WORD)~sides;
+	else
+		pad->wButtons &= (WORD)~vote_held_buttons;
+}
+
 /* the touch controls' stick as the player's movement (input_abstraction.c's
 keyboard_controls_update), forward and strafe -1..1, whatever the
 profile's sticks do; nonzero while it is pushed. Nothing but on Android and
@@ -520,7 +587,7 @@ int halo_linux_touch_move(short controller_index, float *forward, float *strafe)
 	if (controller_index != 0)
 		return FALSE;
 #ifdef HALO_TOUCH_CONTROLS
-	if (!touch_input_move(forward, strafe) || network_chat_keyboard_open())
+	if (!touch_input_move(forward, strafe) || network_chat_controller() == 0)
 	{
 		*forward = 0.0f;
 		*strafe = 0.0f;
@@ -550,7 +617,7 @@ int halo_linux_touch_look(short gamepad_index, float *yaw, float *pitch, float *
 	touch_input_look(0.0022f, yaw, pitch, gyro_yaw, gyro_pitch);
 	/* (none while the chat's on-screen keyboard is up: what was swiped is
 	dropped, not saved for after) */
-	if (network_chat_keyboard_open())
+	if (network_chat_keyboard_open() && network_chat_controller() == 0)
 	{
 		*yaw = 0.0f;
 		*pitch = 0.0f;
@@ -582,7 +649,7 @@ int halo_linux_touch_look_late(short gamepad_index, float *yaw, float *pitch, fl
 		return FALSE;
 #ifdef HALO_TOUCH_CONTROLS
 	/* (none while the chat's on-screen keyboard is up, whose frames drop it) */
-	if (network_chat_keyboard_open())
+	if (network_chat_keyboard_open() && network_chat_controller() == 0)
 		return FALSE;
 	touch_input_look_late(0.0022f, yaw, pitch, gyro_yaw, gyro_pitch);
 	return *yaw != 0.0f || *pitch != 0.0f || *gyro_yaw != 0.0f || *gyro_pitch != 0.0f;
@@ -693,7 +760,11 @@ static BYTE analog(BOOL down)
 /* the game's on-screen keyboard is up (platform_text_typing): the keys type
 into it (XInputDebugGetKeystroke passes them to the game), but for the
 arrows, which move about it, enter (Done, once let go of since it came up)
-and escape (cancel) */
+and escape (cancel). A menu's text field (platform_text_field) takes its
+Enter as a key, once let go of since the field began, which the field
+makes its row's A (menu_functions.c's text_field_show): not Start, which in
+a game closes the menus and drops what was typed with every change on the
+screen */
 static BOOL text_typing;
 static BOOL text_typing_enter_armed;
 /* (the on-screen keyboard's, and a menu's text field's: menu_functions.c) */
@@ -718,12 +789,9 @@ void platform_text_field(int typing, int password)
 {
 	text_typing_field = typing != 0;
 	text_typing_update();
-#ifndef HALO_ANDROID
-	/* (with no keyboard: Steam's on-screen one, sdl_platform.c) */
+	/* (the system's on-screen keyboard, where there is one: Steam's,
+	Android's, iOS's; sdl_platform.c) */
 	platform_screen_keyboard(text_typing_field, typing && password);
-#else
-	(void)password;
-#endif
 }
 
 static void typing_gamepad(const struct platform_input_state *input, XINPUT_GAMEPAD *pad)
@@ -737,9 +805,9 @@ static void typing_gamepad(const struct platform_input_state *input, XINPUT_GAME
 	if (k[SDL_SCANCODE_RIGHT]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_RIGHT;
 	if (!enter)
 		text_typing_enter_armed = TRUE;
-	else if (text_typing_enter_armed)
+	else if (text_typing_enter_armed && !text_typing_field)
 		pad->wButtons |= XINPUT_GAMEPAD_START;
-	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_ESCAPE]);
+	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_ESCAPE] || input->menu_back);
 }
 
 /* when a server browser was shown last (halo_keyboard_browser_keys): its
@@ -790,12 +858,15 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	if (k[SDL_SCANCODE_RIGHT]) pad->wButtons |= XINPUT_GAMEPAD_DPAD_RIGHT;
 	if (k[SDL_SCANCODE_F1]) pad->wButtons |= XINPUT_GAMEPAD_BACK;
 
-	/* (escape backs out, as backspace does: the pause menu's B resumes the
-	game, the main menu's asks to quit; Start would choose, as A does) */
+	/* (escape backs out, as backspace and the mouse's Back button do: the
+	pause menu's B resumes the game, the main menu's asks to quit; Start
+	would choose, as A does. The Back button comes as menu_back, the menus'
+	pointer taking the mouse's buttons (sdl_platform.c); with none, Android's,
+	as X1) */
 	pad->bAnalogButtons[XINPUT_GAMEPAD_A] |= analog(k[SDL_SCANCODE_SPACE] || k[SDL_SCANCODE_RETURN] ||
 		k[SDL_SCANCODE_KP_ENTER]);
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_ESCAPE] || k[SDL_SCANCODE_BACKSPACE] ||
-		(mouse && m[SDL_BUTTON_X1]));
+		input->menu_back || (mouse && m[SDL_BUTTON_X1]));
 #ifdef HALO_ANDROID
 	/* the system back key (gesture or button) backs out of menus */
 	pad->bAnalogButtons[XINPUT_GAMEPAD_B] |= analog(k[SDL_SCANCODE_AC_BACK]);
@@ -815,6 +886,11 @@ static void keyboard_gamepad(const struct platform_input_state *input, XINPUT_GA
 	/* (R as the right trigger: Multiplayer's and the server browser's
 	refresh, drawn as R) */
 	pad->bAnalogButtons[XINPUT_GAMEPAD_RIGHT_TRIGGER] |= analog(k[SDL_SCANCODE_R]);
+	/* (L as the left trigger: the server browsers' Filters, drawn as L) */
+	pad->bAnalogButtons[XINPUT_GAMEPAD_LEFT_TRIGGER] |= analog(k[SDL_SCANCODE_L]);
+	/* (/ as R3 in a server browser: its SEARCH, drawn as /) */
+	if (browser && k[SDL_SCANCODE_SLASH])
+		pad->wButtons |= XINPUT_GAMEPAD_RIGHT_THUMB;
 }
 
 /* the keys held when the game and the menus switch, or typing or the
@@ -826,6 +902,8 @@ next screen's A, nor the Escape that closes the scoreboard's player menu
 static void keys_held_over_switch(struct platform_input_state *input, BOOL scoreboard_holds)
 {
 	static unsigned char held[SDL_SCANCODE_COUNT];
+	/* (and the mouse's Back button, which is Escape in the menus) */
+	static BOOL back_held;
 	static int context = -1;
 	int next_context = (input->menus != FALSE) | (text_typing ? 2 : 0) | (console_is_active() ? 4 : 0) |
 		(network_chat_typing() ? 8 : 0) | (scoreboard_holds ? 16 : 0);
@@ -835,7 +913,12 @@ static void keys_held_over_switch(struct platform_input_state *input, BOOL score
 	{
 		context = next_context;
 		memcpy(held, input->keys, sizeof(held));
+		back_held = input->menu_back;
 	}
+	if (!input->menu_back)
+		back_held = FALSE;
+	else if (back_held)
+		input->menu_back = FALSE;
 	for (scancode = 0; scancode < SDL_SCANCODE_COUNT; scancode++)
 	{
 		if (!input->keys[scancode])
@@ -856,6 +939,7 @@ static const char *const binding_settings[NUMBER_OF_HALO_KEYBOARD_ACTIONS] =
 	"controls.reload", "controls.zoom", "controls.switch_weapon", "controls.switch_grenade", "controls.action",
 	"controls.flashlight", "controls.scoreboard", "controls.pause", "controls.screenshot",
 	"controls.push_to_talk", "controls.chat", "controls.team_chat", "controls.party_accept",
+	"controls.vote_yes", "controls.vote_no",
 };
 
 static const struct
@@ -1089,7 +1173,7 @@ int halo_push_to_talk_held(void)
 		if (input_held(&input, bindings[HALO_KEYBOARD_PUSH_TO_TALK][slot]))
 			return 1;
 	}
-	return 0;
+	return controller_remap_talk();
 }
 
 /* ---------- a Discord friend's ask to join (p2p_discord.c) */
@@ -1266,6 +1350,13 @@ int halo_keyboard_prompts(void)
 	touch_controls = TRUE;
 #endif
 	return prompts_show_keys(setting, prompt_device, prompt_controller_connected, touch_controls);
+}
+
+/* whether the first player last used a controller: the prompts' device
+(prompt_device_update), which the vote's box follows too */
+int halo_gamepad_last_used(void)
+{
+	return prompt_device == PROMPT_DEVICE_CONTROLLER;
 }
 
 /* a binding's name as a prompt shows it: the mouse's buttons by their
@@ -1597,13 +1688,110 @@ int platform_test_menu_click(float *x, float *y)
 	return 1;
 }
 
+/* debug.test_input "menu:...": its "mouse:<button>", a click of that mouse
+button (SDL's numbering: 4 is X1, the side button a browser goes back with),
+and its "wheel:<notches>[*<events>]", the wheel turned that far (away from
+the player positive, as SDL's), in that many events (1 by default: a
+trackpad's or a high-resolution wheel's come in fractions), once in its
+second, as the mouse's own events (sdl_platform.c's test_menu_mouse) */
+int platform_test_menu_mouse(int *button, float *wheel, int *wheel_events)
+{
+	static Uint64 played_step = (Uint64)-1;
+	Uint64 step;
+	const char *token = test_input_menu;
+	size_t length = 0;
+
+	*button = 0;
+	*wheel = 0.0f;
+	*wheel_events = 0;
+	if (!test_input_menu[0])
+		return 0;
+	for (step = (SDL_GetTicks() - test_input_menu_since) / 1000;; step--)
+	{
+		token += strspn(token, " ,");
+		length = strcspn(token, " ,");
+		if (!length || !step)
+			break;
+		token += length;
+	}
+	step = (SDL_GetTicks() - test_input_menu_since) / 1000;
+	if (!length || step == played_step)
+		return 0;
+	if (!strncmp(token, "mouse:", 6) && sscanf(token + 6, "%d", button) == 1 && *button > 0)
+	{
+		played_step = step;
+		return 1;
+	}
+	*button = 0;
+	if (!strncmp(token, "wheel:", 6) && sscanf(token + 6, "%f", wheel) == 1)
+	{
+		const char *times = memchr(token, '*', length);
+
+		*wheel_events = times ? atoi(times + 1) : 1;
+		if (*wheel_events < 1)
+			*wheel_events = 1;
+		played_step = step;
+		return 1;
+	}
+	*wheel = 0.0f;
+	return 0;
+}
+
+/* debug.test_input "menu:...": its "type:<letters and digits>" typed once in
+its second, and its "enter", the Return key held for the first 150 ms of
+its second and its keystroke once, through the keyboard's own path
+(sdl_platform.c's keystroke queue and keys held): *typed the letters to type
+now (empty for none), *enter whether Return is held; 1 when the keystrokes
+are to be queued now */
+int platform_test_menu_keys(char *typed, int size, int *enter)
+{
+	static Uint64 typed_step = (Uint64)-1;
+	Uint64 elapsed, step, into;
+	const char *token = test_input_menu;
+	size_t length = 0;
+	int queue;
+
+	typed[0] = 0;
+	*enter = 0;
+	if (!test_input_menu[0] || size <= 0)
+		return 0;
+	elapsed = SDL_GetTicks() - test_input_menu_since;
+	into = elapsed % 1000;
+	for (step = elapsed / 1000;; step--)
+	{
+		token += strspn(token, " ,");
+		length = strcspn(token, " ,");
+		if (!length || !step)
+			break;
+		token += length;
+	}
+	if (!length)
+		return 0;
+	queue = typed_step != elapsed / 1000;
+	if (length == 5 && !strncmp(token, "enter", 5))
+	{
+		*enter = into < 150;
+		typed_step = elapsed / 1000;
+		return queue;
+	}
+	if (length <= 5 || strncmp(token, "type:", 5) || !queue)
+		return 0;
+	typed_step = elapsed / 1000;
+	length -= 5;
+	if (length > (size_t)size - 1)
+		length = (size_t)size - 1;
+	memcpy(typed, token + 5, length);
+	typed[length] = 0;
+	return 1;
+}
+
 /* debug.test_input "script:<event>;<event>...": the controller played on
 the simulation's clock (sim_trace_scenario_seconds), in seconds from the
 scenario's start, so that one script plays alike at 30, 60 and 120 steps a
 second (tools/scorecard). An event is "<start>[-<end>] <action>":
 
-    fire, throw, jump, melee, action (X), switch (Y), crouch, zoom
-                         the button held from start to end (0.1 seconds
+    fire, throw, jump, melee, action (X), switch (Y), crouch, zoom,
+    flashlight (white)   the button held from start to end (0.1 seconds
                          without an end)
     move=<x>,<y>         the left stick (-1 to 1 each way), start to end
     look=<x>,<y>         the right stick, start to end
@@ -1613,6 +1801,19 @@ second (tools/scorecard). An event is "<start>[-<end>] <action>":
                          the player moving to fight it (bots_hunt: the
                          campaign's footage); a move= after it overrides
                          the moving
+    gyro=<x>,<y>,<z>     a controller's gyroscope turning at these rates
+                         (degrees a second about its axes, SDL's: x to its
+                         right, y up, z toward the player), start to end;
+                         the events at a time add up. Its samples, a
+                         thousand a second, go through what a real
+                         controller's do (gyro_test_feed)
+    tilt=<x>,<y>,<z>     its accelerometer reading up along this direction
+                         (its axes), start to end; level (0,1,0) else
+    gyro_button          its gyroscope button (input.gyro_button) held
+    stick_touch          the thumb on its right stick (its touch, as a
+                         Steam Deck's), start to end (input.gyro_aim's
+                         "touch")
+    gyro_calibrate       its calibration asked for at start, once
 
 A time on the 30 Hz grid (a multiple of 1/30) falls on a step at every
 rate. */
@@ -1629,9 +1830,14 @@ static struct test_script_event
 	float x, y;
 	int aim, aimed;
 	int hunt;
+	/* (gyro=, tilt=: the rates or the direction in x, y and z) */
+	int gyro, tilt, gyro_button, stick_touch, gyro_calibrate;
+	float z;
 } test_script[TEST_SCRIPT_EVENTS];
 static int test_script_count;
 static int test_script_on;
+/* the script plays a controller's gyroscope (gyro_test_feed) */
+static int test_script_gyro;
 
 static void test_script_parse(const char *script)
 {
@@ -1649,6 +1855,7 @@ static void test_script_parse(const char *script)
 		{ "switch", XINPUT_GAMEPAD_Y, 0 },
 		{ "crouch", -1, XINPUT_GAMEPAD_LEFT_THUMB },
 		{ "zoom", -1, XINPUT_GAMEPAD_RIGHT_THUMB },
+		{ "flashlight", XINPUT_GAMEPAD_WHITE, 0 },
 	};
 
 	test_script_on = 1;
@@ -1692,6 +1899,16 @@ static void test_script_parse(const char *script)
 			event->aim = 1;
 		else if (!strcmp(action, "hunt"))
 			event->hunt = 1;
+		else if (sscanf(action, "gyro=%f,%f,%f", &event->x, &event->y, &event->z) == 3)
+			event->gyro = test_script_gyro = 1;
+		else if (sscanf(action, "tilt=%f,%f,%f", &event->x, &event->y, &event->z) == 3)
+			event->tilt = test_script_gyro = 1;
+		else if (!strcmp(action, "gyro_button"))
+			event->gyro_button = test_script_gyro = 1;
+		else if (!strcmp(action, "stick_touch"))
+			event->stick_touch = test_script_gyro = 1;
+		else if (!strcmp(action, "gyro_calibrate"))
+			event->gyro_calibrate = test_script_gyro = 1;
 		else
 		{
 			platform_log("test input: script: no action \"%s\": left out", action);
@@ -1729,6 +1946,9 @@ static void test_script_gamepad(XINPUT_GAMEPAD *pad)
 			}
 			continue;
 		}
+		/* (the gyroscope's are gyro_test_feed's) */
+		if (event->gyro || event->tilt || event->gyro_button || event->stick_touch || event->gyro_calibrate)
+			continue;
 		if (t < event->start || t >= event->end)
 			continue;
 		if (event->hunt)
@@ -1769,9 +1989,8 @@ commas (all four by default). The player otherwise stands still. (A weapon
 that fires as the control is pulled: SWAT's pistol, debug.network_test
 "local:<map>:swat"; the plasma pistol, a multiplayer game's otherwise,
 fires as it is let go.) The mouse's come with the window's events
-(halo_test_input_pump), the controller's with its reading; each ends the
-frame's wait for the clock at its time, as a person's event does
-(halo_test_input_next_ns, sdl_platform.c) */
+(halo_test_input_pump), the controller's with its reading, each read by
+the first frame to start after its time, as a person's is */
 #define LATENCY_TURN_COUNTS 200.0f
 
 enum
@@ -1870,16 +2089,13 @@ static void test_latency_gamepad(XINPUT_GAMEPAD *pad)
 
 /* (sdl_platform.c's platform_pump_events, its input lock held, after the
 window's events) the scripted mouse's own, as its events would bring them:
-its button held or let go, its motion; nonzero for a press come (the
-mouse's, or the controller's, which its reading takes) */
-int halo_test_input_pump(struct platform_input_state *state, unsigned char *buttons_pressed)
+its button held or let go, its motion */
+void halo_test_input_pump(struct platform_input_state *state, unsigned char *buttons_pressed)
 {
-	unsigned long pressed;
 	int kind;
 
 	if (test_latency.state < 0 || !test_latency_on())
-		return 0;
-	pressed = test_latency.pressed;
+		return;
 	kind = test_latency_advance(SDL_GetTicksNS());
 	if (kind == _test_latency_click)
 	{
@@ -1895,14 +2111,6 @@ int halo_test_input_pump(struct platform_input_state *state, unsigned char *butt
 		test_latency.turn_direction = -test_latency.turn_direction;
 	}
 	test_latency.mouse_played = test_latency.pressed;
-	return test_latency.pressed != pressed;
-}
-
-/* when the scripted player presses next (debug.test_input "latency:"), 0
-for none */
-Uint64 halo_test_input_next_ns(void)
-{
-	return test_latency.state > 0 ? test_latency.next_ns : 0;
 }
 
 static void test_input_gamepad(XINPUT_GAMEPAD *pad)
@@ -1937,7 +2145,7 @@ static void test_input_gamepad(XINPUT_GAMEPAD *pad)
 		pad->sThumbLX = -32000;
 	if (test_input_pressed & (1UL << HALO_CHAT_PAD_STICK_RIGHT))
 		pad->sThumbLX = 32000;
-	if (network_chat_keyboard_open())
+	if (network_chat_keyboard_open() && network_chat_controller() == 0)
 		return;
 
 	if (!checked)
@@ -2081,12 +2289,16 @@ static void wheel_update(void)
 /* ---------- SDL gamepads */
 
 /* the SDL gamepads in connection order, at most one per port */
+/* the joystick IDs of the gamepads sdl_gamepads listed last, in its order */
+static SDL_JoystickID sdl_gamepad_ids[PORT_COUNT];
+
 int sdl_gamepads(SDL_Gamepad **gamepads)
 {
 	SDL_JoystickID *ids;
 	int count = 0, index, found = 0;
 
 	memset(gamepads, 0, sizeof(SDL_Gamepad *) * PORT_COUNT);
+	memset(sdl_gamepad_ids, 0, sizeof(sdl_gamepad_ids));
 	ids = SDL_GetGamepads(&count);
 	if (!ids)
 		return 0;
@@ -2110,7 +2322,10 @@ int sdl_gamepads(SDL_Gamepad **gamepads)
 				type = SDL_GetGamepadType(gamepad);
 				recognised = type != SDL_GAMEPAD_TYPE_UNKNOWN && type != SDL_GAMEPAD_TYPE_STANDARD;
 				if (recognised == (pass == 0))
+				{
+					sdl_gamepad_ids[found] = ids[index];
 					gamepads[found++] = gamepad;
+				}
 			}
 		}
 	}
@@ -2120,7 +2335,10 @@ int sdl_gamepads(SDL_Gamepad **gamepads)
 		SDL_Gamepad *gamepad = SDL_GetGamepadFromID(ids[index]);
 
 		if (gamepad)
+		{
+			sdl_gamepad_ids[found] = ids[index];
 			gamepads[found++] = gamepad;
+		}
 	}
 #endif
 	SDL_free(ids);
@@ -2234,6 +2452,626 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 	if (abs(value) > abs(pad->sThumbRY)) pad->sThumbRY = value;
 }
 
+/* the back paddles held (controller_remap_paddles' bits: the left, the
+right, the second left, the second right; a Steam Deck's L4, R4, L5, R5),
+which only a custom layout's actions take (Button Remapping) */
+static unsigned int sdl_gamepad_paddles(SDL_Gamepad *gamepad)
+{
+	static const SDL_GamepadButton paddles[4] =
+	{
+		SDL_GAMEPAD_BUTTON_LEFT_PADDLE1, SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1,
+		SDL_GAMEPAD_BUTTON_LEFT_PADDLE2, SDL_GAMEPAD_BUTTON_RIGHT_PADDLE2,
+	};
+	unsigned int held = 0;
+	int index;
+
+	for (index = 0; gamepad && index < 4; index++)
+	{
+		if (SDL_GetGamepadButton(gamepad, paddles[index]))
+			held |= 1u << index;
+	}
+	return held;
+}
+
+/* ---------- gyro aiming and the flick stick (gyro_aim.h)
+
+A controller with a gyroscope (SDL's gamepad sensors: a DualSense, a
+DualShock 4, a Switch Pro Controller or Joy-Cons, a Steam Deck's own
+controls) turns the player as it turns, as the mouse does: a direct turn,
+added to the stick's after the aim assist's magnetism has acted on that
+(player_control.c), so that the magnetism and the stick's look acceleration
+never touch it. Its sensors are on only while input.gyro_aim asks for them
+(or a calibration runs); their samples come with the window's events
+(sdl_platform.c: halo_gyro_sensor_event), each one turned into the player's
+turn there (gyro_aim_sample) and kept for the controller's port until the
+game takes it (halo_linux_gyro_look), as the mouse's motion is. Under
+Steam Input a game is given Steam's virtual controller, which has no
+sensors: the log says so (Steam keeps the gyroscope for its own mappings).
+
+The flick stick (input.flick_stick) is the right stick read each frame
+(flick_stick_update): pushed to the rim, the player turns to face where it
+points; turned round the rim, the player turns with it. Its turn is the
+game's as the gyroscope's is; the stick's own look is then none
+(input_abstraction.c), and only with the default stick layout, whose right
+stick looks.
+
+The scripted player's gyroscope (debug.test_input "script:", gyro=, tilt=,
+gyro_button, gyro_calibrate) is a controller of its own on port 0, whose
+samples go through the same code (gyro_device_sample). */
+
+/* (the triggers, which are axes: past half way is held) */
+#define GYRO_BUTTON_LEFT_TRIGGER (-2)
+#define GYRO_BUTTON_RIGHT_TRIGGER (-3)
+
+static const struct
+{
+	const char *name;
+	int button;
+} gyro_buttons[] =
+{
+	{ "touchpad", SDL_GAMEPAD_BUTTON_TOUCHPAD },
+	{ "left_paddle", SDL_GAMEPAD_BUTTON_LEFT_PADDLE1 },
+	{ "right_paddle", SDL_GAMEPAD_BUTTON_RIGHT_PADDLE1 },
+	{ "misc", SDL_GAMEPAD_BUTTON_MISC1 },
+	{ "left_bumper", SDL_GAMEPAD_BUTTON_LEFT_SHOULDER },
+	{ "right_bumper", SDL_GAMEPAD_BUTTON_RIGHT_SHOULDER },
+	{ "left_trigger", GYRO_BUTTON_LEFT_TRIGGER },
+	{ "right_trigger", GYRO_BUTTON_RIGHT_TRIGGER },
+	{ "left_stick", SDL_GAMEPAD_BUTTON_LEFT_STICK },
+	{ "right_stick", SDL_GAMEPAD_BUTTON_RIGHT_STICK },
+};
+
+/* the settings (input.gyro_*, input.flick_stick), read as they change */
+static struct
+{
+	int mode;
+	int button;
+	struct gyro_aim_settings aim;
+	int flick_stick;
+} gyro_settings;
+
+static void gyro_settings_read(void)
+{
+	static unsigned long read_at = (unsigned long)-1;
+	const char *mode, *button;
+	unsigned int index;
+
+	if (read_at == config_changes())
+		return;
+	read_at = config_changes();
+	mode = config_string("input.gyro_aim");
+	gyro_settings.mode = !strcmp(mode, "on") ? GYRO_AIM_ON : !strcmp(mode, "hold") ? GYRO_AIM_HOLD :
+		!strcmp(mode, "pause") ? GYRO_AIM_PAUSE : !strcmp(mode, "touch") ? GYRO_AIM_TOUCH : GYRO_AIM_OFF;
+	button = config_string("input.gyro_button");
+	gyro_settings.button = gyro_buttons[0].button;
+	for (index = 0; index < sizeof(gyro_buttons) / sizeof(gyro_buttons[0]); index++)
+	{
+		if (!strcmp(button, gyro_buttons[index].name))
+			gyro_settings.button = gyro_buttons[index].button;
+	}
+	gyro_settings.aim.sensitivity = (float)config_real("input.gyro_sensitivity");
+	if (!(gyro_settings.aim.sensitivity > 0.0f))
+		gyro_settings.aim.sensitivity = 2.0f;
+	gyro_settings.aim.vertical_sensitivity = (float)config_real("input.gyro_vertical_sensitivity");
+	if (!(gyro_settings.aim.vertical_sensitivity > 0.0f))
+		gyro_settings.aim.vertical_sensitivity = 1.0f;
+	gyro_settings.aim.player_space = strcmp(config_string("input.gyro_space"), "local") != 0;
+	gyro_settings.aim.smoothing = config_boolean("input.gyro_smoothing");
+	gyro_settings.flick_stick = config_boolean("input.flick_stick");
+}
+
+#define GYRO_DEVICES 8
+
+/* a controller's gyroscope, by its joystick ID (the scripted player's, the
+test device: its own) */
+struct gyro_device
+{
+	SDL_JoystickID id;
+	/* what it has (looked at once), its sensors on; a Steam Input virtual
+	controller; the touch of its right stick (gyro_stick_touch_known); the
+	Steam Deck's own controls */
+	BOOL looked;
+	BOOL has_gyro, has_accelerometer, steam, stick_touch, deck;
+	/* (Thumb on Stick's want of a touch said in the log) */
+	BOOL touch_told;
+	BOOL enabled;
+	/* its gyroscope's turn counts (input.gyro_aim and its button) */
+	BOOL active;
+	/* the last gyroscope sample's time, nanoseconds */
+	Uint64 sampled_ns;
+	unsigned long samples;
+	struct gyro_aim aim;
+	/* the turn since the game took it, and when it was used last */
+	float pending[2];
+	Uint64 used;
+};
+
+static pthread_mutex_t gyro_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct gyro_device gyro_devices[GYRO_DEVICES];
+static struct gyro_device gyro_test_device;
+static Uint64 gyro_uses;
+/* each port's controller's, as XInputGetState read it last */
+static struct gyro_device *gyro_ports[PORT_COUNT];
+/* the motion the frame's input took for the port's player
+(halo_linux_gyro_look), and how many readings it has gone untaken (motion
+nobody takes, in the menus, is dropped as the mouse's is) */
+static BOOL gyro_taken[PORT_COUNT];
+static unsigned long gyro_polls_unconsumed[PORT_COUNT];
+
+/* the device of a joystick ID (made, the least used one's place taken: the
+IDs never come back), NULL for none */
+static struct gyro_device *gyro_device_of(SDL_JoystickID id, BOOL make)
+{
+	struct gyro_device *oldest = &gyro_devices[0];
+	int index;
+
+	if (!id)
+		return NULL;
+	for (index = 0; index < GYRO_DEVICES; index++)
+	{
+		if (gyro_devices[index].id == id)
+		{
+			gyro_devices[index].used = ++gyro_uses;
+			return &gyro_devices[index];
+		}
+		if (gyro_devices[index].used < oldest->used)
+			oldest = &gyro_devices[index];
+	}
+	if (!make)
+		return NULL;
+	memset(oldest, 0, sizeof(*oldest));
+	oldest->id = id;
+	oldest->used = ++gyro_uses;
+	gyro_aim_reset(&oldest->aim);
+	return oldest;
+}
+
+/* a gyroscope sample over seconds since the last (gyro_lock held) */
+static void gyro_device_sample(struct gyro_device *device, const float gyro[3], float seconds)
+{
+	float turn[2];
+
+	gyro_aim_sample(&device->aim, gyro, seconds, &gyro_settings.aim, turn);
+	device->samples++;
+	if (device->active)
+	{
+		device->pending[0] += turn[0];
+		device->pending[1] += turn[1];
+	}
+}
+
+/* sdl_platform.c: a gamepad's sensor sample (SDL_EVENT_GAMEPAD_SENSOR_UPDATE),
+its time the sensor's (else the event's), nanoseconds */
+void halo_gyro_sensor_event(SDL_JoystickID which, int sensor, const float *data, Uint64 sensor_ns, Uint64 event_ns)
+{
+	struct gyro_device *device;
+	Uint64 now = sensor_ns ? sensor_ns : event_ns;
+
+	pthread_mutex_lock(&gyro_lock);
+	device = gyro_device_of(which, FALSE);
+	if (device && device->enabled)
+	{
+		if (sensor == SDL_SENSOR_ACCEL)
+			gyro_aim_accelerometer(&device->aim, data);
+		else if (sensor == SDL_SENSOR_GYRO)
+		{
+			float seconds = device->sampled_ns && now > device->sampled_ns ?
+				(float)((double)(now - device->sampled_ns) * 1e-9) : 0.0f;
+
+			device->sampled_ns = now;
+			gyro_device_sample(device, data, seconds);
+		}
+	}
+	pthread_mutex_unlock(&gyro_lock);
+}
+
+/* whether the game runs on a Steam Deck: Steam says so to the games it
+starts (SteamDeck=1), or the machine's name does (DMI's product name: Valve's
+Jupiter, the LCD model, or Galileo, the OLED) */
+int halo_steam_deck(void)
+{
+	static int known = -1;
+
+	if (known < 0)
+	{
+#ifdef HALO_GUEST
+		known = 0;
+#else
+		const char *steam_deck = getenv("SteamDeck");
+		char name[64];
+		FILE *file;
+
+		known = steam_deck && !strcmp(steam_deck, "1");
+		if (!known && (file = fopen("/sys/devices/virtual/dmi/id/product_name", "r")) != NULL)
+		{
+			if (fgets(name, sizeof(name), file))
+			{
+				name[strcspn(name, "\r\n")] = 0;
+				known = !strcmp(name, "Jupiter") || !strcmp(name, "Galileo");
+			}
+			fclose(file);
+		}
+#endif
+	}
+	return known;
+}
+
+/* the gyroscope button held on a controller (a Steam Deck's misc1, its
+Quick Access button, is Steam's: never) */
+static BOOL gyro_button_held(struct gyro_device *device, SDL_Gamepad *gamepad, int button)
+{
+	if (!gamepad || (device->deck && button == SDL_GAMEPAD_BUTTON_MISC1))
+		return FALSE;
+	if (button == GYRO_BUTTON_LEFT_TRIGGER)
+		return SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_LEFT_TRIGGER) > 16384;
+	if (button == GYRO_BUTTON_RIGHT_TRIGGER)
+		return SDL_GetGamepadAxis(gamepad, SDL_GAMEPAD_AXIS_RIGHT_TRIGGER) > 16384;
+	return SDL_GetGamepadButton(gamepad, (SDL_GamepadButton)button);
+}
+
+/* looks once at what a controller has, and says it in the log */
+static void gyro_device_look(struct gyro_device *device, SDL_Gamepad *gamepad, int port)
+{
+	device->looked = TRUE;
+	device->has_gyro = SDL_GamepadHasSensor(gamepad, SDL_SENSOR_GYRO);
+	device->has_accelerometer = SDL_GamepadHasSensor(gamepad, SDL_SENSOR_ACCEL);
+	device->steam = SDL_GetGamepadSteamHandle(gamepad) != 0;
+#ifndef HALO_GUEST
+	device->stick_touch = gyro_stick_touch_known(SDL_GetGamepadVendor(gamepad), SDL_GetGamepadProduct(gamepad));
+	device->deck = gyro_steam_deck(SDL_GetGamepadVendor(gamepad), SDL_GetGamepadProduct(gamepad));
+#endif
+	if (device->has_gyro)
+		platform_log("gyro: controller %u (port %d): a gyroscope%s%s", (unsigned)device->id, port + 1,
+			device->has_accelerometer ? " and an accelerometer" : ", no accelerometer (local space only)",
+			device->stick_touch ? ", the right stick's touch" : "");
+	else if (device->steam)
+		platform_log("gyro: controller %u (port %d): Steam Input's virtual controller, which passes no gyroscope "
+			"to the game; to aim with the gyroscope here, turn Steam Input off for OpenH1 (%s), or use Steam's "
+			"own gyro mapping", (unsigned)device->id, port + 1, halo_steam_deck() ?
+			"Steam > OpenH1 > the controller icon > Disable Steam Input" :
+			"in Steam, OpenH1's Properties > Controller > Disable Steam Input");
+	else
+		platform_log("gyro: controller %u (port %d): no gyroscope", (unsigned)device->id, port + 1);
+}
+
+/* the turn the test device's samples make up to the simulation's time:
+the script's gyro= and tilt= at each thousandth of a second, as a real
+controller's would come (gyro_lock held) */
+#define GYRO_TEST_RATE 1000
+static void gyro_test_feed(void)
+{
+	static double fed_to = -1.0;
+	double t = sim_trace_scenario_seconds() + 1e-6;
+	int index;
+
+	if (t < 0.0)
+		return;
+	if (fed_to < 0.0)
+		fed_to = t;
+	for (index = 0; index < test_script_count; index++)
+	{
+		struct test_script_event *event = &test_script[index];
+
+		if (event->gyro_calibrate && !event->aimed && t >= event->start)
+		{
+			event->aimed = 1;
+			gyro_aim_calibrate(&gyro_test_device.aim);
+			platform_log("gyro: test: calibrating");
+		}
+	}
+	while (fed_to + 1.0 / GYRO_TEST_RATE <= t)
+	{
+		float rate[3] = { 0.0f, 0.0f, 0.0f };
+		float up[3] = { 0.0f, 1.0f, 0.0f };
+		float length;
+
+		fed_to += 1.0 / GYRO_TEST_RATE;
+		for (index = 0; index < test_script_count; index++)
+		{
+			struct test_script_event *event = &test_script[index];
+
+			if (fed_to < event->start || fed_to >= event->end)
+				continue;
+			if (event->gyro)
+			{
+				rate[0] += event->x * 0.0174532925f;
+				rate[1] += event->y * 0.0174532925f;
+				rate[2] += event->z * 0.0174532925f;
+			}
+			else if (event->tilt)
+			{
+				up[0] = event->x;
+				up[1] = event->y;
+				up[2] = event->z;
+			}
+		}
+		length = sqrtf(up[0] * up[0] + up[1] * up[1] + up[2] * up[2]);
+		if (length > 0.0f)
+		{
+			up[0] *= 9.80665f / length;
+			up[1] *= 9.80665f / length;
+			up[2] *= 9.80665f / length;
+			gyro_aim_accelerometer(&gyro_test_device.aim, up);
+		}
+		gyro_device_sample(&gyro_test_device, rate, 1.0f / GYRO_TEST_RATE);
+	}
+}
+
+/* the script holds the gyroscope button (touch: has the thumb on the right
+stick) */
+static BOOL gyro_test_button(BOOL touch)
+{
+	double t = sim_trace_scenario_seconds() + 1e-6;
+	int index;
+
+	for (index = 0; index < test_script_count; index++)
+	{
+		if ((touch ? test_script[index].stick_touch : test_script[index].gyro_button) &&
+			t >= test_script[index].start && t < test_script[index].end)
+			return TRUE;
+	}
+	return FALSE;
+}
+
+/* a port's controller read (XInputGetState): its gyroscope's sensors on or
+off as wanted, whether its turn counts, and its turn dropped when nobody
+takes it */
+static void gyro_port_update(int port, SDL_Gamepad *gamepad, SDL_JoystickID id)
+{
+	struct gyro_device *device = NULL;
+	BOOL held = FALSE, want;
+	/* (the right stick touched; -1, the controller cannot tell) */
+	int touched = -1;
+
+	gyro_settings_read();
+	pthread_mutex_lock(&gyro_lock);
+	if (port == 0 && test_script_gyro)
+	{
+		if (!gyro_test_device.looked)
+		{
+			gyro_test_device.looked = gyro_test_device.has_gyro = gyro_test_device.has_accelerometer = TRUE;
+			gyro_test_device.stick_touch = TRUE;
+			gyro_test_device.enabled = TRUE;
+			platform_log("gyro: test: the script's gyroscope on port 1");
+		}
+		device = &gyro_test_device;
+		held = gyro_test_button(FALSE);
+		touched = gyro_test_button(TRUE);
+	}
+	else if (gamepad)
+	{
+		device = gyro_device_of(id, TRUE);
+		if (!device->looked)
+			gyro_device_look(device, gamepad, port);
+		held = gyro_button_held(device, gamepad, gyro_settings.button);
+		if (device->stick_touch)
+			touched = SDL_GetGamepadButton(gamepad, SDL_GAMEPAD_BUTTON_MISC4);
+		else if (gyro_settings.mode == GYRO_AIM_TOUCH && device->has_gyro && !device->touch_told)
+		{
+			device->touch_told = TRUE;
+			platform_log("gyro: controller %u (port %d): Thumb on Stick, but it does not say when its right stick "
+				"is touched (a Steam Deck's own controls and the Steam Controller do): its gyroscope turns nothing",
+				(unsigned)id, port + 1);
+		}
+		want = device->has_gyro && (gyro_settings.mode != GYRO_AIM_OFF || device->aim.calibrating);
+		if (want != device->enabled)
+		{
+			SDL_SetGamepadSensorEnabled(gamepad, SDL_SENSOR_GYRO, want);
+			if (device->has_accelerometer)
+				SDL_SetGamepadSensorEnabled(gamepad, SDL_SENSOR_ACCEL, want);
+			/* (the bias measured is kept; the rest starts again) */
+			if (want)
+			{
+				device->sampled_ns = 0;
+				device->aim.up_known = device->aim.accelerometer_known = device->aim.means_known = 0;
+				device->aim.still_seconds = 0.0f;
+				device->aim.smoothed[0] = device->aim.smoothed[1] = 0.0f;
+			}
+			device->enabled = want;
+			platform_log("gyro: controller %u (port %d): sensors %s", (unsigned)id, port + 1, want ? "on" : "off");
+		}
+	}
+	if (device)
+	{
+		device->active = gyro_aim_active(gyro_settings.mode, held, touched);
+		if (device == &gyro_test_device)
+			gyro_test_feed();
+	}
+	if (gyro_ports[port] != device || (!gyro_taken[port] && ++gyro_polls_unconsumed[port] > 4))
+	{
+		if (gyro_ports[port])
+			gyro_ports[port]->pending[0] = gyro_ports[port]->pending[1] = 0.0f;
+		if (device)
+			device->pending[0] = device->pending[1] = 0.0f;
+	}
+	gyro_ports[port] = device;
+	gyro_taken[port] = FALSE;
+	pthread_mutex_unlock(&gyro_lock);
+}
+
+/* the gyroscope's turn since the last call for the player on a port, in
+radians (positive left and up, as the mouse's), before the zoom's scale
+(player_control.c gives it the mouse's, view_fov.c's mouse_zoom_look_scale);
+FALSE for none. The aim assist's magnetism does not act on it */
+int halo_linux_gyro_look(short gamepad_index, float *yaw, float *pitch)
+{
+	struct gyro_device *device;
+
+	*yaw = 0.0f;
+	*pitch = 0.0f;
+	if (gamepad_index < 0 || gamepad_index >= PORT_COUNT)
+		return FALSE;
+	pthread_mutex_lock(&gyro_lock);
+	device = gyro_ports[gamepad_index];
+	gyro_taken[gamepad_index] = TRUE;
+	gyro_polls_unconsumed[gamepad_index] = 0;
+	if (device)
+	{
+		*yaw = device->pending[0];
+		*pitch = device->pending[1];
+		device->pending[0] = device->pending[1] = 0.0f;
+	}
+	pthread_mutex_unlock(&gyro_lock);
+	/* (none while the chat's on-screen keyboard is up for the player: what
+	was turned is dropped) */
+	if (network_chat_keyboard_open() && network_chat_controller() == gamepad_index)
+	{
+		*yaw = 0.0f;
+		*pitch = 0.0f;
+	}
+	return *yaw != 0.0f || *pitch != 0.0f;
+}
+
+/* The drawn view's own reading of the gyroscope (player_control.c's
+player_control_gyro_look_late, display.direct_camera), late in the frame:
+the turn come since the frame's input took it (halo_linux_gyro_look), the
+window's events taken now. Only the view drawn turns by it: it stays the
+next frame's input, so the game is as it was. FALSE when the frame's input
+took none (a menu) or nothing has come. */
+int halo_linux_gyro_look_late(short gamepad_index, float *yaw, float *pitch)
+{
+	struct gyro_device *device;
+	BOOL taken;
+
+	*yaw = 0.0f;
+	*pitch = 0.0f;
+	if (gamepad_index < 0 || gamepad_index >= PORT_COUNT)
+		return FALSE;
+	pthread_mutex_lock(&gyro_lock);
+	taken = gyro_taken[gamepad_index] && gyro_ports[gamepad_index];
+	pthread_mutex_unlock(&gyro_lock);
+	if (!taken || (network_chat_keyboard_open() && network_chat_controller() == gamepad_index))
+		return FALSE;
+	platform_pump_events();
+	pthread_mutex_lock(&gyro_lock);
+	device = gyro_ports[gamepad_index];
+	if (device && gyro_taken[gamepad_index])
+	{
+		*yaw = device->pending[0];
+		*pitch = device->pending[1];
+	}
+	pthread_mutex_unlock(&gyro_lock);
+	return *yaw != 0.0f || *pitch != 0.0f;
+}
+
+/* for Settings' Gyro & Flick Stick page (menu_functions.c): 2 while a
+connected controller has a gyroscope, 1 while the only ones are Steam
+Input's virtual controllers (which pass none), else 0 */
+int halo_gyro_found(void)
+{
+	SDL_Gamepad *gamepads[PORT_COUNT];
+	int count = sdl_gamepads(gamepads), index, found = 0;
+
+	if (test_script_gyro)
+		return 2;
+	for (index = 0; index < count; index++)
+	{
+		if (SDL_GamepadHasSensor(gamepads[index], SDL_SENSOR_GYRO))
+			return 2;
+		if (SDL_GetGamepadSteamHandle(gamepads[index]))
+			found = 1;
+	}
+	return found;
+}
+
+/* ... its CALIBRATE: every connected gyroscope measured at rest (its
+sensors on meanwhile: gyro_port_update); and whether one is still being
+measured */
+void halo_gyro_calibrate(void)
+{
+	int index;
+
+	pthread_mutex_lock(&gyro_lock);
+	for (index = 0; index < GYRO_DEVICES; index++)
+	{
+		if (gyro_devices[index].id && gyro_devices[index].has_gyro)
+			gyro_aim_calibrate(&gyro_devices[index].aim);
+	}
+	if (test_script_gyro)
+		gyro_aim_calibrate(&gyro_test_device.aim);
+	pthread_mutex_unlock(&gyro_lock);
+	platform_log("gyro: calibrating");
+}
+
+int halo_gyro_calibrating(void)
+{
+	int index, calibrating = FALSE;
+
+	pthread_mutex_lock(&gyro_lock);
+	for (index = 0; index < GYRO_DEVICES; index++)
+	{
+		if (gyro_devices[index].id && gyro_devices[index].aim.calibrating)
+			calibrating = TRUE;
+	}
+	if (gyro_test_device.aim.calibrating)
+		calibrating = TRUE;
+	pthread_mutex_unlock(&gyro_lock);
+	return calibrating;
+}
+
+/* the flick stick of each port: its state, the turn since the game took
+it, when it was read last (seconds), and its readings untaken */
+static struct
+{
+	struct flick_stick stick;
+	float pending;
+	double read_at;
+	BOOL taken;
+	unsigned long polls_unconsumed;
+} flick_ports[PORT_COUNT];
+
+/* the clock the flick stick turns by: the simulation's while a script
+plays, so that it plays alike at any speed */
+static double flick_clock(void)
+{
+	return test_script_on ? sim_trace_scenario_seconds() : (double)SDL_GetTicksNS() * 1e-9;
+}
+
+/* a port's reading's right stick, as the flick stick */
+static void flick_port_update(int port, const XINPUT_GAMEPAD *pad)
+{
+	double now = flick_clock();
+	double seconds = flick_ports[port].read_at > 0.0 ? now - flick_ports[port].read_at : 0.0;
+
+	flick_ports[port].read_at = now;
+	if (!gyro_settings.flick_stick || (!flick_ports[port].taken && ++flick_ports[port].polls_unconsumed > 4))
+	{
+		flick_stick_reset(&flick_ports[port].stick);
+		flick_ports[port].pending = 0.0f;
+		if (!gyro_settings.flick_stick)
+			return;
+	}
+	flick_ports[port].taken = FALSE;
+	if (seconds < 0.0 || seconds > 0.1)
+		seconds = 0.0;
+	flick_ports[port].pending += flick_stick_update(&flick_ports[port].stick, pad->sThumbRX / 32767.0f,
+		pad->sThumbRY / 32767.0f, (float)seconds);
+}
+
+/* input.flick_stick (input_abstraction.c: with the default stick layout,
+the right stick's own look none) */
+int halo_linux_flick_stick(void)
+{
+	gyro_settings_read();
+	return gyro_settings.flick_stick;
+}
+
+/* the flick stick's turn since the last call for the player on a port, in
+radians of yaw (positive left); FALSE for none */
+int halo_linux_flick_look(short gamepad_index, float *yaw)
+{
+	*yaw = 0.0f;
+	if (gamepad_index < 0 || gamepad_index >= PORT_COUNT)
+		return FALSE;
+	*yaw = flick_ports[gamepad_index].pending;
+	flick_ports[gamepad_index].pending = 0.0f;
+	flick_ports[gamepad_index].taken = TRUE;
+	flick_ports[gamepad_index].polls_unconsumed = 0;
+	if (network_chat_keyboard_open() && network_chat_controller() == gamepad_index)
+		*yaw = 0.0f;
+	return *yaw != 0.0f;
+}
+
 /* ---------- XAPI */
 
 VOID WINAPI XInitDevices(DWORD preallocation_type_count, PXDEVICE_PREALLOC_TYPE preallocation_types)
@@ -2256,6 +3094,8 @@ static DWORD connected_gamepads(void)
 		return mask;
 #endif
 	/* the first pad shares port 0 with the keyboard (port_gamepad) */
+	for (port = 0; port < PORT_COUNT; port++)
+		controller_device_update((short)port, port_gamepad(gamepads, count, port));
 	for (port = 1; port < PORT_COUNT; port++)
 	{
 		if (port_gamepad(gamepads, count, port))
@@ -2327,6 +3167,34 @@ static int controller_port(HANDLE device)
 	return -1;
 }
 
+/* what OpenH1's overlays read of a port's pad as it is, whatever its button
+layout (input.controller_p1 to p4: controller_remap_reserve): the scoreboard's
+D-pad and X while it offers its player menu, all of it while it holds the
+controls (scoreboard_pad_port_hold's, not counted as a reading); a vote's
+D-pad left and right, a Discord ask's up and down (the first controller's) */
+static unsigned int remap_reserved(int port)
+{
+	struct scoreboard_pad *pad = &scoreboard_pads[port];
+	struct platform_input_state input;
+	unsigned int reserved = 0;
+	int hold;
+
+	platform_input_read(&input, FALSE);
+	pthread_mutex_lock(&scoreboard_pad_lock);
+	hold = input.menus || pad->readings > SCOREBOARD_PAD_READINGS ? HALO_SCOREBOARD_PAD_FREE : pad->hold;
+	pthread_mutex_unlock(&scoreboard_pad_lock);
+	if (hold == HALO_SCOREBOARD_PAD_HOLDS)
+		return CONTROLLER_REMAP_RESERVE_ALL;
+	if (hold == HALO_SCOREBOARD_PAD_OFFERED)
+		reserved |= CONTROLLER_REMAP_RESERVE_X | CONTROLLER_REMAP_RESERVE_DPAD_UP | CONTROLLER_REMAP_RESERVE_DPAD_DOWN |
+			CONTROLLER_REMAP_RESERVE_DPAD_LEFT | CONTROLLER_REMAP_RESERVE_DPAD_RIGHT;
+	if (port == 0 && network_vote_pad_open())
+		reserved |= CONTROLLER_REMAP_RESERVE_DPAD_LEFT | CONTROLLER_REMAP_RESERVE_DPAD_RIGHT;
+	if (port == 0 && discord_ask_serial())
+		reserved |= CONTROLLER_REMAP_RESERVE_DPAD_UP | CONTROLLER_REMAP_RESERVE_DPAD_DOWN;
+	return reserved;
+}
+
 /* reads a controller's state; for port 0 the keyboard, mouse, debug input
 and touchscreen are merged into the first gamepad's; runs on the game's main
 thread (touch_input_gamepad relies on it); returns ERROR_SUCCESS or
@@ -2339,12 +3207,25 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 #ifdef HALO_VR
 	int back = 0;
 #endif
+	XINPUT_GAMEPAD physical;
+	int captured;
 
 	memset(state, 0, sizeof(*state));
 	if (port < 0)
 		return ERROR_DEVICE_NOT_CONNECTED;
 	platform_pump_events();
 	count = sdl_gamepads(gamepads);
+	controller_device_update((short)port, port_gamepad(gamepads, count, port));
+	/* Keep physical remapping separate from the keyboard and touch controls. */
+	memset(&physical, 0, sizeof(physical));
+	if (port_gamepad(gamepads, count, port))
+		sdl_gamepad_state(port_gamepad(gamepads, count, port), &physical);
+	/* Keep the opening chat press so even B can open it without immediately closing it. */
+	chat_pad_record((short)port, &physical);
+	chat_physical_pad[port] = chat_pad[port];
+	controller_remap_reserve((short)port, remap_reserved(port));
+	controller_remap_paddles((short)port, sdl_gamepad_paddles(port_gamepad(gamepads, count, port)));
+	captured = controller_remap_input((short)port, &physical, port_gamepad(gamepads, count, port) != NULL);
 	if (port == 0)
 	{
 		struct platform_input_state input;
@@ -2353,6 +3234,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		int scoreboard_hold;
 		BOOL console_active;
 		unsigned long discord_ask;
+		short aiming_deflection;
 
 		platform_input_read(&input, TRUE);
 		mouse_poll(&input);
@@ -2393,7 +3275,7 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 			}
 		}
 		if (port_gamepad(gamepads, count, 0))
-			sdl_gamepad_state(gamepads[0], &state->Gamepad);
+			controller_remap_merge(&physical, &state->Gamepad);
 		discord_ask_pad(port_gamepad(gamepads, count, 0), discord_ask, &state->Gamepad);
 #ifdef HALO_VR
 		if (halo_vr_running())
@@ -2441,10 +3323,17 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 		scoreboard_pad_read(0, &state->Gamepad, scoreboard_keys, scoreboard_hold);
 		/* (the text chat's on-screen keyboard reads them, and takes them
 		while it is up) */
-		chat_pad_record(&state->Gamepad);
-		chat_pad_hold_over(&state->Gamepad);
-		if (abs(state->Gamepad.sThumbRX) > STICK_AIMING_DEFLECTION ||
-			abs(state->Gamepad.sThumbRY) > STICK_AIMING_DEFLECTION)
+		chat_pad_record(0, &state->Gamepad);
+		chat_pad_hold_over(0, &state->Gamepad);
+		/* (and a vote running takes the D-pad's left and right:
+		network_votekick.c) */
+		vote_pad_hold_over(&state->Gamepad);
+		/* (a right stick dead zone set below it aims from that) */
+		aiming_deflection = halo_stick_dead_range(1);
+		if (aiming_deflection > STICK_AIMING_DEFLECTION)
+			aiming_deflection = STICK_AIMING_DEFLECTION;
+		if (abs(state->Gamepad.sThumbRX) > aiming_deflection ||
+			abs(state->Gamepad.sThumbRY) > aiming_deflection)
 		{
 			pthread_mutex_lock(&mouse_lock);
 			stick_aimed_ms = SDL_GetTicks();
@@ -2459,10 +3348,28 @@ DWORD WINAPI XInputGetState(HANDLE device, PXINPUT_STATE state)
 	{
 		struct platform_input_state input;
 
-		sdl_gamepad_state(port_gamepad(gamepads, count, port), &state->Gamepad);
+		state->Gamepad = physical;
 		/* (a split screen player's scoreboard, as port 0's) */
 		platform_input_read(&input, FALSE);
 		scoreboard_pad_read(port, &state->Gamepad, 0, scoreboard_pad_port_hold(port, input.menus));
+		/* (the chat's on-screen keyboard, when this player opened it) */
+		chat_pad_record((short)port, &state->Gamepad);
+		chat_pad_hold_over((short)port, &state->Gamepad);
+	}
+	if (captured) memset(&state->Gamepad, 0, sizeof(state->Gamepad));
+	/* (the port's gyroscope, and its right stick as the flick stick) */
+	{
+		SDL_Gamepad *gamepad = port_gamepad(gamepads, count, port);
+		SDL_JoystickID id = 0;
+		int index;
+
+		for (index = 0; index < count; index++)
+		{
+			if (gamepads[index] == gamepad)
+				id = sdl_gamepad_ids[index];
+		}
+		gyro_port_update(port, gamepad, id);
+		flick_port_update(port, &state->Gamepad);
 	}
 
 	if (memcmp(&state->Gamepad, &controllers[port].previous, sizeof(state->Gamepad)))
@@ -2538,6 +3445,13 @@ DWORD WINAPI XInputDebugGetKeystroke(PXINPUT_DEBUG_KEYSTROKE keystroke)
 		/* key ups always pass, so no key is left latched down; while typing,
 		escape does not (it cancels, as B: the game's own escape leaves the
 		menus, main.c) */
+		/* (a menu's text field's Enter, while the Enter that began the
+		field is still held: not its end) */
+		if (!key_up && next.virtual_key == 0x0D /* return */ && text_typing_field && !text_typing_enter_armed &&
+			!console_is_active() && !network_chat_typing())
+		{
+			continue;
+		}
 		if (key_up || next.virtual_key == VK_OEM_3_BACKQUOTE || console_is_active() || network_chat_typing() ||
 			(text_typing && next.virtual_key != 0x1B /* escape */))
 		{

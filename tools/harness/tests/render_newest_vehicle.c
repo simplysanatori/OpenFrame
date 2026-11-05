@@ -180,6 +180,13 @@ static boolean player_control_touch_look_late(short local_player_index, real *ya
 	*pitch = 0.0f;
 	return FALSE;
 }
+/* (a controller's gyroscope: none here) */
+static boolean player_control_gyro_look_late(short local_player_index, real *yaw, real *pitch)
+{
+	*yaw = 0.0f;
+	*pitch = 0.0f;
+	return FALSE;
+}
 static boolean passenger_camera_enabled(short local_player_index) { return FALSE; }
 static real biped_eye_rise_ahead(long unit_index, real since) { return 0.0f; }
 static void unit_get_camera_position(long index, real_point3d *position);
@@ -237,7 +244,7 @@ static void render_interpolation_seat(long unit_index, boolean *gun_view, boolea
 	*gun_view = seat_gun_view;
 	*aim_in_world = seat_aim_in_world;
 }
-struct interpolation_ghost { boolean in_use; long tick; };
+struct interpolation_ghost { boolean in_use; long tick; long step; short substep_count; };
 static struct interpolation_ghost ghosts[64];
 static void render_interpolation_ghosts_tick(void) {}
 

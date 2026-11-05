@@ -12,10 +12,22 @@ after the observer and before the projection and the visibility frustum
 are built), from the game's own */
 real render_fov_vertical(short local_player_index, real native_vertical_field_of_view);
 /* how much the reticle shrinks or grows to stay on its aim at that view (the
-last local view's own projection against the game's): 1 for the stock view */
+last local view's own projection against the game's): 1 for the stock view.
+A scope's own pieces, drawn zoomed over its picture, keep to it */
 real render_fov_reticle_scale(short local_player_index);
+/* the weapon's reticle's size: its scale at the unzoomed view (display.panini's
+magnification of the middle with it), kept through the zoom (the stock game
+draws its reticle one size at every zoom: display.fov sizes it, the zoom
+does not) */
+real render_fov_reticle_size(short local_player_index);
 /* the view's own vertical angle when display.fov widened it, else 0 */
 real render_fov_authored_vertical(short local_player_index);
+/* the local player's unit when its view is the player's own aim, which the
+fields of view widen and the lowered reticle turns: on foot or seated,
+first or third person, not dead, in a cinematic, a scripted camera or a
+view the director holds (and its index); else NULL */
+struct unit_datum;
+struct unit_datum *render_fov_unit(short local_player_index, long *unit_index);
 
 /* what the unit's zoom multiplies the mouse's turn by (input.zoom_sensitivity,
 port/linux/include/mouse_sensitivity.h): "cs2", the zoomed field of view
@@ -28,6 +40,30 @@ real mouse_zoom_look_scale(short local_player_index, long unit_index, short zoom
 passes: balanced and nestable, the current local render view only */
 void viewmodel_projection_begin(void);
 void viewmodel_projection_end(void);
+
+/* where the first-person weapon and hands are drawn: moved along the view's
+right, up and forward, in world units (display.viewmodel_offset_x, _y and
+_z), and turned, in radians, muzzle up (display.viewmodel_pitch), right
+(_yaw) and top to the right (_roll); each weapon's own (display.viewmodel_weapon,
+by its tag's path) added. FALSE when it has none */
+struct viewmodel_offset
+{
+	real right, up, forward;
+	real pitch, yaw, roll;
+};
+boolean viewmodel_offset(long weapon_index, struct viewmodel_offset *offset);
+/* the local player's weapon's and hands' node matrices, built at the camera,
+turned about their middle and moved by that offset: what is drawn and the
+markers the muzzle's effects, the shells and the lights are placed at,
+together. With display.viewmodel_fov the moves right and up are scaled to
+go as far on the screen as at the weapon's stock angle */
+struct real_matrix4x3;
+struct render_camera;
+void viewmodel_offset_apply(short local_player_index, long weapon_index, struct real_matrix4x3 *node_matrices,
+	short node_count, struct render_camera const *camera);
+/* the tag path of the weapon the local player holds now (Settings' THIS
+WEAPON rows); FALSE with none */
+boolean viewmodel_held_weapon(short local_player_index, char *path, unsigned int size);
 
 /* whether the first-person weapon, hands and attached visuals are drawn
 (display.viewmodel_visible); its firing, sounds and lights go on either way */

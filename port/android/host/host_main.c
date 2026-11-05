@@ -163,6 +163,48 @@ void host_orientation(int which)
 	host_logf(HOST_LOG_INFO, "orientation %s", names[which]);
 }
 
+/* the system's keyboard for a menu's text field (sdl_platform.c's
+screen_keyboard_update): SDL's text input on the game's window, which the
+activity's keyboard shows, one line (Enter ends the field), a password's
+hidden; what it types arrives as keys */
+static SDL_Window *text_input_window(void)
+{
+	int count = 0;
+	SDL_Window **windows = SDL_GetWindows(&count);
+	SDL_Window *window = windows && count > 0 ? windows[0] : NULL;
+
+	SDL_free(windows);
+	return window;
+}
+
+void host_android_text_input(int show, int password)
+{
+	SDL_Window *window = text_input_window();
+	SDL_PropertiesID properties;
+
+	if (!window)
+		return;
+	if (!show)
+	{
+		SDL_StopTextInput(window);
+		return;
+	}
+	properties = SDL_CreateProperties();
+	SDL_SetBooleanProperty(properties, SDL_PROP_TEXTINPUT_MULTILINE_BOOLEAN, false);
+	SDL_SetNumberProperty(properties, SDL_PROP_TEXTINPUT_TYPE_NUMBER,
+		password ? SDL_TEXTINPUT_TYPE_TEXT_PASSWORD_HIDDEN : SDL_TEXTINPUT_TYPE_TEXT);
+	if (!SDL_StartTextInputWithProperties(window, properties))
+		host_logf(HOST_LOG_WARN, "text input: %s", SDL_GetError());
+	SDL_DestroyProperties(properties);
+}
+
+int host_android_text_input_active(void)
+{
+	SDL_Window *window = text_input_window();
+
+	return window && SDL_TextInputActive(window);
+}
+
 /* Whether the app runs through an ARM translator. The x86 emulator runs the
 app's ARM code through one, which ro.dalvik.vm.native.bridge names; it
 cannot deliver the page faults of the write tracking to the app
@@ -260,6 +302,28 @@ static void *game_main(void *unused)
 		if (!brokers || !SDL_SaveFile(path, brokers, brokers_size))
 			host_logf(HOST_LOG_ERROR, "cannot write %s: %s", path, SDL_GetError());
 		SDL_free(brokers);
+	}
+	/* ...and the stock maps' preparations' records (port/linux/src/
+	prepared_shipped.h), the same way */
+	{
+		size_t records_size = 0;
+		void *records = SDL_LoadFile("prepared.records", &records_size);
+
+		snprintf(path, sizeof(path), "%s/prepared.records", data_root);
+		if (!records || !SDL_SaveFile(path, records, records_size))
+			host_logf(HOST_LOG_ERROR, "cannot write %s: %s", path, SDL_GetError());
+		SDL_free(records);
+	}
+	/* ...and the textures', fonts' and menus' bytes (port/linux/src/
+	embedded_assets.h), the same way */
+	{
+		size_t assets_size = 0;
+		void *assets = SDL_LoadFile("openh1.assets", &assets_size);
+
+		snprintf(path, sizeof(path), "%s/openh1.assets", data_root);
+		if (!assets || !SDL_SaveFile(path, assets, assets_size))
+			host_logf(HOST_LOG_ERROR, "cannot write %s: %s", path, SDL_GetError());
+		SDL_free(assets);
 	}
 	snprintf(path, sizeof(path), "%s/config.toml", data_root);
 

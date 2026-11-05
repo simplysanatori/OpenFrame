@@ -52,6 +52,7 @@ symbols in this file:
 
 /* ---------- headers */
 
+#include "controller_remap.h" /* port: port/linux/game/controller_remap_game.c */
 #include "cseries/cseries.h"
 #include "bink/bink_playback.h"
 #include "cseries/errors.h"
@@ -96,13 +97,6 @@ enum
 	_joystick_controls_legacy,
 	_joystick_controls_legacy_southpaw,
 	NUMBER_OF_JOYSTICK_CONTROLS,
-};
-
-/* port: input_xbox.c's GAMEPAD_STICK_DEAD_RANGE, for a sub-step's reading
-(input_abstraction_port_substep_state) */
-enum
-{
-	SUBSTEP_GAMEPAD_STICK_DEAD_RANGE = 9000,
 };
 
 enum
@@ -242,6 +236,127 @@ static void keyboard_hold_ticks(
 	return;
 }
 
+/* port: a crouched player's move kept below the full stick's 0.98 that
+stands a grounded biped up (player_control.c): its length brought down to
+0.97, a full diagonal's too (the touch controls' stick gives a square's,
+up to 1.41 long) */
+static void crouch_walk(
+	real *forward,
+	real *strafe)
+{
+	real length = square_root(*forward * *forward + *strafe * *strafe);
+
+	if (length > 0.97f)
+	{
+		*forward *= 0.97f / length;
+		*strafe *= 0.97f / length;
+	}
+	return;
+}
+
+/* port: input.crouch "toggle": a crouch let go within CROUCH_TAP_MS of
+its press stays on until crouch is pressed again (that press stands up),
+Jump is pressed, or the player dies or takes a seat
+(input_abstraction_crouch_release); one held longer crouches while it is
+held, as "hold" does. The touch controls' own toggle holds the button for
+as long as it is on, so it is a hold here, unchanged */
+#define CROUCH_TAP_MS 300
+
+static struct
+{
+	boolean latched;
+	/* the press that stood a latched crouch up: no crouch until let go */
+	boolean standing;
+	boolean down;
+	boolean jump_down;
+	long down_time;
+} crouch_toggles[MAXIMUM_GAMEPADS];
+
+/* port: input.crouch ("toggle") and input.crouch_walk, read again when the
+settings change */
+static struct
+{
+	unsigned long read_at;
+	boolean toggle;
+	boolean walk;
+} crouch_settings = { (unsigned long)-1, FALSE, FALSE };
+
+static void crouch_settings_read(
+	void)
+{
+	extern const char *config_string(const char *name);
+	extern int config_boolean(const char *name);
+	extern unsigned long config_changes(void);
+
+	if (crouch_settings.read_at != config_changes())
+	{
+		const char *value = config_string("input.crouch");
+
+		crouch_settings.read_at = config_changes();
+		crouch_settings.toggle = value && !strcmp(value, "toggle");
+		crouch_settings.walk = config_boolean("input.crouch_walk") != 0;
+	}
+	return;
+}
+
+void input_abstraction_crouch_release(
+	long controller_index)
+{
+	if (controller_index >= 0 && controller_index < MAXIMUM_GAMEPADS)
+		crouch_toggles[controller_index].latched = FALSE;
+	return;
+}
+
+/* port: crouch after every device has been read: input.crouch's toggle,
+then, with input.crouch_walk, any crouch kept below the stand-up push
+(crouch_walk); without it a full push stands a crouched controller's
+player up, as Halo did */
+static void crouch_controls_update(
+	long controller_index,
+	struct game_input_state *state)
+{
+	boolean down = state->buttons[_game_control_crouch] != 0;
+	boolean jump_down = state->buttons[_game_control_jump] != 0;
+
+	crouch_settings_read();
+	if (crouch_settings.toggle)
+	{
+		long now = (long)system_milliseconds();
+
+		if (down && !crouch_toggles[controller_index].down)
+		{
+			crouch_toggles[controller_index].standing = crouch_toggles[controller_index].latched;
+			crouch_toggles[controller_index].latched = FALSE;
+			crouch_toggles[controller_index].down_time = now;
+		}
+		else if (!down && crouch_toggles[controller_index].down)
+		{
+			if (!crouch_toggles[controller_index].standing &&
+				now - crouch_toggles[controller_index].down_time < CROUCH_TAP_MS)
+			{
+				crouch_toggles[controller_index].latched = TRUE;
+			}
+			crouch_toggles[controller_index].standing = FALSE;
+		}
+		if (jump_down && !crouch_toggles[controller_index].jump_down)
+			crouch_toggles[controller_index].latched = FALSE;
+		if (crouch_toggles[controller_index].standing)
+			state->buttons[_game_control_crouch] = 0;
+		else if (crouch_toggles[controller_index].latched && !down)
+			state->buttons[_game_control_crouch] = 1;
+	}
+	else
+	{
+		crouch_toggles[controller_index].latched = FALSE;
+		crouch_toggles[controller_index].standing = FALSE;
+	}
+	crouch_toggles[controller_index].down = down;
+	crouch_toggles[controller_index].jump_down = jump_down;
+	if (state->buttons[_game_control_crouch] && crouch_settings.walk)
+		crouch_walk(&state->forward_movement, &state->strafe);
+	return;
+}
+
 /* the keys held as a game input state's (the keyboard's ticks counted as
 keyboard_controls_update counted them) */
 static void keyboard_controls_apply(
@@ -284,13 +399,11 @@ static void keyboard_controls_apply(
 		if (halo_linux_touch_move((short)controller_index, &forward, &strafe))
 		{
 			/* port: crouched (the touch Crouch tapped on, or any crouch
-			held), below the full stick's 0.98 too, as the keys' crouch
-			walk above: a full push stood the player up while it lasted */
+			held), below the full stick's 0.98 whatever input.crouch_walk
+			is, a full diagonal too: a full push stood the player up while
+			it lasted */
 			if (state->buttons[_game_control_crouch])
-			{
-				forward *= 0.97f;
-				strafe *= 0.97f;
-			}
+				crouch_walk(&forward, &strafe);
 			state->forward_movement = forward;
 			state->strafe = strafe;
 		}
@@ -449,6 +562,18 @@ boolean input_abstraction_port_look_inverted(
 	preferences = &input_abstraction_globals.player_control_preferences[controller_index];
 	return preferences->invert_look ||
 		(preferences->invert_look_aircraft_control && local_player_is_piloting_aircraft(controller_index));
+}
+
+/* port: the controller's right stick is the flick stick (input.flick_stick),
+whose turn player_control.c gives the player: only with the default stick
+layout, in which the right stick looks (another's moves or strafes with it) */
+boolean input_abstraction_port_flick_stick(
+	short controller_index)
+{
+	if (controller_index < 0 || controller_index >= MAXIMUM_GAMEPADS || !halo_linux_flick_stick())
+		return FALSE;
+	return input_abstraction_globals.player_control_preferences[controller_index].joystick_controls ==
+		_joystick_controls_default;
 }
 
 /* ---------- public code */
@@ -825,6 +950,19 @@ static void input_abstraction_state_from_gamepad(
 			error(_error_silent, "unknown joystick preset");
 			break;
 	}
+	/* port: the look's side to side inverted (input.invert_look_horizontal),
+	whichever stick or D-pad turns */
+	if (halo_look_horizontal_inverted())
+		state->yaw = -state->yaw;
+	/* port: the right stick as the flick stick looks by itself: its turn is
+	the flick stick's (player_control.c), its look as the stick's none */
+	if (input_abstraction_port_flick_stick((short)controller_index))
+	{
+		state->yaw = 0.f;
+		state->pitch = 0.f;
+	}
+	/* port: digital movement bindings are independent of stick presets. */
+	controller_remap_movement((short)controller_index, &state->forward_movement, &state->strafe);
 
 	return;
 }
@@ -850,6 +988,7 @@ void input_abstraction_update(
 			player_look_pitch_rate[controller_index] = input_abstraction_globals.player_control_preferences[controller_index].pitch_rate;
 			input_abstraction_state_from_gamepad(controller_index, gamepad, state);
 			keyboard_controls_update(controller_index, state);
+			crouch_controls_update(controller_index, state); /* port */
 			input_abstraction_globals.controller_available[controller_index] = TRUE;
 		}
 		else
@@ -978,10 +1117,11 @@ boolean input_abstraction_port_substep_state(
 		else if (!*ticks)
 			*ticks = 1;
 	}
-	gamepad.sticks[_gamepad_stick_left].x = fix_dead_zone(pad.sThumbLX, SUBSTEP_GAMEPAD_STICK_DEAD_RANGE);
-	gamepad.sticks[_gamepad_stick_left].y = fix_dead_zone(pad.sThumbLY, SUBSTEP_GAMEPAD_STICK_DEAD_RANGE);
-	gamepad.sticks[_gamepad_stick_right].x = fix_dead_zone(pad.sThumbRX, SUBSTEP_GAMEPAD_STICK_DEAD_RANGE);
-	gamepad.sticks[_gamepad_stick_right].y = fix_dead_zone(pad.sThumbRY, SUBSTEP_GAMEPAD_STICK_DEAD_RANGE);
+	/* (each stick's dead range as input_xbox.c's: halo_stick_dead_range) */
+	gamepad.sticks[_gamepad_stick_left].x = fix_dead_zone(pad.sThumbLX, halo_stick_dead_range(_gamepad_stick_left));
+	gamepad.sticks[_gamepad_stick_left].y = fix_dead_zone(pad.sThumbLY, halo_stick_dead_range(_gamepad_stick_left));
+	gamepad.sticks[_gamepad_stick_right].x = fix_dead_zone(pad.sThumbRX, halo_stick_dead_range(_gamepad_stick_right));
+	gamepad.sticks[_gamepad_stick_right].y = fix_dead_zone(pad.sThumbRY, halo_stick_dead_range(_gamepad_stick_right));
 	input_abstraction_state_from_gamepad(controller_index, &gamepad, state);
 	keyboard_controls_apply(controller_index, halo_keyboard_actions(controller_index), state);
 	*primary_trigger = primary_trigger_pull(controller_index, &gamepad);

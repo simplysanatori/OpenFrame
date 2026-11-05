@@ -21,6 +21,7 @@ high-res HUD's are (hud_hires.c).
 #include "halo_menus.h"
 #include "hud_hires.h"
 #include "menu_files.h"
+#include "embedded_assets.h"
 #include "platform.h"
 #include "port_config.h"
 /* (the renderer's backend is on the host: the pictures are images) */
@@ -33,6 +34,7 @@ high-res HUD's are (hud_hires.c).
 
 #include <SDL3/SDL.h>
 #include <errno.h>
+#include <pthread.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -167,7 +169,12 @@ static void files_gather(void)
 		}
 		else
 		{
-			file_add(embedded->path, (const unsigned char *)embedded->data, embedded->size, 0);
+			/* (the game's own, in the assets' file: embedded_assets.h) */
+			const unsigned char *own = (const unsigned char *)embedded_assets_data(embedded->data_offset,
+				embedded->size);
+
+			if (own)
+				file_add(embedded->path, own, embedded->size, 0);
 		}
 	}
 #ifndef HALO_ANDROID
@@ -980,17 +987,22 @@ static int read_file(struct reader *reader, const struct menu_file *file)
 
 /* ---------- public code */
 
-struct halo_menus const *halo_menus_load(void)
+/* The files are read once, on a thread of their own from the start
+(halo_menus_read_ahead), so that the first map's load (the main menu's)
+does not wait the 24 ms Expat takes over them: halo_menus_load waits for
+that thread, and nothing else reads the files before it. */
+static struct halo_menus menus;
+static int menus_succeeded;
+static int menus_read;
+static pthread_t menus_reader;
+static int menus_reading;
+
+static void menus_files_read(void)
 {
-	static int read;
-	static struct halo_menus menus;
-	static int succeeded;
 	struct reader reader;
 	long index;
 
-	if (read)
-		return succeeded ? &menus : NULL;
-	read = 1;
+	menus_read = 1;
 	files_gather();
 	memset(&reader, 0, sizeof(reader));
 	for (index = 0; index < file_count && !reader.failed; index++)
@@ -1009,13 +1021,37 @@ struct halo_menus const *halo_menus_load(void)
 	{
 		if (reader.failed)
 			platform_log("menus: the files have a problem; using the game's own menus");
-		return NULL;
+		return;
 	}
 	if (!reader.menus.root)
 		reader.menus.root = "main_menu";
 	menus = reader.menus;
-	succeeded = 1;
-	return &menus;
+	menus_succeeded = 1;
+}
+
+static void *menus_files_reader(void *unused)
+{
+	(void)unused;
+	menus_files_read();
+	return NULL;
+}
+
+void halo_menus_read_ahead(void)
+{
+	if (!menus_read && !menus_reading && !pthread_create(&menus_reader, NULL, menus_files_reader, NULL))
+		menus_reading = 1;
+}
+
+struct halo_menus const *halo_menus_load(void)
+{
+	if (menus_reading)
+	{
+		pthread_join(menus_reader, NULL);
+		menus_reading = 0;
+	}
+	if (!menus_read)
+		menus_files_read();
+	return menus_succeeded ? &menus : NULL;
 }
 
 long halo_menus_utf16(char const *utf8, unsigned short *out, long capacity)
@@ -1056,7 +1092,25 @@ void halo_menus_log(char const *file, long line, char const *message, char const
 	platform_log("menus: %s:%ld: %s%s%s", file ? file : "?", line, message, detail ? " " : "", detail ? detail : "");
 }
 
-/* ---------- art */
+/* ---------- art
+
+Each bitmap's PNG is decoded on a thread of its own ahead of its first
+draw (halo_menus_art_ahead: those of a screen shown and of the screens it
+opens, menu_tags.c's pc_menu_screen_shown), so that a screen opens without
+decoding its art: the game's thread then only makes the image of the
+pixels. A PNG drawn before its decoding is done waits for it; one never
+asked for is decoded as it is drawn. */
+
+enum
+{
+	_art_decode_none,
+	_art_decode_queued,
+	_art_decode_decoding,
+	_art_decode_done,
+};
+
+/* threads decoding at once */
+#define ART_DECODE_THREADS 2
 
 static struct
 {
@@ -1065,9 +1119,18 @@ static struct
 	unsigned int texture;
 	unsigned long levels;
 	int failed;
+	/* its decoding ahead (art_lock's): the PNG, its pixels once decoded */
+	int decode_state;
+	const unsigned char *decode_png;
+	unsigned long decode_png_size;
+	unsigned char *pixels;
+	unsigned long width, height;
 } art[MAXIMUM_ART];
 static long art_count;
 static unsigned short art_lookup[MAXIMUM_ART * 2];
+static pthread_mutex_t art_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t art_decoded = PTHREAD_COND_INITIALIZER;
+static int art_decoders;
 
 /* Most textures are not menu art. Find those without walking every menu
 bitmap for each texture stage of every draw. Entries survive until forget. */
@@ -1082,6 +1145,16 @@ static unsigned long art_slot(unsigned long data)
 	while (art_lookup[slot] && art[art_lookup[slot] - 1].data != data)
 		slot = (slot + 1) % (MAXIMUM_ART * 2);
 	return slot;
+}
+
+/* (art_lock held) an entry's decoding ahead let go: waited for if running */
+static void art_decode_forget(long index)
+{
+	while (art[index].decode_state == _art_decode_decoding)
+		pthread_cond_wait(&art_decoded, &art_lock);
+	free(art[index].pixels);
+	art[index].pixels = NULL;
+	art[index].decode_state = _art_decode_none;
 }
 
 void halo_menus_art_register(void const *texture, char const *png)
@@ -1105,6 +1178,9 @@ void halo_menus_art_register(void const *texture, char const *png)
 	}
 	else
 	{
+		pthread_mutex_lock(&art_lock);
+		art_decode_forget(index);
+		pthread_mutex_unlock(&art_lock);
 		free(art[index].png);
 		if (art[index].texture)
 		{
@@ -1120,6 +1196,10 @@ void halo_menus_art_forget(void)
 {
 	long index;
 
+	pthread_mutex_lock(&art_lock);
+	for (index = 0; index < art_count; index++)
+		art_decode_forget(index);
+	pthread_mutex_unlock(&art_lock);
 	for (index = 0; index < art_count; index++)
 	{
 		free(art[index].png);
@@ -1132,6 +1212,78 @@ void halo_menus_art_forget(void)
 	memset(art_lookup, 0, sizeof(art_lookup));
 }
 
+/* a decoding thread: each PNG queued in turn, until none is */
+static void *art_decode_thread(void *unused)
+{
+	(void)unused;
+	pthread_mutex_lock(&art_lock);
+	for (;;)
+	{
+		long index;
+		const unsigned char *png;
+		unsigned long size, width = 0, height = 0;
+		unsigned char *pixels;
+
+		for (index = 0; index < art_count && art[index].decode_state != _art_decode_queued; index++)
+			;
+		if (index == art_count)
+			break;
+		art[index].decode_state = _art_decode_decoding;
+		png = art[index].decode_png;
+		size = art[index].decode_png_size;
+		pthread_mutex_unlock(&art_lock);
+		pixels = hud_hires_png_pixels(png, size, &width, &height);
+		pthread_mutex_lock(&art_lock);
+		art[index].pixels = pixels;
+		art[index].width = width;
+		art[index].height = height;
+		art[index].decode_state = _art_decode_done;
+		pthread_cond_broadcast(&art_decoded);
+	}
+	art_decoders--;
+	pthread_cond_broadcast(&art_decoded);
+	pthread_mutex_unlock(&art_lock);
+	return NULL;
+}
+
+void halo_menus_art_ahead(void const *texture)
+{
+	unsigned long slot = art_slot(((const unsigned long *)texture)[1]);
+	long index = art_lookup[slot] ? art_lookup[slot] - 1 : -1;
+	const unsigned char *png;
+	unsigned long size = 0;
+
+	if (index < 0 || art[index].texture || art[index].failed || !art[index].png ||
+		art[index].decode_state != _art_decode_none)
+	{
+		return;
+	}
+	/* (the PNG found here: the files' table is the game thread's) */
+	png = file_data(art[index].png, &size);
+	if (!png)
+		return;
+	pthread_mutex_lock(&art_lock);
+	art[index].decode_png = png;
+	art[index].decode_png_size = size;
+	art[index].decode_state = _art_decode_queued;
+	if (art_decoders < ART_DECODE_THREADS)
+	{
+		pthread_t thread;
+
+		art_decoders++;
+		if (pthread_create(&thread, NULL, art_decode_thread, NULL) == 0)
+			pthread_detach(thread);
+		else
+		{
+			art_decoders--;
+			/* (none: decoded as it is drawn) */
+			if (!art_decoders)
+				art[index].decode_state = _art_decode_none;
+		}
+	}
+	pthread_mutex_unlock(&art_lock);
+}
+
 unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
 {
 	unsigned long slot = art_slot(data);
@@ -1141,10 +1293,33 @@ unsigned int menu_art_texture(unsigned long data, unsigned long *levels)
 		return 0;
 	if (!art[index].texture)
 	{
-		unsigned long size = 0;
-		const unsigned char *png = file_data(art[index].png, &size);
+		unsigned char *pixels = NULL;
+		unsigned long width = 0, height = 0;
+		int decoded = 0;
 
-		art[index].texture = png ? hud_hires_png_texture(png, size, &art[index].levels) : 0;
+		/* (decoded ahead, or being decoded: waited for; queued, and
+		not yet begun: decoded here) */
+		pthread_mutex_lock(&art_lock);
+		while (art[index].decode_state == _art_decode_decoding)
+			pthread_cond_wait(&art_decoded, &art_lock);
+		if (art[index].decode_state == _art_decode_done)
+		{
+			pixels = art[index].pixels;
+			width = art[index].width;
+			height = art[index].height;
+			art[index].pixels = NULL;
+			decoded = 1;
+		}
+		art[index].decode_state = _art_decode_none;
+		pthread_mutex_unlock(&art_lock);
+		if (!decoded)
+		{
+			unsigned long size = 0;
+			const unsigned char *png = file_data(art[index].png, &size);
+
+			pixels = png ? hud_hires_png_pixels(png, size, &width, &height) : NULL;
+		}
+		art[index].texture = pixels ? hud_hires_pixels_texture(pixels, width, height, &art[index].levels) : 0;
 		if (!art[index].texture)
 		{
 			platform_log("menus: could not draw %s", art[index].png);

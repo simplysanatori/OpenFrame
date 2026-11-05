@@ -41,6 +41,7 @@ round the listener to a WAV file, to listen to.
 
 #include <math.h>
 #include <pthread.h>
+#include <stddef.h>
 
 typedef int BOOL;
 typedef unsigned long DWORD;
@@ -92,6 +93,17 @@ static void voice_audio_mix(float *output, unsigned long frames)
 
 /* ---------- voices */
 
+/* a voice's one packet, as the game submitted it and the mixer took it over
+(dsound_sdl.c's hand-off: mix takes the game's side over first) */
+static void voice_packet_taken(struct sdl_stream *stream)
+{
+	stream->packets[0] = stream->mixing[0];
+	stream->packet_count = 1;
+	stream->submitted = 1;
+	stream->mixing_count = 1;
+	stream->mixing_next = 1;
+}
+
 /* a voice of frames frames of channels channels at rate, played at frequency
 (0: its rate), a 2D voice heard at full volume in both speakers */
 static struct sdl_stream *voice_new(const short *samples, unsigned long frames, unsigned long channels,
@@ -105,17 +117,41 @@ static struct sdl_stream *voice_new(const short *samples, unsigned long frames, 
 	stream->volume = 1.0f;
 	stream->mix_left = stream->mix_right = 1.0f;
 	stream->room = stream->room_hf = DSBVOLUME_MIN;
-	stream->packets[0].samples = malloc(frames * channels * sizeof(short));
-	memcpy(stream->packets[0].samples, samples, frames * channels * sizeof(short));
-	stream->packets[0].frames = frames;
-	stream->packet_count = 1;
+	stream->mixing[0].samples = malloc(frames * channels * sizeof(short));
+	memcpy(stream->mixing[0].samples, samples, frames * channels * sizeof(short));
+	stream->mixing[0].frames = frames;
+	voice_packet_taken(stream);
 	resampler_reset(stream);
 	return stream;
 }
 
+/* a game thread holding the voices' lock for 300 ms, set aside by the
+scheduler (hand-off-never-waits) */
+static struct
+{
+	pthread_mutex_t lock;
+	pthread_cond_t condition;
+	BOOL holding;
+} hand_off_test = { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER, FALSE };
+
+static void *hand_off_holder(void *parameter)
+{
+	struct timespec pause = { 0, 300000000L };
+
+	(void)parameter;
+	pthread_mutex_lock(&voices_lock);
+	pthread_mutex_lock(&hand_off_test.lock);
+	hand_off_test.holding = TRUE;
+	pthread_cond_signal(&hand_off_test.condition);
+	pthread_mutex_unlock(&hand_off_test.lock);
+	nanosleep(&pause, NULL);
+	pthread_mutex_unlock(&voices_lock);
+	return NULL;
+}
+
 static void voice_delete(struct sdl_stream *stream)
 {
-	free(stream->packets[0].samples);
+	free(stream->mixing[0].samples);
 	free(stream);
 }
 
@@ -415,11 +451,12 @@ static void scene(unsigned long voices, unsigned long silent, BOOL indoor, doubl
 			stream->room_hf = 0;
 		}
 		/* a packet as long as the scene */
-		free(stream->packets[0].samples);
-		stream->packets[0].frames = (unsigned long)(seconds * 50000);
-		stream->packets[0].samples = malloc(stream->packets[0].frames * stream->channels * sizeof(short));
-		for (n = 0; n < stream->packets[0].frames * stream->channels; n++)
-			stream->packets[0].samples[n] = (v == 0 ? stereo : mono)[n % frames];
+		free(stream->mixing[0].samples);
+		stream->mixing[0].frames = (unsigned long)(seconds * 50000);
+		stream->mixing[0].samples = malloc(stream->mixing[0].frames * stream->channels * sizeof(short));
+		for (n = 0; n < stream->mixing[0].frames * stream->channels; n++)
+			stream->mixing[0].samples[n] = (v == 0 ? stereo : mono)[n % frames];
+		voice_packet_taken(stream);
 		stream->next = streams;
 		streams = stream;
 	}
@@ -452,7 +489,7 @@ static void bench(unsigned long voices, unsigned long silent, BOOL indoor, doubl
 	scene(voices, silent, indoor, seconds);
 	clock_gettime(CLOCK_MONOTONIC, &start);
 	for (chunk = 0; chunk < chunks; chunk++)
-		mix(output, CHUNK);
+		mix(output, CHUNK, TRUE);
 	clock_gettime(CLOCK_MONOTONIC, &end);
 	elapsed = (double)(end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) * 1e-9;
 	printf("%lu voices (%lu out of earshot)%s: %.2f%% of a core, %.1f ns a frame\n", voices, silent,
@@ -934,7 +971,7 @@ int main(int argc, char **argv)
 		render(loud, heard, 20000, TRUE);
 		render(quiet, skipped, 20000, TRUE);
 		CHECK(quiet->center == loud->center && quiet->silence == loud->silence &&
-			quiet->packets[0].finished == loud->packets[0].finished, "turned down, the voice ends at %lu (%lu), "
+			quiet->mixing[0].finished == loud->mixing[0].finished, "turned down, the voice ends at %lu (%lu), "
 			"heard at %lu (%lu)", quiet->center, quiet->silence, loud->center, loud->silence);
 		voice_delete(loud);
 		voice_delete(quiet);
@@ -1107,6 +1144,44 @@ int main(int argc, char **argv)
 		doppler_enabled = TRUE;
 		return 0;
 	}
+	/* the Doppler shift glides: a voice whose velocity jumps from mix to mix
+	between 5 and 15 units a second towards the listener (as the camera's
+	velocity did between the frames, sound_manager.c refresh_listener: its
+	shift from mix to mix 1.046 or 1.153, 170 cents apart) is heard steady,
+	at the shift in between, its pitch moving under 25 cents */
+	CASE("doppler-steady")
+	{
+		static short samples[22050];
+		static float output[CHUNK * 2], send[CHUNK];
+		struct sdl_stream *stream;
+		float lowest = 10.0f, highest = 0.0f, middle = 343.0f / (343.0f - 10.0f * 3.048f);
+		unsigned long mix;
+
+		resampler_mode = RESAMPLER_SINC;
+		listener.distance_factor = 3.048f;
+		stream = voice_new(samples, 22050, 1, 22050, 0);
+		stream->has_3d = TRUE;
+		stream->mode = DS3DMODE_NORMAL;
+		stream->position[2] = 10.0f;
+		stream->minimum_distance = 1.0f;
+		stream->maximum_distance = 1000.0f;
+		for (mix = 0; mix < 40; mix++)
+		{
+			stream->velocity[2] = mix & 1 ? -15.0f : -5.0f;
+			mix_voice(stream, output, send, CHUNK);
+			/* (after a quarter of a second) */
+			if (mix * CHUNK >= OUTPUT_RATE / 4)
+			{
+				lowest = stream->current_doppler < lowest ? stream->current_doppler : lowest;
+				highest = stream->current_doppler > highest ? stream->current_doppler : highest;
+			}
+		}
+		CHECK(1200.0 * log2((double)highest / lowest) < 25.0 && lowest < middle && highest > middle,
+			"heard from x%.4f to x%.4f (%.1f cents), around x%.4f", lowest, highest,
+			1200.0 * log2((double)highest / lowest), middle);
+		voice_delete(stream);
+		return 0;
+	}
 	/* the limiter leaves a mix up to full scale as it is (the menus' music
 	reaches it), and holds two such voices' sum to it */
 	CASE("limiter")
@@ -1127,7 +1202,7 @@ int main(int argc, char **argv)
 		streams = first;
 		for (chunk = 0; chunk < OUTPUT_RATE / 2 / CHUNK; chunk++)
 		{
-			mix(mixed, CHUNK);
+			mix(mixed, CHUNK, TRUE);
 			for (n = 0; chunk && n < CHUNK * 2; n++)
 				alone = fabsf(mixed[n]) > alone ? fabsf(mixed[n]) : alone;
 		}
@@ -1137,7 +1212,7 @@ int main(int argc, char **argv)
 		streams = second;
 		for (chunk = 0; chunk < OUTPUT_RATE / 2 / CHUNK; chunk++)
 		{
-			mix(mixed, CHUNK);
+			mix(mixed, CHUNK, TRUE);
 			for (n = 0; chunk && n < CHUNK * 2; n++)
 				both = fabsf(mixed[n]) > both ? fabsf(mixed[n]) : both;
 		}
@@ -1304,26 +1379,23 @@ int main(int argc, char **argv)
 		output_channels = 2;
 		return 0;
 	}
-	/* audio.spatial: "auto" through the HRTF on headphones only (speakers
-	and not known: the pan), "headphones" and "speakers" whatever the host
-	says, another word as "auto"; the VR mode by vr.hrtf alone */
+	/* audio.spatial: "auto" through the HRTF on any stereo output, as the
+	Xbox, "speakers" panned, another word as "auto"; the VR mode by vr.hrtf
+	alone */
 	CASE("spatial-choice")
 	{
-		static const struct { const char *setting; int headphones; BOOL vr, vr_hrtf, expected; } cases[] = {
-			{ "auto", 1, FALSE, FALSE, TRUE }, { "auto", 0, FALSE, FALSE, FALSE },
-			{ "auto", -1, FALSE, FALSE, FALSE }, { "headphones", 0, FALSE, FALSE, TRUE },
-			{ "headphones", -1, FALSE, FALSE, TRUE }, { "headphones", 1, FALSE, FALSE, TRUE },
-			{ "speakers", 1, FALSE, FALSE, FALSE }, { "speakers", -1, FALSE, FALSE, FALSE },
-			{ "", 1, FALSE, FALSE, TRUE }, { "", -1, FALSE, FALSE, FALSE },
-			{ "auto", 1, TRUE, FALSE, FALSE }, { "speakers", 0, TRUE, TRUE, TRUE },
-			{ "headphones", 1, TRUE, FALSE, FALSE },
+		static const struct { const char *setting; BOOL vr, vr_hrtf, expected; } cases[] = {
+			{ "auto", FALSE, FALSE, TRUE }, { "headphones", FALSE, FALSE, TRUE },
+			{ "speakers", FALSE, FALSE, FALSE }, { "", FALSE, FALSE, TRUE },
+			{ "auto", TRUE, FALSE, FALSE }, { "speakers", TRUE, TRUE, TRUE },
+			{ "headphones", TRUE, FALSE, FALSE },
 		};
 
 		for (index = 0; index < sizeof(cases) / sizeof(cases[0]); index++)
 		{
-			CHECK(spatial_hrtf(cases[index].setting, cases[index].headphones, cases[index].vr, cases[index].vr_hrtf) ==
-				cases[index].expected, "audio.spatial \"%s\", the host saying %d%s: %s, not %s", cases[index].setting,
-				cases[index].headphones, cases[index].vr ? (cases[index].vr_hrtf ? ", VR with vr.hrtf" : ", VR") : "",
+			CHECK(spatial_hrtf(cases[index].setting, cases[index].vr, cases[index].vr_hrtf) ==
+				cases[index].expected, "audio.spatial \"%s\"%s: %s, not %s", cases[index].setting,
+				cases[index].vr ? (cases[index].vr_hrtf ? ", VR with vr.hrtf" : ", VR") : "",
 				cases[index].expected ? "panned" : "through the HRTF", cases[index].expected ? "through the HRTF" : "panned");
 		}
 		return 0;
@@ -1332,7 +1404,7 @@ int main(int argc, char **argv)
 	right ear 0.66 ms later (Woodworth's 31.5 frames) and its high
 	frequencies well down; ahead and behind, the ears alike, and behind
 	duller above a few kHz; above, the pinna's notch moved up from ahead's
-	7.7 kHz to 11 kHz, below down to 6 kHz. Panned: to the left, louder in
+	10.5 kHz to 14.3 kHz, below down to 7 kHz. Panned: to the left, louder in
 	the left ear but at the same time; above, below and behind exactly as
 	ahead (no cue of them) */
 	CASE("hrtf-cues")
@@ -1358,7 +1430,7 @@ int main(int argc, char **argv)
 		below_pan = placed_noise(FALSE, 0.0f, -3.0f, 0.0f, frames);
 
 		delay = ears_delay(left_hrtf, frames);
-		CHECK(delay >= 29 && delay <= 34, "to the left through the HRTF, the right ear %ld frames later, not 31.5", delay);
+		CHECK(delay >= 29 && delay <= 34, "to the left through the HRTF, the right ear %ld frames later, not 32", delay);
 		CHECK(ears_level(left_hrtf, frames) > 10.0, "to the left through the HRTF, the left ear's high frequencies "
 			"%+.1f dB over the right's", ears_level(left_hrtf, frames));
 		delay = ears_delay(left_pan, frames);
@@ -1377,11 +1449,12 @@ int main(int argc, char **argv)
 			CHECK(rear_db < -4.0 && fabs(low_db) < 1.0, "behind through the HRTF, 15 kHz %+.1f dB and 300 Hz %+.1f dB "
 				"of ahead's (ear %d)", rear_db, low_db, ear);
 			/* (each notch: its band against the other's) */
-			notch_ahead = ear_band(ahead_hrtf, frames, ear, 7667.0) - ear_band(ahead_hrtf, frames, ear, 11000.0);
-			notch_above = ear_band(above_hrtf, frames, ear, 7667.0) - ear_band(above_hrtf, frames, ear, 11000.0);
-			notch_below = ear_band(below_hrtf, frames, ear, 6000.0) - ear_band(below_hrtf, frames, ear, 7667.0);
-			CHECK(notch_above - notch_ahead > 8.0 && notch_below < -4.0, "the notch: ahead 7.7 kHz %+.1f dB of 11 kHz, "
-				"above %+.1f dB; below 6 kHz %+.1f dB of 7.7 kHz (ear %d)", notch_ahead, notch_above, notch_below, ear);
+			notch_ahead = ear_band(ahead_hrtf, frames, ear, 10500.0) - ear_band(ahead_hrtf, frames, ear, 14300.0);
+			notch_above = ear_band(above_hrtf, frames, ear, 10500.0) - ear_band(above_hrtf, frames, ear, 14300.0);
+			notch_below = ear_band(below_hrtf, frames, ear, 7040.0) - ear_band(below_hrtf, frames, ear, 10500.0);
+			CHECK(notch_above - notch_ahead > 8.0 && notch_below < -4.0, "the notch: ahead 10.5 kHz %+.1f dB of 14.3 "
+				"kHz, above %+.1f dB; below 7 kHz %+.1f dB of 10.5 kHz (ear %d)", notch_ahead, notch_above, notch_below,
+				ear);
 		}
 		for (index = 0; index < frames * 2; index++)
 		{
@@ -1606,6 +1679,149 @@ int main(int argc, char **argv)
 		free(through);
 		return 0;
 	}
+	/* audio.volume and a voice's own volume (SetVolume) scale every voice
+	alike, the 3D voices through the HRTF as well as the 2D ones: each
+	voice at a fifth of both is 2 x 13.98 dB down */
+	/* Settings > Audio's SOUND (audio.enabled) as the game plays: off fades
+	the output to silence over SOUND_FADE_FRAMES and keeps it silent, on
+	fades it back and then leaves it as mixed; a device is opened for it
+	once a change of the settings turns it on with none open */
+	CASE("sound-off")
+	{
+		static float output[CHUNK * 2];
+		unsigned long frame;
+		float gain = 1.0f;
+
+		for (frame = 0; frame < CHUNK * 2; frame++)
+			output[frame] = 0.5f;
+		gain = sound_fade(output, CHUNK, 2, gain, FALSE);
+		CHECK(output[0] < 0.5f && output[0] > 0.49f, "the fade's first frame: %f", output[0]);
+		CHECK(output[2 * (SOUND_FADE_FRAMES / 2)] > 0.2f && output[2 * (SOUND_FADE_FRAMES / 2)] < 0.3f,
+			"half way: %f", output[2 * (SOUND_FADE_FRAMES / 2)]);
+		for (frame = SOUND_FADE_FRAMES; frame < CHUNK; frame++)
+			CHECK(output[frame * 2] == 0.0f && output[frame * 2 + 1] == 0.0f, "frame %lu after the fade", frame);
+		CHECK(gain == 0.0f, "the gain off: %f", gain);
+		for (frame = 0; frame < CHUNK * 2; frame++)
+			output[frame] = 0.5f;
+		gain = sound_fade(output, CHUNK, 2, gain, FALSE);
+		for (frame = 0; frame < CHUNK * 2; frame++)
+			CHECK(output[frame] == 0.0f, "off, sample %lu: %f", frame, output[frame]);
+		for (frame = 0; frame < CHUNK * 2; frame++)
+			output[frame] = 0.5f;
+		gain = sound_fade(output, CHUNK, 2, gain, TRUE);
+		CHECK(output[0] > 0.0f && output[0] < 0.01f, "fading in: %f", output[0]);
+		CHECK(output[2 * (CHUNK - 1)] == 0.5f && gain == 1.0f, "faded in: %f, gain %f", output[2 * (CHUNK - 1)], gain);
+		for (frame = 0; frame < CHUNK * 2; frame++)
+			output[frame] = 0.5f;
+		gain = sound_fade(output, CHUNK, 2, gain, TRUE);
+		for (frame = 0; frame < CHUNK * 2; frame++)
+			CHECK(output[frame] == 0.5f, "on, sample %lu: %f", frame, output[frame]);
+		/* (the device: turned on with none open, once a change; not when
+		paced by the frames, before the start, already open, off) */
+		CHECK(sound_device_wanted(TRUE, FALSE, TRUE, FALSE, 4, 5), "turned on: no device opened");
+		CHECK(!sound_device_wanted(TRUE, FALSE, TRUE, FALSE, 5, 5), "opened again with no change");
+		CHECK(!sound_device_wanted(TRUE, TRUE, TRUE, FALSE, 4, 5), "a paced mix's device");
+		CHECK(!sound_device_wanted(FALSE, FALSE, TRUE, FALSE, 4, 5), "before the start");
+		CHECK(!sound_device_wanted(TRUE, FALSE, TRUE, TRUE, 4, 5), "one open already");
+		CHECK(!sound_device_wanted(TRUE, FALSE, FALSE, FALSE, 4, 5), "a device for no sound");
+		return 0;
+	}
+	CASE("master-volume")
+	{
+		unsigned long frames = 24000, kind;
+		short *samples = noise_samples(frames * 2 + 4096);
+		float *output = malloc(frames * 2 * sizeof(float));
+
+		hrtf_initialize();
+		listener_reset();
+		for (kind = 0; kind < 5; kind++)
+		{
+			double power_db[2];
+			int pass;
+
+			for (pass = 0; pass < 2; pass++)
+			{
+				struct sdl_stream *stream;
+
+				if (kind == 0)
+					stream = voice_new(samples, frames + 2048, 2, 44100, 0);
+				else if (kind == 1)
+					stream = voice_new(samples, frames + 2048, 1, 22050, 0);
+				else if (kind == 2)
+				{
+					stream = voice_new(samples, frames + 2048, 2, 22050, 0);
+					stream->stereo_positioned = TRUE;
+					stream->stereo_pan = -0.6f;
+				}
+				else
+					stream = voice_placed(samples, frames + 2048, 22050, -3.0f, 1.0f, 0.0f);
+				hrtf_enabled = kind == 4;
+				master_volume = pass ? 0.2f : 1.0f;
+				stream->volume = pass ? 0.2f : 1.0f;
+				render(stream, output, frames, TRUE);
+				power_db[pass] = ears_power(output + CHUNK * 2, frames - CHUNK);
+				voice_delete(stream);
+			}
+			hrtf_enabled = FALSE;
+			master_volume = 1.0f;
+			CHECK(fabs(power_db[1] - power_db[0] + 27.96) < 0.05, "voice %lu (0 2D stereo, 1 2D mono, 2 stereo placed, "
+				"3 3D panned, 4 3D through the HRTF) at a fifth of the master volume and its own: %+.2f dB", kind,
+				power_db[1] - power_db[0]);
+		}
+		free(samples);
+		free(output);
+		return 0;
+	}
+	/* the game's buffers (the loading screen's chant): a looped buffer plays
+	at its rate and gain, under the master volume, coming in without a
+	click; stopped, it fades out and stops; one played once stops at its
+	end */
+	CASE("buffers")
+	{
+		unsigned long frames = 4800, frame;
+		struct sdl_buffer buffer;
+		float *output = calloc(frames * 2, sizeof(float));
+		short *samples = malloc(1000 * sizeof(short));
+		double first_step;
+
+		for (frame = 0; frame < 1000; frame++)
+			samples[frame] = 16384;
+		memset(&buffer, 0, sizeof(buffer));
+		buffer.channels = 1;
+		buffer.samples = samples;
+		buffer.frames = 1000;
+		buffer.rate = OUTPUT_RATE / 2.0;
+		buffer.gain = 0.5f;
+		buffer.playing = buffer.looping = TRUE;
+		buffers = &buffer;
+		master_volume = 0.5f;
+		mix_buffers(output, frames);
+		/* (no click: its gain rises from nothing) */
+		first_step = output[0];
+		CHECK(fabs(first_step) < 0.01, "a buffer comes in at %.4f", first_step);
+		/* (a half, at half its own gain under half the master volume) */
+		CHECK(fabs(output[(frames - 2) * 2] - 0.125f) < 0.001 &&
+			fabs(output[(frames - 2) * 2] - output[(frames - 2) * 2 + 1]) < 1e-6,
+			"a looped buffer at a quarter's gain plays %.4f", output[(frames - 2) * 2]);
+		CHECK(buffer.playing && buffer.position < 1000.0, "a looped buffer loops (at %.1f)", buffer.position);
+		buffer.stopping = TRUE;
+		mix_buffers(output, frames);
+		memset(output, 0, frames * 2 * sizeof(float));
+		mix_buffers(output, frames);
+		CHECK(!buffer.playing && fabs(output[0]) < 1e-6, "a stopped buffer fades out and stops (%d, %.5f)",
+			buffer.playing, output[0]);
+		buffer.playing = TRUE;
+		buffer.looping = FALSE;
+		buffer.stopping = FALSE;
+		buffer.position = 0.0;
+		mix_buffers(output, frames);
+		CHECK(!buffer.playing, "a buffer played once stops at its end");
+		buffers = NULL;
+		master_volume = 1.0f;
+		free(samples);
+		free(output);
+		return 0;
+	}
 	/* "circle <file.wav> hrtf|pan": a sound going round the listener, to
 	listen to (circle) */
 	CASE("circle")
@@ -1679,9 +1895,74 @@ int main(int argc, char **argv)
 		{
 			if (index == OUTPUT_RATE / CHUNK)
 				scene_approach();
-			mix(mixed, CHUNK);
+			mix(mixed, CHUNK, TRUE);
 			fwrite(mixed, sizeof(float), CHUNK * 2, stdout);
 		}
+		return 0;
+	}
+	/* the hand-off: while a game thread holds the voices' lock (set aside by
+	the scheduler), the device's mix does not wait for it, mixes what it took
+	last, and takes the game's change at the next mix */
+	CASE("hand-off-never-waits")
+	{
+		static float mixed[CHUNK * 2];
+		static short samples[48000];
+		struct sdl_stream *stream = voice_new(samples, 48000, 1, 48000, 0);
+		pthread_t holder;
+		struct timespec start, end;
+		double waited;
+
+		streams = stream;
+		mix(mixed, CHUNK, FALSE);
+		pthread_mutex_lock(&hand_off_test.lock);
+		pthread_create(&holder, NULL, hand_off_holder, NULL);
+		while (!hand_off_test.holding)
+			pthread_cond_wait(&hand_off_test.condition, &hand_off_test.lock);
+		pthread_mutex_unlock(&hand_off_test.lock);
+		/* (the game sets the voice's volume as it holds the lock) */
+		stream->pending = (struct voice_settings){ 0 };
+		stream->pending.frequency = 48000;
+		stream->pending.volume = 0.25f;
+		stream->pending_changed = TRUE;
+		clock_gettime(CLOCK_MONOTONIC, &start);
+		mix(mixed, CHUNK, FALSE);
+		clock_gettime(CLOCK_MONOTONIC, &end);
+		waited = (double)(end.tv_sec - start.tv_sec) + (double)(end.tv_nsec - start.tv_nsec) * 1e-9;
+		CHECK(waited < 0.1, "the mix waited %.0f ms for the game's thread", waited * 1000.0);
+		CHECK(hand_offs_skipped == 1 && stream->volume == 1.0f, "the mix took the game's side while it was held");
+		pthread_join(holder, NULL);
+		mix(mixed, CHUNK, FALSE);
+		CHECK(stream->volume == 0.25f && !stream->pending_changed, "the next mix did not take the game's change");
+		streams = NULL;
+		voice_delete(stream);
+		return 0;
+	}
+	/* the hand-off takes every setting the game gives a voice to the mixer's
+	side, and nothing else: the game's side all one byte, the mixer's that
+	byte in as many bytes */
+	CASE("hand-off-settings")
+	{
+		struct sdl_stream *stream = calloc(1, sizeof(*stream));
+		const unsigned char *bytes = (const unsigned char *)stream;
+		size_t offset, taken = 0;
+
+		memset(&stream->pending, 0x5a, sizeof(stream->pending));
+		stream->pending_changed = TRUE;
+		streams = stream;
+		voices_hand_off(TRUE);
+		for (offset = 0; offset < sizeof(*stream); offset++)
+		{
+			if (offset >= offsetof(struct sdl_stream, pending) &&
+				offset < offsetof(struct sdl_stream, pending) + sizeof(stream->pending))
+			{
+				continue;
+			}
+			taken += bytes[offset] == 0x5a;
+		}
+		CHECK(taken == sizeof(struct voice_settings), "%zu bytes of the settings taken, of %zu", taken,
+			sizeof(struct voice_settings));
+		streams = NULL;
+		free(stream);
 		return 0;
 	}
 	/* "bench [voices] [out of earshot] [indoor|outdoor] [hrtf]": through the

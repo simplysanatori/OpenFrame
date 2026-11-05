@@ -7,7 +7,16 @@ made by tools/button_assets.py), the fonts the text is drawn with
 tools/ce_menus.py), the windows' icon and the loading picture in the game
 as C data:
 
-    python tools/embed_assets.py OUTPUT.c
+    python tools/embed_assets.py OUTPUT.c ASSETS
+
+The textures', fonts' and menu files' bytes (about 15 MB, which the guest
+images have no room for) go into ASSETS, openh1.assets, a file the builds
+put beside the game as they do brokers.txt (port/linux/src/
+embedded_assets.h: its form, and how the game finds it); OUTPUT.c has their
+tables, each entry's bytes as an offset in that file, and the file's size and
+CRC-32, so that a file of another build is never read. The window's icon, the
+menus' pointer and the loading picture, needed before anything else, stay in
+OUTPUT.c.
 
 writes OUTPUT.c with each PNG and the bitmap it stands for (its tag, index
 and checksum of its pixels, from port/assets/hud/layout.json,
@@ -25,8 +34,10 @@ operands (it keeps .ascii strings as they are, but once garbled them).
 """
 
 import json
+import math
 import struct
 import sys
+import zlib
 from pathlib import Path
 from typing import Any, List
 
@@ -48,6 +59,15 @@ MENU_LIST = MENU_ASSETS / "menus.json"
 # the desktop windows' icon (tools/app_icon.py; port/linux/src/sdl_platform.c)
 WINDOW_ICON = Path("port/assets/icon/openh1-icon-256.png")
 LOADING_PICTURE = Path("port/assets/loading/loading.rgba.zlib")
+# the pointer the menus show in place of the system's (port/linux/src/sdl_platform.c)
+MENU_CURSOR = Path("port/assets/cursor/menu_cursor.png")
+# the menus' pictures drawn again from the player's maps: a pose each (any
+# <bitmap>_<frame>.json dropped in), and the maps they are made for
+# (port/linux/include/menu_pictures.h)
+PICTURE_ASSETS = Path("port/assets/pictures")
+PICTURE_MAPS = PICTURE_ASSETS / "maps.json"
+# the bitmaps of ui.map whose frames a pose may draw
+PICTURE_BITMAPS = {"sp_levels": "ui\\shell\\bitmaps\\sp_levels", "mp_map_grafix": "ui\\shell\\bitmaps\\mp_map_grafix"}
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
@@ -78,6 +98,88 @@ def menu_files() -> List[str]:
     return json.loads((ROOT / MENU_LIST).read_text())["files"]
 
 
+def picture_poses() -> List[Path]:
+    """The pictures' pose files, by name."""
+    folder = ROOT / PICTURE_ASSETS
+    if not folder.is_dir():
+        return []
+    return sorted(PICTURE_ASSETS / path.name for path in folder.glob("*.json") if path.name != PICTURE_MAPS.name)
+
+
+def picture_number(value: float) -> str:
+    return ("%.4f" % value).rstrip("0").rstrip(".")
+
+
+def picture_pose(path: Path, maps: dict) -> dict:
+    """A pose file's entry in menu_picture_poses (menu_pictures.h); exits on
+    a pose the game could not use."""
+    data = (ROOT / path).read_bytes()
+    pose = json.loads(data)
+    bitmap, _, frame = path.stem.rpartition("_")
+    if bitmap not in PICTURE_BITMAPS or not frame.isdigit():
+        sys.exit(f"{path}: name it <bitmap>_<frame>.json, of {', '.join(PICTURE_BITMAPS)}")
+    scenario = pose["scenario"]
+    map_name = scenario.replace("/", "\\").rsplit("\\", 1)[-1]
+    if map_name not in maps:
+        sys.exit(f"{path}: {map_name} is not in {PICTURE_MAPS} (its cache file checksum)")
+    camera = pose["pose"]
+    # (the vertical field of view as the game's, across at 4:3; the script's
+    # camera halts at 90 degrees: camera_pose.c)
+    fov = math.degrees(2 * math.atan(math.tan(math.radians(camera["vfov"]) / 2) * 4 / 3))
+    if not 0 < fov < 90:
+        sys.exit(f"{path}: a field of view of {fov:.1f} degrees (it must be under 90)")
+    words = [camera["x"], camera["y"], camera["z"], camera["yaw"] % 360, camera["pitch"], camera["roll"], fov]
+    commands = list(pose.get("prepare", []))
+    objects = pose.get("objects", [])
+    if objects:
+        commands.append('debug_object_place "clear"')
+    for item in objects:
+        if "seat" in item:
+            line = [item["tag"], "seat", item["seat"]]
+        else:
+            line = [item["tag"]] + [picture_number(item.get(key, 0.0)) for key in ("x", "y", "z", "yaw", "pitch", "roll")]
+        if "color" in item:
+            line += ["color"] + [picture_number(value) for value in item["color"]]
+        commands.append('debug_object_place "%s"' % " ".join(line))
+    # ("raw" and "none": the picture's colours as rendered)
+    colour = pose.get("colour", "raw")
+    if colour not in ("raw", "none", "curve"):
+        sys.exit(f'{path}: colour is "raw" or "curve"')
+    # (how long the world runs for the objects to settle; 0: left as placed)
+    settle = float(pose.get("settle_seconds", 3.0)) if objects else 0.0
+    if not 0 <= settle <= 30:
+        sys.exit(f"{path}: settle_seconds is 0 to 30")
+    return {"name": path.stem, "bitmap": PICTURE_BITMAPS[bitmap], "frame": int(frame), "map": map_name,
+            "scenario": scenario, "bsp": int(pose.get("bsp", 0)), "aspect": float(pose["aspect"]),
+            "colour": int(colour == "curve"), "settle": int(round(settle * 1000)),
+            "camera": " ".join(picture_number(value) for value in words),
+            "commands": "".join(line + "\n" for line in commands),
+            "checksums": [int(value, 16) for value in maps[map_name]][:4], "hash": zlib.crc32(data)}
+
+
+def c_string(text: str) -> str:
+    return '"' + text.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n") + '"'
+
+
+def picture_lines() -> List[str]:
+    """The poses' table (menu_pictures.h)."""
+    maps = json.loads((ROOT / PICTURE_MAPS).read_text())["maps"] if (ROOT / PICTURE_MAPS).is_file() else {}
+    poses = [picture_pose(path, maps) for path in picture_poses()]
+    lines = ['#include "menu_pictures.h"', "", "const struct menu_picture_pose menu_picture_poses[] =", "{"]
+    for pose in poses:
+        checksums = ", ".join(f"0x{value:08x}u" for value in pose["checksums"])
+        lines.append(f'\t{{ {c_string(pose["name"])}, {c_string(pose["bitmap"])}, {pose["frame"]}, '
+                     f'{c_string(pose["map"])}, {c_string(pose["scenario"])}, {pose["bsp"]}, {pose["aspect"]!r}f, '
+                     f'{pose["colour"]}, {pose["settle"]}, {c_string(pose["camera"])}, {c_string(pose["commands"])}, '
+                     f'{{ {checksums} }}, {len(pose["checksums"])}, 0x{pose["hash"]:08x}u }},')
+    if not poses:
+        lines.append("\t{ 0 },")
+    lines.append("};")
+    lines.append(f"const unsigned int menu_picture_pose_count = {len(poses)};")
+    lines.append("")
+    return lines
+
+
 def hud_asset_inputs() -> List[Path]:
     """The files the generated source is made from."""
     inputs = [listing for listing in (LAYOUT, CE_LAYOUT, CE_STOCK, CUSTOM_EDITION_HUD, TITLE_LIST, BUTTON_LIST, FONT_LIST, MENU_LIST)
@@ -85,7 +187,9 @@ def hud_asset_inputs() -> List[Path]:
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
             *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
             *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else []),
-            *([LOADING_PICTURE] if (ROOT / LOADING_PICTURE).is_file() else [])]
+            *([LOADING_PICTURE] if (ROOT / LOADING_PICTURE).is_file() else []),
+            *([MENU_CURSOR] if (ROOT / MENU_CURSOR).is_file() else []),
+            *([PICTURE_MAPS] if (ROOT / PICTURE_MAPS).is_file() else []), *picture_poses()]
 
 
 def hud_configure_inputs() -> List[Path]:
@@ -97,6 +201,9 @@ def hud_configure_inputs() -> List[Path]:
                             (FONT_ASSETS, FONT_LIST), (MENU_ASSETS, MENU_LIST)):
         if (ROOT / listing).is_file():
             inputs += [folder, listing]
+    # (a pose dropped in changes the folder: configure.py runs again)
+    if (ROOT / PICTURE_ASSETS).is_dir():
+        inputs.append(PICTURE_ASSETS)
     return inputs
 
 
@@ -108,18 +215,48 @@ def words(data: bytes) -> List[str]:
             for start in range(0, len(values), 8)]
 
 
+def assets_file(output: Path) -> Path:
+    """the assets' file hud_assets_build makes beside output"""
+    return output.with_name(ASSETS_NAME)
+
+
 def hud_assets_build(n: Any, prefix: str, output: Path) -> List[Path]:
-    """Emits the rule that generates output; returns [output]. It is made
-    whatever assets the checkout has (with none, its tables are empty), so
-    that the symbols the platform layer refers to are always defined."""
+    """Emits the rule that generates output and the assets' file beside it
+    (assets_file); returns [output]. It is made whatever assets the checkout
+    has (with none, its tables are empty), so that the symbols the platform
+    layer refers to are always defined."""
     inputs = hud_asset_inputs()
     n.rule(
         name=f"{prefix}_embed_assets",
-        command="$python tools/embed_assets.py $out",
+        command=f"$python tools/embed_assets.py $out {assets_file(output)}",
         description=f"{prefix.upper()} EMBED $out",
     )
-    n.build(outputs=output, rule=f"{prefix}_embed_assets", implicit=[Path("tools/embed_assets.py"), *inputs])
+    n.build(outputs=output, rule=f"{prefix}_embed_assets", implicit=[Path("tools/embed_assets.py"), *inputs],
+            implicit_outputs=[assets_file(output)])
     return [output]
+
+
+# the assets' file (port/linux/src/embedded_assets.h)
+ASSETS_NAME = "openh1.assets"
+ASSETS_MAGIC = 0x4131484F  # "OH1A"
+ASSETS_FORM = 1
+
+
+class AssetsFile:
+    """the assets' file's bytes, each blob 16-byte aligned after its header"""
+
+    def __init__(self) -> None:
+        self.data = bytearray(struct.pack("<4I", ASSETS_MAGIC, ASSETS_FORM, 0, 0))
+
+    def add(self, blob: bytes) -> int:
+        self.data += b"\0" * (-len(self.data) % 16)
+        offset = len(self.data)
+        self.data += blob
+        return offset
+
+    def lines(self) -> List[str]:
+        return [f"const unsigned int embedded_assets_size = {len(self.data)}u;",
+                f"const unsigned int embedded_assets_crc = 0x{zlib.crc32(bytes(self.data)):08x}u;", ""]
 
 
 def write_output(output: Path, lines: List[str]) -> None:
@@ -155,8 +292,9 @@ def png_size(data: bytes, name: str) -> tuple:
 
 
 def main() -> None:
-    if len(sys.argv) != 2:
-        sys.exit("usage: embed_assets.py OUTPUT.c")
+    if len(sys.argv) != 3:
+        sys.exit("usage: embed_assets.py OUTPUT.c ASSETS")
+    assets = AssetsFile()
     lines = [
         "/* generated by tools/embed_assets.py from port/assets: do not edit */",
         "",
@@ -175,10 +313,7 @@ def main() -> None:
         scale = asset["scale"]
         if (width, height) != (asset["width"] * scale, asset["height"] * scale):
             sys.exit(f"{name}: {width}x{height}, not {scale}x its bitmap's {asset['width']}x{asset['height']}")
-        lines.append(f"static const unsigned int asset{index}[] = {{")
-        lines.extend(words(data))
-        lines.append("};")
-        lines.append("")
+        offset = assets.add(data)
         tag = asset["tag"].replace("\\", "\\\\")
         coverage = int(asset.get("coverage", False) or any(cell.get("kind") == "meter" for cell in asset.get("cells", [])))
         point_threshold = int(asset.get("point_threshold", False) or any(cell.get("thresholds") for cell in asset.get("cells", [])))
@@ -205,7 +340,7 @@ def main() -> None:
                      f'{point_threshold}, {int(title)}, 0x{sprites:x}u, '
                      f'{f"cells{index}" if cells else "0"}, {len(cells)}, '
                      f'{int(bool(ce))}, {int(asset.get("ce_only", False))}, {ce.get("width", 0)}, {ce.get("height", 0)}, '
-                     f'{ce.get("size", 0)}, 0x{ce.get("crc", 0):08x}u, asset{index}, {len(data)} }},')
+                     f'{ce.get("size", 0)}, 0x{ce.get("crc", 0):08x}u, {offset}u, {len(data)} }},')
     lines.append("const struct hud_hires_embedded hud_hires_embedded[] =")
     lines.append("{")
     lines.extend(table)
@@ -230,11 +365,7 @@ def main() -> None:
     lines.append('#include "text_hires.h"')
     lines.append("")
     files = font_files()
-    for index, name in enumerate(files):
-        lines.append(f"static const unsigned int font{index}[] = {{")
-        lines.extend(words((ROOT / FONT_ASSETS / name).read_bytes()))
-        lines.append("};")
-        lines.append("")
+    font_offsets = [assets.add((ROOT / FONT_ASSETS / name).read_bytes()) for name in files]
     fonts = json.loads((ROOT / FONT_LIST).read_text())["fonts"] if files else []
     lines.append("const struct text_hires_embedded text_hires_embedded[] =")
     lines.append("{")
@@ -242,7 +373,7 @@ def main() -> None:
         index = files.index(font["file"])
         tag = font["tag"].replace("\\", "\\\\")
         size = (ROOT / FONT_ASSETS / font["file"]).stat().st_size
-        lines.append(f'\t{{ "{tag}", "{font["file"]}", font{index}, {size} }},')
+        lines.append(f'\t{{ "{tag}", "{font["file"]}", {font_offsets[index]}u, {size} }},')
     if not fonts:
         lines.append("\t{ 0 },")
     lines.append("};")
@@ -252,19 +383,17 @@ def main() -> None:
     lines.append('#include "menu_files.h"')
     lines.append("")
     menus = menu_files()
-    for index, name in enumerate(menus):
+    menu_offsets = []
+    for name in menus:
         data = (ROOT / MENU_ASSETS / name).read_bytes()
         if name.endswith(".png"):
             png_size(data, name)
-        lines.append(f"static const unsigned int menu{index}[] = {{")
-        lines.extend(words(data))
-        lines.append("};")
-        lines.append("")
+        menu_offsets.append(assets.add(data))
     lines.append("const struct menu_file_embedded menu_files_embedded[] =")
     lines.append("{")
     for index, name in enumerate(menus):
         size = (ROOT / MENU_ASSETS / name).stat().st_size
-        lines.append(f'\t{{ "{name}", menu{index}, {size} }},')
+        lines.append(f'\t{{ "{name}", {menu_offsets[index]}u, {size} }},')
     if not menus:
         lines.append("\t{ 0 },")
     lines.append("};")
@@ -276,6 +405,13 @@ def main() -> None:
     lines.extend(words(data) if data else ["\t0,"])
     lines.append("};")
     lines.append(f"const unsigned long platform_window_icon_size = {len(data)};")
+    # the menus' pointer, a PNG (of size 0 where the checkout has none)
+    data = (ROOT / MENU_CURSOR).read_bytes() if (ROOT / MENU_CURSOR).is_file() else b""
+    lines.append("")
+    lines.append("const unsigned int platform_menu_cursor[] = {")
+    lines.extend(words(data) if data else ["\t0,"])
+    lines.append("};")
+    lines.append(f"const unsigned long platform_menu_cursor_size = {len(data)};")
     data = (ROOT / LOADING_PICTURE).read_bytes() if (ROOT / LOADING_PICTURE).is_file() else b""
     lines.append("")
     lines.append("const unsigned int platform_loading_picture[] = {")
@@ -283,7 +419,17 @@ def main() -> None:
     lines.append("};")
     lines.append(f"const unsigned long platform_loading_picture_size = {len(data)};")
     lines.append("")
+    lines.extend(picture_lines())
+    # the assets' file, its size and CRC-32 in its header too
+    struct.pack_into("<I", assets.data, 8, len(assets.data))
+    lines.append('#include "embedded_assets.h"')
+    lines.append("")
+    lines.extend(assets.lines())
     write_output(Path(sys.argv[1]), lines)
+    pack = Path(sys.argv[2])
+    pack.parent.mkdir(parents=True, exist_ok=True)
+    if not pack.is_file() or pack.read_bytes() != bytes(assets.data):
+        pack.write_bytes(bytes(assets.data))
 
 
 if __name__ == "__main__":

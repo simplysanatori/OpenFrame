@@ -46,9 +46,10 @@ The core:
 - keeps depth reversed (xgpu_backend.h, "Reversed depth"), in a float
   format where the device has one (D32_SFLOAT_S8_UINT): the pipelines'
   depth functions mirrored, the clears and the depth range as 1 - them,
-  the constant depth bias the shaders' and the slope's turned; but in the
-  VR build (HALO_VR), whose eyes, effects, cockpit and compositor's depth
-  read depth as the game has it (XGPU_VULKAN_REVERSED_DEPTH 0).
+  the constant depth bias the shaders' and the slope's turned; in the VR
+  build (HALO_VR) too, whose eyes' passes, effects, cockpit, scope window,
+  rim and compositor's depth read and write it reversed
+  (host_vulkan_vr.c, xgpu_spirv.h's reversed_depth).
 
 Submissions are numbered by a timeline semaphore: xgpu_vulkan_fence ends the
 work recorded so far and returns its number, xgpu_vulkan_wait waits for it.
@@ -64,11 +65,7 @@ work recorded so far and returns its number, xgpu_vulkan_wait waits for it.
 #include <vulkan/vulkan_core.h>
 
 /* depth kept reversed (above) */
-#ifdef HALO_VR
-#define XGPU_VULKAN_REVERSED_DEPTH 0
-#else
 #define XGPU_VULKAN_REVERSED_DEPTH 1
-#endif
 
 /* ---------- the core's life */
 
@@ -120,16 +117,24 @@ struct xgpu_vulkan_options
 	/* display.hdr: what the backend tells of its display (the render
 	thread, as it changes): whether it shows HDR (the window's display
 	does, and the surface has an HDR colour space), its headroom over
-	SDR white (host_render_stream_display_hdr). And the encoding of a
+	SDR white, that white in nits and whether the system gave it
+	(host_render_stream_display_hdr). And the encoding of a
 	frame for an HDR swapchain (xgpu_vulkan_post.c's): encode_prepare
 	makes its pipelines at the start (1 if it can), encode draws the frame
 	into an image of its own of the swapchain's format
 	(XGPU_VULKAN_FORMAT_*) and returns it, NULL if it cannot. NULL: no HDR
 	swapchain. */
-	void (*display_hdr)(int hdr, float headroom);
+	void (*display_hdr)(int hdr, float headroom, float white_nits, int white_reported);
 	int (*encode_prepare)(void);
 	struct xgpu_vulkan_image *(*encode)(struct xgpu_vulkan_image *image, const struct xgpu_hdr_frame *frame,
 		uint8_t format);
+	/* display.gamma: its curve over an SDR frame before the swapchain
+	(xgpu_vulkan_post.c's): gamma_prepare makes its pipeline at the start
+	(1 if it can), gamma draws the frame curved (each channel raised to a
+	power) into an image of its own and returns it, NULL if it cannot.
+	NULL: no curve (the VR build's). */
+	int (*gamma_prepare)(void);
+	struct xgpu_vulkan_image *(*gamma)(struct xgpu_vulkan_image *image, float power);
 };
 
 /* 1 on success: a device that has what the backend needs (logged if not) */
@@ -177,6 +182,10 @@ struct xgpu_vulkan_capabilities
 	is ordered after the ones before it by a barrier (two of its own
 	triangles over the same pixel, unordered) */
 	int color_read, raster_order;
+	/* pixel shaders have the subgroups' bitwise operations (Vulkan 1.1's
+	subgroup arithmetic in the fragment stage): xgpu_spirv_options
+	subgroups */
+	int subgroups;
 };
 void xgpu_vulkan_capabilities(struct xgpu_vulkan_capabilities *capabilities);
 
@@ -217,6 +226,8 @@ enum
 	/* ASTC 4x4 (LDR): DXT textures transcoded on a device without BC
 	(port/linux/astc/xgpu_astc.h) */
 	XGPU_VULKAN_FORMAT_ASTC,
+	/* a signed byte (display.ambient_occlusion "world"'s distance field) */
+	XGPU_VULKAN_FORMAT_R8_SNORM,
 	XGPU_VULKAN_FORMAT_COUNT
 };
 
@@ -385,6 +396,10 @@ struct xgpu_vulkan_pipeline_description
 /* the pipeline of a description, made the first time; VK_NULL_HANDLE if it
 cannot be */
 VkPipeline xgpu_vulkan_pipeline(const struct xgpu_vulkan_pipeline_description *description);
+/* the pipeline where it is made; else none (VK_NULL_HANDLE), and it is made
+apart from the draws, on the compilers, never waited for (display.ambient_
+occlusion "world"'s, while their stand-ins draw) */
+VkPipeline xgpu_vulkan_pipeline_ready(const struct xgpu_vulkan_pipeline_description *description);
 /* Queue preparation without requiring the handle yet. Nonzero means the
 request was accepted or already ready; PREPARED drains every accepted job. */
 int xgpu_vulkan_pipeline_prepare(const struct xgpu_vulkan_pipeline_description *description);
@@ -502,10 +517,17 @@ struct xgpu_vulkan_draw
 {
 	VkPipeline pipeline;
 	uint8_t topology, dynamic_lights, reads_depth, writes_depth;
+	/* its pixel shader reads display.ambient_occlusion's occlusion
+	(xgpu_vulkan_set_ambient_occlusion) */
+	uint8_t ambient_occlusion;
 	/* its pipeline reads the colour attachment (color_read): the
 	attachment bound as its input, the draw ordered after the pass's
 	draws before it */
 	uint8_t reads_color;
+	/* HALO_VULKAN_DRAW_TIMES (measuring): the game's draw's kind, its
+	pixel key's ambient_occlusion, its pipeline key's lighting and its
+	per_pixel_lighting, and XGPU_VULKAN_DRAW_GAME; zeros the backend's own */
+	uint8_t kind[4];
 	const struct xgpu_vulkan_dynamic_state *dynamic;
 	uint32_t bindings;
 	struct xgpu_vulkan_range vertices[XGPU_VULKAN_BINDINGS];
@@ -516,13 +538,63 @@ struct xgpu_vulkan_draw
 	int32_t vertex_offset;
 };
 
+#define XGPU_VULKAN_DRAW_GAME 0x80
 void xgpu_vulkan_draw(const struct xgpu_vulkan_draw *draw);
 
+/* display.ambient_occlusion: the occlusion of the 3D view (an image of the
+target's size, its red the share of the ambient light each pixel has) that
+the draws lighting by it read (xgpu_vulkan_draw's ambient_occlusion), at
+binding XGPU_VULKAN_BINDING_OCCLUSION of the pipeline layout's set
+XGPU_VULKAN_SET_OCCLUSION (xgpu_spirv.h's XGPU_SPIRV_SET_OCCLUSION and
+XGPU_SPIRV_BINDING_AMBIENT_OCCLUSION); NULL: a white texel, none */
+#define XGPU_VULKAN_SET_OCCLUSION 3
+#define XGPU_VULKAN_BINDING_OCCLUSION 0
+void xgpu_vulkan_set_ambient_occlusion(struct xgpu_vulkan_image *image);
+/* display.ambient_occlusion "world" (xgpu_vulkan_world_ao.c, xgpu_stream.h's
+struct xgpu_world_ao_block): in the same set, the structure's distance
+field, its atlas of bricks (a 3D image of signed bytes, linear, clamped to
+its edge) and its table of cells (a 3D RGBA8 image, read by texel), each a
+1x1x1 far-outside stand-in where the field is not whole, and the window's
+block (a uniform buffer) */
+#define XGPU_VULKAN_BINDING_WORLD_SDF 1
+#define XGPU_VULKAN_BINDING_WORLD_AO 2
+#define XGPU_VULKAN_BINDING_WORLD_SDF_TABLE 3
+/* (and the static scenery's pages of the level's occlusion: a 2D array of
+bytes, linear, clamped, a 1x1 page of none where they have not all come) */
+#define XGPU_VULKAN_BINDING_WORLD_AO_SCENERY 4
+/* (and the vehicles' occlusion fields' atlas: a 3D image of four halves,
+linear, clamped, a texel of none where it has not all come) */
+#define XGPU_VULKAN_BINDING_WORLD_AO_OBJECTS 5
+struct xgpu_world_ao_block;
+/* the stand-ins and the sampler made (the core's start): 0 if they cannot be */
+int xgpu_vulkan_world_ao_create(void);
+/* slices z_first to z_first + z_count - 1 of a width x height x depth part
+of the field (XGPU_STREAM_WORLD_AO_TABLE or _ATLAS), in the stream's order
+(width 0: both let go of), and the window's block from now on (NULL: none,
+zeros) */
+void xgpu_vulkan_world_ao_field(uint32_t part, uint32_t width, uint32_t height, uint32_t depth, uint32_t z_first,
+	uint32_t z_count, const void *data);
+void xgpu_vulkan_world_ao_window(const struct xgpu_world_ao_block *block);
+/* (the core's occlusion set) the field's atlas and table or the stand-ins,
+the sampler, the block's range in the ring for the submission of that
+serial (0: none), and a number that changes whenever any of them does */
+struct xgpu_vulkan_image *xgpu_vulkan_world_ao_field_image(void);
+struct xgpu_vulkan_image *xgpu_vulkan_world_ao_table_image(void);
+struct xgpu_vulkan_image *xgpu_vulkan_world_ao_scenery_image(void);
+struct xgpu_vulkan_image *xgpu_vulkan_world_ao_objects_image(void);
+VkSampler xgpu_vulkan_world_ao_sampler(void);
+int xgpu_vulkan_world_ao_block(uint64_t serial, VkDescriptorBufferInfo *info);
+uint64_t xgpu_vulkan_world_ao_number(void);
+
 /* the enhanced dynamic lights' block (struct xgpu_dynamic_lights_block,
-size bytes) and their grid's cells (32 x 32 x 16, four uints each: xgpu.h),
-which the draw set holds (xgpu_spirv.h), in the stream's order: draws
-recorded before it read the old ones, draws after it these */
+size bytes) and their grid's cells (32 x 32 x 16, four uints each: xgpu.h)
+with the clusters' masks past them (a slice more), which the draw set holds
+(xgpu_spirv.h), in the stream's order: draws recorded before it read the old
+ones, draws after it these */
 void xgpu_vulkan_dynamic_lights_upload(const void *block, uint32_t size, const void *cells);
+/* the world (xgpu.h): count texels, into the cells' texture past the
+clusters' masks, in the stream's order as the cells are */
+void xgpu_vulkan_dynamic_lights_world(const void *texels, uint32_t count);
 
 /* ---------- visibility tests */
 
@@ -536,10 +608,13 @@ void xgpu_vulkan_visibility_count_samples(int enabled);
 uint32_t xgpu_vulkan_visibility_counter(void);
 VkFormat xgpu_vulkan_depth_format(void);
 /* area: the samples a pixel of the game's is, which the count written for
-the game is divided by */
-void xgpu_vulkan_visibility_end(uint32_t slot, float area);
+the game is divided by; number: the game's number for the test, written
+with its count */
+void xgpu_vulkan_visibility_end(uint32_t slot, float area, uint32_t number);
 /* where each slot's latest count is written, divided by its area (a count
-of the game's pixels, as the game reads it; any thread) */
+of the game's pixels, as the game reads it; any thread), then, after
+XGPU_VULKAN_VISIBILITY_SLOTS counts, the number of the test each count is
+of, written after the count (a release store: xgpu_stream.h) */
 void xgpu_vulkan_set_visibility_output(volatile uint32_t *counts);
 #define XGPU_VULKAN_VISIBILITY_SLOTS 4096
 /* the largest count written (the game halts on a negative one:
@@ -601,17 +676,22 @@ changes: SDL's): whether HDR is on, its SDR white in scRGB's units (1.0:
 80 nits; 1.0 also where the system does not say) and its headroom over SDR
 white; the swapchain is made again where its output changes. And the front
 end's state (the stream's record, render thread): whether the frames are
-HDR (a half-float back buffer), the mode, paper white (percent of SDR
-white). */
+HDR (a half-float back buffer), the mode, paper white (in nits; 0: the
+system's SDR white, in percent of it: xgpu_hdr_paper_white_nits), the
+UI's white (in nits; 0: paper white's). */
 void xgpu_vulkan_window_hdr(int enabled, float sdr_white, float headroom);
-void xgpu_vulkan_hdr_state(int active, int mode, int paper_white);
+void xgpu_vulkan_hdr_state(int active, int mode, int paper_white_nits, int paper_white, int ui_nits);
 /* display.picture_position: a picture of another shape than the window
 this many pixels from its top (no lower than its bottom) or centered (-1)
 (present), from the next present on */
 void xgpu_vulkan_picture_top(int top);
+/* display.gamma (the stream's record, render thread): the setting, 1 for
+none, from the next present on; an SDR frame is curved by one over it
+(present), an HDR swapchain's never */
+void xgpu_vulkan_gamma(float gamma);
 /* the tone map's and the encoding's parameters now (xgpu_hdr.h): the
-swapchain's output, paper white in its units, the peak in paper whites (1
-and SDR where the swapchain is SDR) */
+swapchain's output, paper white in its units, the peak in paper whites, the
+UI's white over paper white (1 and SDR where the swapchain is SDR) */
 void xgpu_vulkan_hdr_frame(struct xgpu_hdr_frame *frame);
 
 /* the frame's end: its last work submitted, and (with a window) an image
@@ -644,6 +724,21 @@ struct xgpu_vulkan_statistics
 	/* display.hdr's draws that read their colour attachment after a
 	barrier (none where the device orders the reads itself) */
 	uint32_t local_reads;
+	/* HALO_VULKAN_DISCARDS (xgpu_vulkan.c): aspects of attachments not
+	stored (those at frames' ends among them), multisampled images
+	resolved in the pass that drew them, and resolves of samples resolved
+	already (not made again) */
+	uint32_t stores_discarded, frame_end_discards, resolves_in_pass, resolves_skipped;
+	/* aside passes (xgpu_vulkan.c): passes that continued the one before
+	them in one rendering, passes put aside before it, and buffers renamed
+	rather than written in order */
+	uint32_t passes_continued, passes_aside, buffers_renamed;
+	/* debug.gpu_stats (not the VR mode's): the frames' GPU time (from each
+	frame's first work to its last, waits between its submissions
+	included) and the frames it is of; the time between frames' ends and
+	the frames it is of */
+	double gpu_milliseconds, frame_seconds;
+	uint32_t gpu_frames, frames_timed;
 	uint64_t ring_bytes;
 	double pipeline_seconds;
 	uint64_t waits;

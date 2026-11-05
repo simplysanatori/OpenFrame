@@ -23,10 +23,12 @@ Edition channel orders, which the command stream hands the host.
 #include "xgpu_images.h"
 #include "hud_hires.h"
 #include "menu_files.h"
+#include "menu_pictures.h"
 #include "text_hires.h"
 #include "../game/cache_file_formats.h"
 
 #include <SDL3/SDL.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -164,6 +166,140 @@ for each texture by its Data, Format and Size. */
 #define REPLACEMENT_BUCKET_COUNT 1024
 #define REPLACEMENT_IDLE_FRAMES 1800
 
+/* A menu's picture of ui.map's drawn larger than it is (kind 5: a mission's
+picture, a difficulty's badge) is upscaled on a thread of its own, the
+original drawn until it is: upscaling one (256x128 to 1024x512) took a few
+milliseconds of the frame that first drew it, four of them as Choose
+Mission opened. */
+struct upscale_job
+{
+	struct upscale_job *next;
+	unsigned char *bgra, *pixels;
+	unsigned long width, height;
+	long kind;
+	int done;
+	/* its entry gone: freed by the thread when done */
+	int abandoned;
+};
+
+static struct
+{
+	pthread_mutex_t lock;
+	pthread_cond_t work;
+	int running;
+	struct upscale_job *queue;
+} upscaler = { PTHREAD_MUTEX_INITIALIZER, PTHREAD_COND_INITIALIZER };
+
+static void *upscaler_thread(void *unused)
+{
+	(void)unused;
+	pthread_mutex_lock(&upscaler.lock);
+	for (;;)
+	{
+		struct upscale_job *job;
+		unsigned char *pixels;
+
+		while (!upscaler.queue)
+			pthread_cond_wait(&upscaler.work, &upscaler.lock);
+		job = upscaler.queue;
+		upscaler.queue = job->next;
+		pthread_mutex_unlock(&upscaler.lock);
+		pixels = job->abandoned ? NULL :
+			hud_hires_upscale_kind_pixels(job->bgra, job->width, job->height, job->kind);
+		pthread_mutex_lock(&upscaler.lock);
+		free(job->bgra);
+		job->bgra = NULL;
+		if (job->abandoned)
+		{
+			free(pixels);
+			free(job);
+			continue;
+		}
+		job->pixels = pixels;
+		job->done = 1;
+	}
+	return NULL;
+}
+
+/* the texels (BGRA, the job's now) upscaled on the thread: the job, or NULL
+if it cannot be */
+static struct upscale_job *upscale_begin(unsigned char *bgra, unsigned long width, unsigned long height, long kind)
+{
+	struct upscale_job *job = calloc(1, sizeof(*job)), **end;
+
+	if (!job)
+	{
+		free(bgra);
+		return NULL;
+	}
+	job->bgra = bgra;
+	job->width = width;
+	job->height = height;
+	job->kind = kind;
+	pthread_mutex_lock(&upscaler.lock);
+	if (!upscaler.running)
+	{
+		pthread_t thread;
+
+		if (pthread_create(&thread, NULL, upscaler_thread, NULL) != 0)
+		{
+			pthread_mutex_unlock(&upscaler.lock);
+			free(bgra);
+			free(job);
+			return NULL;
+		}
+		pthread_detach(thread);
+		upscaler.running = 1;
+	}
+	for (end = &upscaler.queue; *end; end = &(*end)->next)
+		;
+	*end = job;
+	pthread_cond_signal(&upscaler.work);
+	pthread_mutex_unlock(&upscaler.lock);
+	return job;
+}
+
+/* the job's image, once it is done (the job freed); 0 until then, or if it
+could not be made */
+static unsigned int upscale_take(struct upscale_job **job, unsigned long *levels)
+{
+	unsigned char *pixels;
+	unsigned long width, height;
+
+	pthread_mutex_lock(&upscaler.lock);
+	if (!(*job)->done)
+	{
+		pthread_mutex_unlock(&upscaler.lock);
+		return 0;
+	}
+	pthread_mutex_unlock(&upscaler.lock);
+	pixels = (*job)->pixels;
+	width = (*job)->width;
+	height = (*job)->height;
+	free(*job);
+	*job = NULL;
+	return hud_hires_upscaled_texture(pixels, width, height, levels);
+}
+
+/* the job let go of (freed now if done, else by the thread) */
+static void upscale_drop(struct upscale_job **job)
+{
+	if (!*job)
+		return;
+	pthread_mutex_lock(&upscaler.lock);
+	if ((*job)->done)
+	{
+		free((*job)->pixels);
+		free(*job);
+	}
+	else
+	{
+		(*job)->abandoned = 1;
+	}
+	pthread_mutex_unlock(&upscaler.lock);
+	*job = NULL;
+}
+
 struct replacement_entry
 {
 	struct replacement_entry *next;
@@ -173,6 +309,11 @@ struct replacement_entry
 	unsigned int hud_upscale;
 	unsigned long hud_upscale_levels, last_used_frame;
 	BOOL hud_upscale_checked;
+	/* its upscaling on the thread (a menu's picture's), until it is done */
+	struct upscale_job *upscale_job;
+	/* the menu picture's pose whose original this is (menu_pictures.h), -1
+none, -2 not yet looked for */
+	long picture;
 	/* its pages' newest generation when it was found, and the memory
 	watch serial as of which that is known (as texture_entry's) */
 	unsigned long generation, watched_serial;
@@ -203,6 +344,7 @@ void xgpu_texture_cache_begin_frame(void)
 			{
 				*link = entry->next;
 				xgpu_image_delete(entry->hud_upscale);
+				upscale_drop(&entry->upscale_job);
 				free(entry);
 				continue;
 			}
@@ -248,6 +390,7 @@ static struct replacement_entry *replacement_get(const DWORD *resource, const st
 		entry->format_word = format_word;
 		entry->size_word = size_word;
 		entry->override = -1;
+		entry->picture = -2;
 		entry->next = *bucket;
 		*bucket = entry;
 	}
@@ -268,7 +411,9 @@ static struct replacement_entry *replacement_get(const DWORD *resource, const st
 			entry->generation = 1;
 		xgpu_image_delete(entry->hud_upscale);
 		entry->hud_upscale = 0;
+		upscale_drop(&entry->upscale_job);
 		entry->hud_upscale_checked = FALSE;
+		entry->picture = -2;
 		entry->override = hud_hires_override_find(address, description->width, description->height,
 			description->levels > 1 ? xgpu_texture_level_offset(description, 1) : size);
 		if (entry->override >= 0 && !hud_hires_override_texture(entry->override, &levels))
@@ -310,6 +455,21 @@ unsigned int xgpu_texture_replacement(DWORD resource, struct xgpu_texture_descri
 	entry = replacement_get(header, description);
 	if (!entry)
 		return 0;
+	/* (a menu's picture of a mission or a map, drawn again from the
+player's map: menu_pictures.c) */
+	if (entry->picture == -2)
+	{
+		entry->picture = description->width == MENU_PICTURE_FRAME_WIDTH &&
+			description->height == MENU_PICTURE_FRAME_HEIGHT ?
+			menu_picture_at((unsigned long)PLATFORM_PHYSICAL_TO_VIRTUAL(header[1]), (long)description->width,
+				(long)description->height) : -1;
+	}
+	if (entry->picture >= 0 && (image = menu_pictures_texture(entry->picture, &levels)) != 0)
+	{
+		description->levels = levels;
+		description->hires = TRUE;
+		return image;
+	}
 	override = entry->override;
 	if (override >= 0 && (image = hud_hires_override_texture(override, &levels)) != 0)
 	{
@@ -328,11 +488,11 @@ unsigned int xgpu_texture_replacement(DWORD resource, struct xgpu_texture_descri
 			long kind = hud_hires_upscale_at(address, description->width, description->height);
 
 			/* (a Custom Edition map's stock sheet, kind 4, may be DXT and
-			up to 512 square) */
+			up to 512 square; a menu's picture of ui.map's, kind 5, DXT) */
 			unsigned long largest = kind == 4 ? 512 : 256;
 
 			entry->hud_upscale_checked = TRUE;
-			if (kind && size && (!description->compressed || kind == 4) &&
+			if (kind && size && (!description->compressed || kind == 4 || kind == 5) &&
 				description->width <= largest && description->height <= largest &&
 				custom_edition_texels_order(address) == _custom_edition_channels_xbox &&
 				platform_is_contiguous((void *)address) && platform_is_contiguous((void *)(address + size - 1)))
@@ -349,12 +509,24 @@ unsigned int xgpu_texture_replacement(DWORD resource, struct xgpu_texture_descri
 				{
 					decoded = xgpu_texture_decode_level(description, 0, (const unsigned char *)address, NULL, pixels);
 				}
-				if (decoded)
+				/* (a menu's picture upscaled on the thread, the original drawn
+				meanwhile; the HUD's sheets, as the HUD is first drawn, here) */
+				if (decoded && kind == 5)
+				{
+					entry->upscale_job = upscale_begin((unsigned char *)pixels, description->width,
+						description->height, kind);
+					pixels = NULL;
+				}
+				else if (decoded)
+				{
 					entry->hud_upscale = hud_hires_upscale_texture((const unsigned char *)pixels,
 						description->width, description->height, kind, &entry->hud_upscale_levels);
+				}
 				free(pixels);
 			}
 		}
+		if (entry->upscale_job)
+			entry->hud_upscale = upscale_take(&entry->upscale_job, &entry->hud_upscale_levels);
 		if (entry->hud_upscale)
 		{
 			description->hires = TRUE;

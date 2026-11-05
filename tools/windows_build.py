@@ -28,6 +28,8 @@ Windows executable (port/windows/host; port/windows/README.md):
   package, which the host loads only once it has reserved the guest's memory
   (a delay-loaded DLL);
 - build/windows/brokers.txt, internet play's brokers.
+- build/windows/prepared.records, the stock maps' preparations' records.
+- build/windows/openh1.assets, the textures', fonts' and menus' bytes.
 """
 
 import hashlib
@@ -192,7 +194,7 @@ def generate_windows_build(n: Writer, sln: Any) -> None:
         fetch_third_party(THIRD_PARTY)
         fetch_vulkan_headers(VULKAN_HEADERS_DIR)
     except (OSError, RuntimeError, subprocess.CalledProcessError) as error:
-        print(f"Windows build disabled: cannot fetch musl, SDL3 or the Vulkan headers ({error})",
+        print(f"Windows build disabled: cannot fetch musl, SDL3, FFmpeg or the Vulkan headers ({error})",
               file=sys.stderr)
         return
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
@@ -364,5 +366,14 @@ def _generate_host(n: Writer, sln: Any, guest: Dict[str, Path]) -> None:
     # (network.masters_file, server.masters_file)
     masters = BUILD / "masters.txt"
     n.build(outputs=masters, rule="windows_copy", inputs=Path("port/assets/network/masters.txt"))
-    n.build(outputs="windows", rule="phony", inputs=[output, sdl_dll, brokers, masters])
+    # ... and the relays offered when a direct connection fails (network.relays_file)
+    relays = BUILD / "relays.txt"
+    n.build(outputs=relays, rule="windows_copy", inputs=Path("port/assets/network/relays.txt"))
+    # ... and the stock maps' preparations' records (port/linux/src/prepared_shipped.h)
+    records = BUILD / "prepared.records"
+    n.build(outputs=records, rule="windows_copy", inputs=Path("port/assets/prepared/prepared.records"))
+    # ... and the textures', fonts' and menus' bytes (port/linux/src/embedded_assets.h)
+    assets = BUILD / "openh1.assets"
+    n.build(outputs=assets, rule="windows_copy", inputs=guest["assets"])
+    n.build(outputs="windows", rule="phony", inputs=[output, sdl_dll, brokers, masters, relays, records, assets])
     n.newline()

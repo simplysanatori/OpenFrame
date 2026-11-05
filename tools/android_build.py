@@ -33,10 +33,13 @@ from .guest_toolchain import LLVM_VERSION, guest_toolchain
 from .build_common import (LINUX_PROFILE, MBEDTLS_DIR, MINIUPNPC_DEFINES, MINIUPNPC_DIR, MUSL_MATH_DIR, OWN_CODE_ERRORS,
                            PLATFORM_SEMANTICS_HEADER, QUIET_OWN_CODE_FLAGS, SEMANTICS_HEADER, STB_VORBIS_SOURCE,
                            XDK_INCLUDE, compile_launcher, configuration_defines, download, game_defines_and_includes,
-                           game_sources, miniupnpc_sources, musl_math_sources, opus_cflags, opus_sources, pgo_profile,
-                           profile_use_flags, updater_defines, xdk_headers)
+                           FFMPEG_CALLER, ffmpeg_cflags, game_sources, miniupnpc_sources,
+                           musl_math_sources, opus_cflags, opus_sources,
+                           PROFILE_GENERATE_FLAGS, pgo_generate_defines, pgo_mode, pgo_profile, profile_use_flags, updater_defines,
+                           xdk_headers)
 from . import check_host_imports
-from .embed_assets import hud_assets_build, hud_configure_inputs, server_ui_build
+from .ffmpeg_fetch import fetch_ffmpeg, ffmpeg_sources, ffmpeg_tree
+from .embed_assets import assets_file, hud_assets_build, hud_configure_inputs, server_ui_build
 from .linux_package import ROOT as REPO_ROOT, notices as release_notices
 from .ninja_syntax import Writer
 from .vulkan_build import VULKAN_DIR, fetch_vulkan_headers, host_vulkan_renderer
@@ -72,6 +75,12 @@ SDL_COMMIT = "fa2c02bb6e21974a89ea9824bc53c9932abe5f9c"
 SDL_DIR = THIRD_PARTY / "SDL3"
 SDL_URL = "https://github.com/libsdl-org/SDL.git"
 SDL_ANDROID_MOUSE_PATCH = Path("port/android/patches/sdl-relative-mouse.patch")
+# the Wayland compositor's reference white in cd/m² (its SDR brightness), as
+# the window's property openh1.wayland.reference_luminance: SDL 3.4 keeps
+# only the headroom over it, which gives the display's peak in no nits
+# (port/linux/vulkan/host_vulkan.c)
+SDL_WAYLAND_REFERENCE_PATCH = Path("port/android/patches/sdl-wayland-reference-luminance.patch")
+SDL_WAYLAND_REFERENCE_FILE = "src/video/wayland/SDL_waylandcolor.c"
 SDL_ANDROID_MOUSE_LISTENER = "android-project/app/src/main/java/org/libsdl/app/SDLControllerManager.java"
 ANDROID_API = 28
 # what Gradle builds the APK from beside what ninja stages: the app's Java,
@@ -147,6 +156,8 @@ MUSL_EXCLUDE = {
     "string/explicit_bzero.c",
     # eight bytes at a time (guest_string.c)
     "string/memcmp.c",
+    # the same sort, faster (guest_qsort.c)
+    "stdlib/qsort.c", "stdlib/qsort_nr.c",
 }
 # game files that call variadic functions without a prototype in scope, which
 # only works under x86's calling convention (tools/android_abi_check.py)
@@ -215,9 +226,10 @@ def check_sdl_commit(directory: Path) -> None:
 
 
 def fetch_third_party(third_party: Path = THIRD_PARTY) -> None:
-    """Download musl and SDL3 (configure time, once). musl's archive is
-    checked against MUSL_SHA256 before it is unpacked; a failed download
-    raises RuntimeError, and a failed clone CalledProcessError."""
+    """Download musl, SDL3 and FFmpeg (configure time, once). musl's archive
+    is checked against MUSL_SHA256 before it is unpacked (FFmpeg's against
+    FFMPEG_SHA256: tools/ffmpeg_fetch.py); a failed download raises
+    RuntimeError, and a failed clone CalledProcessError."""
     musl_dir = third_party / f"musl-{MUSL_VERSION}"
     sdl_dir = third_party / "SDL3"
     third_party.mkdir(parents=True, exist_ok=True)
@@ -256,6 +268,16 @@ def fetch_third_party(third_party: Path = THIRD_PARTY) -> None:
     if reverse.returncode != 0:
         subprocess.run(["git", "-C", str(sdl_dir), "checkout", "--", SDL_ANDROID_MOUSE_LISTENER], check=True)
         subprocess.run(["git", "-C", str(sdl_dir), "apply", str(SDL_ANDROID_MOUSE_PATCH.resolve())], check=True)
+    # (and the Wayland one, the same way)
+    reverse = subprocess.run(
+        ["git", "-C", str(sdl_dir), "apply", "--reverse", "--check", str(SDL_WAYLAND_REFERENCE_PATCH.resolve())],
+        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+    )
+    if reverse.returncode != 0:
+        subprocess.run(["git", "-C", str(sdl_dir), "checkout", "--", SDL_WAYLAND_REFERENCE_FILE], check=True)
+        subprocess.run(["git", "-C", str(sdl_dir), "apply", str(SDL_WAYLAND_REFERENCE_PATCH.resolve())], check=True)
+    # the Bink movies' decoders (display.movies)
+    fetch_ffmpeg(third_party)
 
 
 def _musl_sources(musl_dir: Path = MUSL_DIR) -> List[Path]:
@@ -296,7 +318,7 @@ def app_sources() -> List[Path]:
 def android_configure_inputs() -> List[Path]:
     # (app/src's folders, so that adding or removing a file there re-runs it)
     app_folders = [APP_SOURCES, *sorted(path for path in APP_SOURCES.rglob("*") if path.is_dir())]
-    return [Path(__file__), GUEST_ARCH_SCRIPT, GUEST_TOOLCHAIN_SCRIPT, SDL_ANDROID_MOUSE_PATCH, PORT_DIR / "guest" / "runtime", PORT_DIR / "host",
+    return [Path(__file__), GUEST_ARCH_SCRIPT, GUEST_TOOLCHAIN_SCRIPT, SDL_ANDROID_MOUSE_PATCH, SDL_WAYLAND_REFERENCE_PATCH, PORT_DIR / "guest" / "runtime", PORT_DIR / "host",
             LINUX_DIR / "src", Path("tools/vulkan_build.py"), VULKAN_DIR, *app_folders, *hud_configure_inputs()]
 
 
@@ -478,11 +500,13 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
                      *generated_headers]
     if base_register:
         tool_implicit.append(Path("tools/guest_base_register.py"))
-    # profile-guided optimisation with the committed Linux profile: the game
-    # and platform code are the same, and functions that differ simply go
-    # without (the guests train none of their own)
-    profile = pgo_profile(sln, None, [LINUX_PROFILE], guest_cc)
-    profile_flags = " ".join(profile_use_flags(profile))
+    # profile-guided optimisation with the committed profile: the game and
+    # platform code are every guest's, and functions that differ simply go
+    # without; or, with --pgo=generate, instrumented to record it
+    # (guest_profile.c writes it at exit)
+    profile_generate = pgo_mode(sln) == "generate"
+    profile = pgo_profile(sln, [LINUX_PROFILE], guest_cc)
+    profile_flags = " ".join(PROFILE_GENERATE_FLAGS if profile_generate else profile_use_flags(profile))
     if profile:
         tool_implicit.append(profile)
 
@@ -562,6 +586,9 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
     for source in sorted((LINUX_DIR / "src").glob("*.c")):
         if (source.name.startswith("posix_") and source.name not in guest_posix) or source.name in guest_host_only:
             continue
+        # (with FFmpeg's headers, below)
+        if source.name == FFMPEG_CALLER:
+            continue
         # (the build's number: the updater's, and a dedicated server's
         # --version and status)
         if source.name in ("updater.c", "server_mode.c") and updater_cflags:
@@ -586,6 +613,14 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
     # library
     for source in opus_sources():
         objects.append(guest_object(source, " ".join([opus_cflags(guest_abi), *libc_includes])))
+    # the Bink movies' decoders (FFmpeg's, fetched: tools/ffmpeg_fetch.py),
+    # and the platform layer's file that calls them, with the guest's ABI and
+    # C library
+    ffmpeg_dir = ffmpeg_tree(third_party)
+    for source in ffmpeg_sources(ffmpeg_dir):
+        objects.append(guest_object(source, " ".join([ffmpeg_cflags(guest_abi, ffmpeg_dir), *libc_includes])))
+    objects.append(guest_object(LINUX_DIR / "src" / FFMPEG_CALLER, " ".join([
+        ffmpeg_cflags(guest_abi, ffmpeg_dir, QUIET_OWN_CODE_FLAGS), profile_flags, *libc_includes])))
     # internet play's signatures, for public games' listings
     # (port/third_party/monocypher; p2p_crypto.c)
     for name in ("monocypher.c", "monocypher-ed25519.c"):
@@ -618,6 +653,8 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
     ])
     runtime_dir = PORT_DIR / "guest" / "runtime"
     for source in sorted(runtime_dir.glob("*.c")):
+        if source.name == "guest_profile.c" and not profile_generate:
+            continue
         if source.name in ("guest_thread.c", "guest_start.c"):
             objects.append(guest_object(source, runtime_internal_cflags))
         elif source.name == "guest_memory_watch.c":
@@ -655,13 +692,16 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
     checked = guest_dir / "halo_guest.checked"
     n.rule(
         name=f"{prefix}_guest_check",
-        command=f"{python} tools/guest_image_check.py --arch {arch.name} --objdump {objdump} --map $in.map $in $out",
+        command=(f"{python} tools/guest_image_check.py --arch {arch.name} --objdump {objdump} "
+                 f"{'--pgo-generate ' if profile_generate else ''}--map $in.map $in $out"),
         description=f"{label} CHECK $in",
     )
     n.build(outputs=checked, rule=f"{prefix}_guest_check", inputs=image,
             implicit=[Path("tools/guest_image_check.py"), GUEST_ARCH_SCRIPT])
 
-    return {"image": image, "checked": checked, "host_table_c": host_table_c}
+    # (and the assets' file the game reads beside it: embedded_assets.h)
+    return {"image": image, "checked": checked, "host_table_c": host_table_c,
+            "assets": assets_file(gen_dir / "hud_hires_assets.c")}
 
 
 def generate_android_build(n: Writer, sln: Any) -> None:
@@ -679,7 +719,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
         fetch_third_party()
         fetch_vulkan_headers(vulkan_headers)
     except (subprocess.CalledProcessError, OSError, RuntimeError) as error:
-        print(f"Android build disabled: cannot fetch musl/SDL3 or the Vulkan headers ({error})", file=sys.stderr)
+        print(f"Android build disabled: cannot fetch musl, SDL3, FFmpeg or the Vulkan headers ({error})", file=sys.stderr)
         return
     import json
     config: Dict[str, Any] = json.loads(config_path.read_text(encoding="utf-8"))
@@ -777,7 +817,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     host_cflags = " ".join([
         "-O2", "-g", "-fPIC", "-Wall", "-Wno-unused-function", *OWN_CODE_ERRORS, "-D_GNU_SOURCE",
         f"-I{PORT_DIR}/include", f"-I{PORT_DIR}/host", f"-I{SDL_DIR}/include", f"-I{LINUX_DIR}/src",
-        f"-I{TOML_DIR}", "-DHALO_VULKAN=1", *(["-DHALO_GUEST_BASE=1"] if base_register else []),
+        f"-I{TOML_DIR}", "-DHALO_VULKAN=1", *(["-DHALO_GUEST_BASE=1"] if base_register else []), *pgo_generate_defines(sln),
     ])
     host_sources = host_memory_sources(sorted((PORT_DIR / "host").glob("*.c")), base_register) + [
         LINUX_DIR / "src" / "posix_files.c", LINUX_DIR / "src" / "posix_net.c",
@@ -857,8 +897,24 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     staged_licenses = [assets_dir / "licenses" / name for _, name in licenses]
     for (source, _), staged in zip(licenses, staged_licenses):
         n.build(outputs=staged, rule="android_copy", inputs=source)
-    staged_assets = [staged_image, staged_brokers, *staged_licenses]
-    n.build(outputs="android", rule="phony", inputs=[libmain, staged_sdl, *staged_assets])
+    # ... and the stock maps' preparations' records, which it writes there too
+    # (port/linux/src/prepared_shipped.h)
+    staged_records = assets_dir / "prepared.records"
+    n.build(outputs=staged_records, rule="android_copy", inputs=Path("port/assets/prepared/prepared.records"))
+    # the textures', fonts' and menus' bytes (port/linux/src/embedded_assets.h),
+    # which the app writes there too
+    staged_embedded = assets_dir / "openh1.assets"
+    n.build(outputs=staged_embedded, rule="android_copy", inputs=guest["assets"])
+    staged_assets = [staged_image, staged_brokers, staged_records, staged_embedded, *staged_licenses]
+    # the native libraries load on kernels of 16 KB pages (Android 15 and
+    # later; Google Play requires it): every loadable segment 16 KB aligned
+    # (-z max-page-size=16384, above), checked
+    elf_alignment = BUILD / "elf_alignment.stamp"
+    n.rule(name="android_elf_alignment", command="$python tools/android_elf_alignment.py $out $in",
+           description="ANDROID CHECK 16 KB pages")
+    n.build(outputs=elf_alignment, rule="android_elf_alignment", inputs=[libmain, staged_sdl],
+            implicit=[Path("tools/android_elf_alignment.py")])
+    n.build(outputs="android", rule="phony", inputs=[libmain, staged_sdl, elf_alignment, *staged_assets])
 
     apk = PORT_DIR / "app" / "build" / "outputs" / "apk" / "debug" / "app-debug.apk"
     sdl_android_mouse_listener = SDL_DIR / SDL_ANDROID_MOUSE_LISTENER
@@ -872,7 +928,7 @@ def generate_android_build(n: Writer, sln: Any) -> None:
     )
     # (and the app's own files: a change to its Java, manifest or resources
     # alone would otherwise leave the old APK in place)
-    n.build(outputs=apk, rule="android_gradle", inputs=[libmain, staged_sdl, *staged_assets],
+    n.build(outputs=apk, rule="android_gradle", inputs=[libmain, staged_sdl, elf_alignment, *staged_assets],
             implicit=[sdl_android_mouse_listener, *app_sources(), *GRADLE_FILES])
     n.build(outputs="android_apk", rule="phony", inputs=apk)
     n.newline()

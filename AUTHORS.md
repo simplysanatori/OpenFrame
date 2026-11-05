@@ -2,7 +2,7 @@
 
 ## Art
 
-- **The loading screen**: by Paul Hontz (`port/assets/loading`).
+- **The loading screen**: by g0atbutt (`port/assets/loading`).
 
 - **The game's icon** (the macOS app's, the Android app's launcher icon,
   `halo.exe`'s, the Linux release's and the desktop windows'): the OpenH1 logo, Tail Code, by Erin Cena
@@ -29,6 +29,8 @@
   reference photos by Aerocatia. The sniper rifle's zoom labels (2x, 10x)
   are set in Overpass (`port/assets/fonts`). The message icons' pictures
   are Aerocatia's and Jessie's (below).
+- **The menus' mouse cursor** (the blue arrow the menus show for the
+  mouse): by pugzysixtyfour (`port/assets/cursor`).
 
 ## Third-party art
 
@@ -48,6 +50,9 @@
   [Lucide](https://lucide.dev) 1.53.0, under the same licence.
 - **The server browsers' favorite star**: `star` from
   [Lucide](https://lucide.dev) 1.53.0, under the same licence.
+- **The server browsers' search icons** (a column's search, and its
+  clearing): `search` and `x` from [Lucide](https://lucide.dev) 1.53.0,
+  under the same licence.
 - **The Android touch controls' line icons** (start, back, the D-pad, the
   toolbar): outlines of glyphs of [Mobile Controls](https://kenney.nl/assets/mobile-controls)
   1.0 by Kenney (www.kenney.nl), CC0

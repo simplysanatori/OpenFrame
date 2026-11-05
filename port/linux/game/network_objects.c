@@ -71,6 +71,8 @@ same datum index (identifier and all), so that any message can name one:
 
 /* physics.c's */
 extern real global_gravity;
+/* player_queues_new.c's */
+long update_queues_distributed_input_key(long absolute_player_index);
 
 /* units.c's */
 void unit_network_add_weapon(long unit_index, long weapon_index, short slot);
@@ -160,6 +162,9 @@ enum
 	/* a client: where the vehicles its own players drive were, the last
 	ticks (a power of two, more than the longest round trip) */
 	OWN_VEHICLE_POSITION_TICKS = 64,
+	/* ... and how far past its own latest tick it takes the host's word to
+	name (network_distributed.c's PREDICTION_ECHO_LEAD_TICKS) */
+	OWN_VEHICLE_ECHO_LEAD_TICKS = 2,
 	/* the host: the client's ticks it takes as run since a client's vehicle's
 	anchor beyond its own (its messages delayed, then bunched) */
 	VEHICLE_PREDICTION_JITTER_TICKS = 6,
@@ -206,6 +211,12 @@ fourth (as it sends players, network_distributed.c) */
 #define NEAR_OBJECT_DISTANCE 25.0f
 #define MIDDLE_OBJECT_DISTANCE 60.0f
 #define FAR_OBJECT_DISTANCE 120.0f
+/* how near a unit the line of another's aim passes for the other to aim at
+it (network_objects_aims_with_machine): a unit's width and the AI's error
+and lead; or how little off the aim it is, a crosshair on something far
+(5 degrees) */
+#define AIMED_AT_DISTANCE 2.0f
+#define AIMED_AT_COSINE 0.996f
 
 /* a step of an unsteered vehicle's path (world units a tick). Further than
 this in one tick, the host moved it some other way (a teleport), which is
@@ -402,6 +413,11 @@ static struct
 	boolean valid;
 	long machine_index;
 	struct distributed_object_state state;
+	/* (distributed_prediction_at_tick_start) the one heard before it, not
+	yet taken, as a player's (network_distributed.c's
+	distributed_predictions_earlier) */
+	boolean earlier_valid;
+	struct distributed_object_state earlier;
 	long accepted_vehicle_index;
 	word accepted_time;
 	long accepted_host_time;
@@ -1480,6 +1496,59 @@ short network_objects_send_period(
 	return 1;
 }
 
+/* whether the line from from along aim (a unit vector) passes within
+AIMED_AT_DISTANCE of to, or within AIMED_AT_COSINE of the way to it, ahead
+of from */
+static boolean distributed_aims_at(
+	real_point3d const *from,
+	real_vector3d const *aim,
+	real_point3d const *to)
+{
+	real dx = to->x - from->x;
+	real dy = to->y - from->y;
+	real dz = to->z - from->z;
+	real along = dx * aim->i + dy * aim->j + dz * aim->k;
+	real distance_squared = dx * dx + dy * dy + dz * dz;
+
+	/* (what is left of the distance across the line, squared; the cosine
+	compared squared, along / distance >= cosine) */
+	return along > 0.0f && (distance_squared - along * along < AIMED_AT_DISTANCE * AIMED_AT_DISTANCE ||
+		along * along >= AIMED_AT_COSINE * AIMED_AT_COSINE * distance_squared);
+}
+
+/* ... whether a unit at position aiming along aim (a unit vector) aims at
+one of the machine's players, or one of them aims at it */
+boolean network_objects_aims_with_machine(
+	long machine_index,
+	real_point3d const *position,
+	real_vector3d const *aim)
+{
+	short machine_number;
+
+	for (machine_number = 0; machine_number < objects_host_viewers.count; machine_number++)
+	{
+		short count = objects_host_viewers.machines[machine_number].unit_count;
+		short index;
+
+		if (objects_host_viewers.indices[machine_number] != machine_index)
+			continue;
+		for (index = 0; index < count; index++)
+		{
+			long unit_index = objects_host_viewers.machines[machine_number].unit_indices[index];
+			real_point3d const *origin = &objects_host_viewers.machines[machine_number].origins[index];
+
+			if (distributed_aims_at(position, aim, origin) ||
+				(object_try_and_get_and_verify_type(unit_index, _object_mask_unit) &&
+					distributed_aims_at(origin, &unit_get(unit_index)->unit.aiming_vector, position)))
+			{
+				return TRUE;
+			}
+		}
+		return FALSE;
+	}
+	return FALSE;
+}
+
 /* the kinds of states sent this tick */
 enum
 {
@@ -1839,6 +1908,13 @@ void network_objects_handle_vehicle_prediction(
 		{
 			continue;
 		}
+		/* (one not taken yet, kept: network_objects_apply_vehicle_predictions) */
+		if (objects_host_vehicle_predictions[player_index].valid &&
+			(short)(word)((word)state->time - (word)objects_host_vehicle_predictions[player_index].state.time) > 0)
+		{
+			objects_host_vehicle_predictions[player_index].earlier_valid = TRUE;
+			objects_host_vehicle_predictions[player_index].earlier = objects_host_vehicle_predictions[player_index].state;
+		}
 		objects_host_vehicle_predictions[player_index].valid = TRUE;
 		objects_host_vehicle_predictions[player_index].machine_index = machine_index;
 		objects_host_vehicle_predictions[player_index].state = *state;
@@ -1930,9 +2006,12 @@ by it (its gravity on a copy said to hover and fall). A teleporter moves
 the host's copy too, further than it goes since the last taken: it is
 measured from where the host has it only, a new anchor. In the air it is
 no higher than network_objects_vehicle_below_ceiling says. Which of the
-client's ticks the host has it at is noted, to tell the client. */
+client's ticks the host has it at is noted, to tell the client. As the tick
+ends, or (at_tick_start) as it begins for the drivers whose input and
+prediction the host takes then (distributed_prediction_at_tick_start), as a
+player's (distributed_apply_predictions). */
 void network_objects_apply_vehicle_predictions(
-	void)
+	boolean at_tick_start)
 {
 	long now = game_time_get();
 	short player_index;
@@ -1940,6 +2019,7 @@ void network_objects_apply_vehicle_predictions(
 	for (player_index = 0; player_index < MAXIMUM_TRACKED_PLAYERS; player_index++)
 	{
 		struct distributed_object_state const *state = &objects_host_vehicle_predictions[player_index].state;
+		struct distributed_object_state earlier;
 		struct unit_datum *vehicle;
 		struct unit_datum *driver;
 		real_vector3d forward, up, velocity, angular_velocity;
@@ -1947,10 +2027,43 @@ void network_objects_apply_vehicle_predictions(
 		real speed;
 		boolean anchored;
 
+		if (distributed_prediction_at_tick_start(player_index) != at_tick_start)
+			continue;
 		network_objects_note_vehicle_ground(player_index);
 		if (!objects_host_vehicle_predictions[player_index].valid)
 			continue;
 		objects_host_vehicle_predictions[player_index].valid = FALSE;
+		/* (as a player's, distributed_host_take_choice: the input of the
+		client's tick after the latest not come yet, the one before it, whose
+		input has, the latest kept; none, the latest kept, where the
+		prediction of the input heard was lost, or for a tick held) */
+		if (at_tick_start)
+		{
+			long key = update_queues_distributed_input_key(player_index);
+
+			if (key != NONE)
+			{
+				long time = key + (short)(word)((word)state->time - (word)key);
+				long earlier_time = key +
+					(short)(word)((word)objects_host_vehicle_predictions[player_index].earlier.time - (word)key);
+				short take = distributed_host_take_choice(player_index, key, time,
+					objects_host_vehicle_predictions[player_index].earlier_valid, earlier_time);
+
+				if (take == _distributed_take_earlier)
+				{
+					earlier = objects_host_vehicle_predictions[player_index].earlier;
+					state = &earlier;
+					objects_host_vehicle_predictions[player_index].valid = TRUE;
+				}
+				else if (take == _distributed_take_lost || take == _distributed_take_hold)
+				{
+					objects_host_vehicle_predictions[player_index].valid = TRUE;
+					objects_host_vehicle_predictions[player_index].earlier_valid = FALSE;
+					continue;
+				}
+			}
+			objects_host_vehicle_predictions[player_index].earlier_valid = FALSE;
+		}
 		vehicle = (struct unit_datum *)object_try_and_get_and_verify_type(state->object_index, _object_mask_vehicle);
 		if (!vehicle || vehicle->unit.driver_object_index == NONE || vehicle->object.parent_object_index != NONE)
 			continue;
@@ -2533,6 +2646,15 @@ static boolean distributed_client_correct_own_vehicle(
 	real_point3d before, position;
 	short index;
 
+	/* (a tick this machine has not ended yet, as a player's
+	(distributed_correct_own_unit): the host, taking its input as its own
+	tick begins, ran it as this machine runs it. Where this machine had the
+	vehicle last, OWN_VEHICLE_ECHO_LEAD_TICKS at most) */
+	if ((short)(word)((word)state->time - (word)now) > 0 &&
+		(short)(word)((word)state->time - (word)now) <= OWN_VEHICLE_ECHO_LEAD_TICKS)
+	{
+		time = now;
+	}
 	if (!TEST_FLAG(state->flags, _distributed_object_predicted_bit) ||
 		local_player_index < 0 || local_player_index >= MAXIMUM_LOCAL_PLAYERS ||
 		objects_client_own_vehicles[local_player_index][time & (OWN_VEHICLE_POSITION_TICKS - 1)].time != time ||
@@ -3266,6 +3388,39 @@ static void distributed_client_apply_inventory(
 	/* (what the host changed here is not this machine's doing) */
 	if (own)
 		distributed_client_note_own_inventory(own, inventory->unit_index, FALSE);
+}
+
+/* a client: a unit it killed ahead of the host's word, standing again
+(network_damage.c), has the weapons it dropped back in their slots, those
+still loose here, and the one it held (the host's inventory follows) */
+void network_objects_client_restore_weapons(
+	long unit_index,
+	long const *weapon_indices,
+	short current_weapon_index)
+{
+	struct unit_datum *unit = (struct unit_datum *)object_try_and_get_and_verify_type(unit_index, _object_mask_unit);
+	short weapon_slot;
+
+	if (!unit)
+		return;
+	for (weapon_slot = 0; weapon_slot < MAXIMUM_WEAPONS_PER_UNIT; weapon_slot++)
+	{
+		long weapon_index = weapon_indices[weapon_slot];
+
+		if (unit->unit.weapon_object_indices[weapon_slot] != NONE || weapon_index == NONE ||
+			!distributed_client_weapon_here(weapon_index) ||
+			object_get(weapon_index)->object.parent_object_index != NONE)
+		{
+			continue;
+		}
+		distributed_client_release_item(weapon_index, FALSE);
+		unit_network_add_weapon(unit_index, weapon_index, weapon_slot);
+	}
+	if (current_weapon_index >= 0 && current_weapon_index < MAXIMUM_WEAPONS_PER_UNIT &&
+		unit->unit.weapon_object_indices[current_weapon_index] != NONE)
+	{
+		unit->unit.desired_weapon_index = current_weapon_index;
+	}
 }
 
 /* a client's own player picked up a weapon (network_player_show_pickup) */

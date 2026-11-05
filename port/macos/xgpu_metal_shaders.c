@@ -45,16 +45,19 @@ _Static_assert(XGPU_VERTEX_PROGRAM_MAXIMUM == XGPU_STREAM_VERTEX_PROGRAM_MAXIMUM
 /* the emitter's bindings are the backend's */
 _Static_assert(XGPU_MSL_BUFFER_CONSTANTS == XGPU_METAL_BUFFER_VERTEX_CONSTANTS, "constants' buffer");
 _Static_assert(XGPU_MSL_BUFFER_UNIFORMS == XGPU_METAL_BUFFER_DRAW_UNIFORMS, "uniforms' buffer");
+_Static_assert(XGPU_MSL_TEXTURE_AMBIENT_OCCLUSION == XGPU_METAL_TEXTURE_STAGE(XGPU_METAL_TEXTURE_AMBIENT_OCCLUSION) &&
+	XGPU_METAL_TEXTURE_AMBIENT_OCCLUSION < XGPU_METAL_TEXTURE_STAGE_COUNT, "the ambient occlusion's texture");
 _Static_assert(XGPU_METAL_BUFFER_STREAM(XGPU_METAL_STREAM_COUNT - 1) < XGPU_MSL_BUFFER_CONSTANTS, "streams' buffers");
 _Static_assert(XGPU_MSL_BUFFER_DYNAMIC_LIGHTS == XGPU_METAL_BUFFER_DYNAMIC_LIGHTS &&
-	XGPU_MSL_BUFFER_DYNAMIC_LIGHT_CELLS == XGPU_METAL_BUFFER_DYNAMIC_LIGHT_CELLS, "dynamic lights' buffers");
+	XGPU_MSL_BUFFER_DYNAMIC_LIGHT_CELLS == XGPU_METAL_BUFFER_DYNAMIC_LIGHT_CELLS &&
+	XGPU_MSL_BUFFER_DYNAMIC_LIGHT_WORLD == XGPU_METAL_BUFFER_DYNAMIC_LIGHT_WORLD, "dynamic lights' buffers");
 _Static_assert(XGPU_METAL_BUFFER_CONSTANT_ATTRIBUTES != XGPU_MSL_BUFFER_DYNAMIC_LIGHTS &&
 	XGPU_METAL_BUFFER_CONSTANT_ATTRIBUTES != XGPU_MSL_BUFFER_SAMPLES &&
 	XGPU_METAL_BUFFER_CONSTANT_ATTRIBUTES != XGPU_MSL_BUFFER_DYNAMIC_LIGHT_CELLS &&
 	XGPU_METAL_BUFFER_VIEW_UNIFORMS != XGPU_MSL_BUFFER_DYNAMIC_LIGHT_CELLS &&
 	XGPU_METAL_BUFFER_CONSTANT_ATTRIBUTES > XGPU_MSL_BUFFER_UNIFORMS, "constant inputs' buffer");
-_Static_assert(XGPU_METAL_STREAM_DYNAMIC_LIGHT_CELLS_SIZE ==
-	XGPU_DYNAMIC_LIGHTS_GRID_X * XGPU_DYNAMIC_LIGHTS_GRID_Y * XGPU_DYNAMIC_LIGHTS_GRID_Z * 16, "dynamic lights' cells");
+_Static_assert(XGPU_METAL_STREAM_DYNAMIC_LIGHT_CELLS_SIZE == XGPU_DYNAMIC_LIGHTS_CELLS_BYTES, "dynamic lights' cells");
+_Static_assert(XGPU_METAL_STREAM_DYNAMIC_LIGHT_WORLD_TEXELS == XGPU_DYNAMIC_LIGHTS_WORLD_TEXELS, "dynamic lights' world");
 _Static_assert(sizeof(struct xgpu_metal_halo_uniforms) == sizeof(struct xgpu_msl_halo_uniforms) &&
 	offsetof(struct xgpu_metal_halo_uniforms, depth_parameters) == offsetof(struct xgpu_msl_halo_uniforms, depth_parameters) &&
 	offsetof(struct xgpu_metal_halo_uniforms, screen_offset) == offsetof(struct xgpu_msl_halo_uniforms, screen_offset),
@@ -117,6 +120,7 @@ static void pixel_program_convert(const struct xgpu_stream_pixel_program *wire, 
 	program->dynamic_lights = wire->dynamic_lights;
 	program->multiview = wire->multiview;
 	program->source_blend = wire->source_blend;
+	program->ambient_occlusion = wire->ambient_occlusion;
 	program->hdr = wire->hdr;
 }
 
@@ -250,6 +254,9 @@ static int shaders_make(void *context, const struct xgpu_stream_pipeline_define 
 	/* (as the GL backend's: a model lighting program's normal and position,
 	or a structure's lightmap pass's own) */
 	vertex_lighting_convert(lighting_record, &model);
+	/* (display.ambient_occlusion: lit for each vertex, the ambient light
+	handed on apart) */
+	model.split = key->lighting == XGPU_LIGHTING_MODEL_SPLIT;
 	lighting = key->lighting == XGPU_LIGHTING_NONE ? NULL : key->lighting == XGPU_LIGHTING_ENVIRONMENT ? &environment :
 		&model;
 	memset(&options, 0, sizeof(options));
@@ -320,6 +327,9 @@ static uint32_t uniforms_make(void *context, const struct xgpu_metal_stream_unif
 		memcpy(to->bump_luminance, from->bump_luminance, sizeof(to->bump_luminance));
 		memcpy(to->texture_scale, from->texture_scale, sizeof(to->texture_scale));
 		memcpy(to->texture_lod_bias, from->texture_lod_bias, sizeof(to->texture_lod_bias));
+		/* (display.ambient_occlusion "world": the draw's object) */
+		to->world_ao[0] = from->world_ao[0];
+		to->world_ao[1] = from->world_ao[1];
 	}
 	if (inputs->blend_color)
 		memcpy(to->blend_constant, inputs->blend_color, sizeof(to->blend_constant));

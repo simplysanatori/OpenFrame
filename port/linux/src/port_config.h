@@ -22,6 +22,9 @@ long config_integer(const char *name);
 double config_real(const char *name);
 /* never NULL; "" when unset */
 const char *config_string(const char *name);
+/* debug.fresh_memory_fill: the byte (0x00, 0xAA) the allocators fill what
+they give out uncleared with, or -1 for the game's own fill */
+int halo_fresh_memory_fill(void);
 /* sets a setting from its value as text ("true", "60", "1.5", "all"), and
 writes it into config.toml (only its line changes); 1 on success */
 int config_write(const char *name, const char *value);
@@ -74,6 +77,17 @@ struct config_setting_info
 	int written;
 };
 int config_setting_info(int index, struct config_setting_info *info);
+
+/* each weapon's own first-person offsets, by its tag's path ("weapons\\pistol\\pistol",
+any case, / for \\): config.toml's [display.viewmodel_weapon."<path>"] tables,
+x, y and z in centimeters and pitch, yaw and roll in degrees, added to the
+global ones (view_fov.c). config_viewmodel_weapon gives them (0 and 0 if the
+weapon has none); config_viewmodel_weapon_write sets them, for now and in
+config.toml (all 0: the weapon's table taken out), 1 on success.
+config_changes moves with a write */
+#define CONFIG_WEAPON_VALUES 6
+int config_viewmodel_weapon(const char *path, double values[CONFIG_WEAPON_VALUES]);
+int config_viewmodel_weapon_write(const char *path, const double values[CONFIG_WEAPON_VALUES]);
 
 /* the settings whose names begin with prefix ("server.") read from
 config.toml again, but for those their environment variables set; 1 on

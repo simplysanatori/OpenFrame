@@ -112,6 +112,8 @@ symbols in this file:
 #include "saved games/game_state.h"
 #include "rasterizer/rasterizer_console_vars.h"
 #include "rasterizer/rasterizer_model_types.h"
+#include "panini.h" /* port: port/linux/game/panini.c */
+#include "world_ao.h" /* port: port/linux/game/world_ao.c */
 
 /* ---------- constants */
 
@@ -295,6 +297,10 @@ static struct render_object_globals render_object_globals = { 0 };
 boolean debug_inactive_objects = FALSE;
 
 static boolean reported_rendered_object_overflow = FALSE;
+/* port: display.ambient_occlusion's depth pre-pass found the window's
+objects (render_ambient_occlusion_prepass): its draw of them, below, finds
+them no second time */
+static boolean rendered_objects_found_early = FALSE;
 
 /* ---------- public code */
 
@@ -386,7 +392,11 @@ void render_objects(
 	profile_enter(render_objects_section);
 
 	rasterizer_models_begin(FALSE);
-	find_rendered_objects();
+	if (!rendered_objects_found_early)
+	{
+		find_rendered_objects();
+	}
+	rendered_objects_found_early = render_ambient_occlusion_prepass;
 
 	data.shadow = FALSE;
 
@@ -394,7 +404,11 @@ void render_objects(
 	{
 		if (first_person_pass != rasterizer_debug_options.draw_first_person_weapon_first)
 		{
+			/* port: display.ambient_occlusion "world" leaves the first-person
+			weapon as it is (port/linux/game/world_ao.c) */
+			world_ao_first_person(TRUE);
 			first_person_weapon_draw();
+			world_ao_first_person(FALSE);
 		}
 		else
 		{
@@ -404,6 +418,9 @@ void render_objects(
 		first_person_pass = !first_person_pass;
 	}
 	while (first_person_pass);
+	/* port: display.ambient_occlusion "world": no object drawn now (the
+	structure next: port/linux/game/world_ao.c) */
+	world_ao_object_begin(NONE);
 	/* port: the projectiles deleted in the last tick, drawn through it
 	(port/linux/game/render_interpolation.c) */
 	render_interpolation_ghosts_draw();
@@ -566,7 +583,15 @@ static real object_get_level_of_detail_pixels(
 			vr_render_level_of_detail_scale();
 	}
 #else
-	return render_frustum_sphere_diameter_in_pixels(&render.frustum, &center, radius);
+	{
+		/* port: display.panini draws the view's middle larger than the
+		frustum has it (port/linux/game/panini.c): the size it is drawn at
+		there */
+		real pixels = render_frustum_sphere_diameter_in_pixels(&render.frustum, &center, radius);
+		real panini_scale = panini_center_scale();
+
+		return panini_scale != 1.0f ? pixels * panini_scale : pixels;
+	}
 #endif
 }
 
@@ -739,6 +764,10 @@ static void render_object_list(
 						}
 					}
 
+					/* port: display.ambient_occlusion "world": the object drawn
+					(its own proxies do not shade it; its reference:
+					port/linux/game/world_ao.c) */
+					world_ao_object_begin(object_index);
 #ifdef HALO_VR
 					/* port: a weapon the VR mode's right hand reaches for, lit
 					up as the holsters' weapons are (port/linux/game/
@@ -801,7 +830,10 @@ static void render_object_list(
 				}
 			}
 
-			if (!data->shadow && !legs && object->object.first_widget_index != NONE)
+			/* port: (not in display.ambient_occlusion's depth pre-pass: the
+			widgets draw as transparent geometry, queued for later) */
+			if (!data->shadow && !legs && object->object.first_widget_index != NONE &&
+				!render_ambient_occlusion_prepass)
 			{
 				struct render_animation animation;
 
@@ -1131,6 +1163,9 @@ static void object_render_state_refresh(
 				state->desired_lighting.point_light_indices[0];
 			state->lighting.point_light_indices[1] =
 				state->desired_lighting.point_light_indices[1];
+			/* port: (and its own lights: render.h, RENDER_LIGHTING_OWN_LIGHT) */
+			state->lighting.own_lights_low = state->desired_lighting.own_lights_low;
+			state->lighting.own_lights_high = state->desired_lighting.own_lights_high;
 		}
 	}
 	else if (!rebuild && object_light_interpolate)
@@ -1189,6 +1224,9 @@ static void object_render_state_refresh(
 			state->desired_lighting.point_light_indices[0];
 		state->lighting.point_light_indices[1] =
 			state->desired_lighting.point_light_indices[1];
+		/* port: (and its own lights: render.h, RENDER_LIGHTING_OWN_LIGHT) */
+		state->lighting.own_lights_low = state->desired_lighting.own_lights_low;
+		state->lighting.own_lights_high = state->desired_lighting.own_lights_high;
 	}
 	else
 	{

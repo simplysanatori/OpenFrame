@@ -18,8 +18,10 @@ struct xgpu_stream_vertex_lighting;
 struct xgpu_stream_vertex_program;
 
 /* the enhanced dynamic lights' cells' bytes (xgpu.h's grid, four words a
-cell: xgpu_metal_shaders.c checks it) */
-#define XGPU_METAL_STREAM_DYNAMIC_LIGHT_CELLS_SIZE (32 * 32 * 16 * 16)
+cell, and a slice of the clusters' masks past them), and the most texels of
+their world (xgpu_metal_shaders.c checks them) */
+#define XGPU_METAL_STREAM_DYNAMIC_LIGHT_CELLS_SIZE (32 * 32 * 17 * 16)
+#define XGPU_METAL_STREAM_DYNAMIC_LIGHT_WORLD_TEXELS (240 * 1024)
 
 /* the glows' uniforms (the MSL emitter's struct xgpu_msl_halo_uniforms,
 xgpu_msl.h: xgpu_metal_shaders.c checks it) */
@@ -40,7 +42,7 @@ const struct host_render_backend *xgpu_metal_stream_backend(void);
 at a draw: the inputs its vertex layout feeds as integers (unnormalized
 shorts: bit n, input n; none in immediate mode), and for each texture
 stage the axes (bit 0 u, 1 v, 2 w) whose border colour the pixel shader
-draws, the sampler's being one Metal does not have */
+draws (any axis addressed by the border: xgpu_metal_border_axes) */
 struct xgpu_metal_stream_variant
 {
 	uint16_t integer_attributes;

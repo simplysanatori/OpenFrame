@@ -539,6 +539,7 @@ symbols in this file:
 #include "cseries.h"
 #include "game_modes.h" /* port: port/linux/game/game_modes.c */
 #include "infection.h" /* port: port/linux/game/infection.c */
+#include "basic_training.h" /* port: port/linux/game/basic_training.c */
 #include "cseries_windows.h"
 #include "errors.h"
 #include "aim_assist.h"
@@ -577,6 +578,7 @@ symbols in this file:
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "network_party.h" /* port: port/linux/game/network_party.c */
 #include "network_host_controls.h" /* port: port/linux/game/network_host_controls.c */
+#include "network_admin.h" /* port: port/linux/game/network_admin.c */
 #include "halo_keyboard.h" /* port: port/linux/src/xinput_sdl.c */
 /* (network_server_manager_internal.h's: the host's game record) */
 struct network_game *network_game_server_get_game(struct network_game_server *server);
@@ -591,6 +593,7 @@ struct network_game *network_game_server_get_game(struct network_game_server *se
 #include "render/render.h"
 #include "saved games/player_profile.h"
 #include "scenario/scenario.h"
+#include "objects/object_types.h" /* port: the map's vehicle placements (game_engine_vehicle_set_changed) */
 #include "scenario/scenario_definitions.h"
 #include "sound/sound_classes.h"
 #include "text/draw_string.h"
@@ -921,8 +924,10 @@ short debug_player_color = NONE;
 its goal index, so every player needs a goal slot */
 struct netgame_goal global_goal[MAX(32, MULTIPLAYER_MAXIMUM_PLAYERS)] = { 0 };
 /* port: the object each goal is over (game_engine_set_goal_object), to be
-drawn where it is drawn; nothing the ticks do reads it */
+drawn where it is drawn, and the goal's place seen from the object's root
+node as it was when the goal was set; nothing the ticks do reads them */
 static long global_goal_objects[NUMBEROF(global_goal)];
+static real_point3d global_goal_object_points[NUMBEROF(global_goal)];
 struct game_variant global_variant = { 0 };
 struct game_engine *game_engine = NULL;
 
@@ -2077,11 +2082,12 @@ static void scoreboard_menu_items(
 		labels[item][0] = 0;
 	}
 	offered[_scoreboard_item_vote] = TRUE;
-	if (network_votekick_get_status(&status) &&
+	if (network_votekick_get_status(&status) && status.kind == _network_vote_kick &&
 		status.player_index == DATUM_INDEX_TO_ABSOLUTE_INDEX(scoreboard_menu->player_index))
 	{
 		usprintf(labels[_scoreboard_item_vote], status.voted ? L"Voted to kick (%d of %d)" :
-			L"Vote to kick (%d of %d)", status.votes, status.needed);
+			status.voted_no ? L"Voted not to kick (%d of %d)" : L"Vote to kick (%d of %d)", status.votes,
+			status.needed);
 	}
 	else
 	{
@@ -2115,7 +2121,8 @@ static void scoreboard_menu_items(
 	}
 	/* (the host's, as Host Controls has them for the player:
 	network_host_controls.c) */
-	if (network_host_controls_available())
+	/* port: and a dedicated server's admin's (network_admin.c) */
+	if (network_host_controls_available() || network_admin_remote())
 	{
 		unsigned long actions = network_host_controls_player_actions(scoreboard_menu->player_index);
 		struct player_datum *player = player_try_and_get(scoreboard_menu->player_index);
@@ -3213,10 +3220,12 @@ static void game_engine_rasterize_scoreboard(
 		struct data_iterator iterator;
 		struct player_datum *target;
 		wchar_t const *name = L"?";
-		wchar_t const *note = vote.voted ? L" (you voted)" : vote.may_vote ? L"" : L" (too new to vote)";
+		wchar_t const *note = vote.voted ? L" (you voted yes)" : vote.voted_no ? L" (you voted no)" :
+			vote.may_vote ? L"  F1 yes, F2 no" : L" (too new to vote)";
 
 		data_iterator_new(&iterator, player_data);
-		while ((target = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+		while (vote.kind == _network_vote_kick &&
+			(target = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
 		{
 			if (DATUM_INDEX_TO_ABSOLUTE_INDEX(iterator.datum_index) == vote.player_index)
 			{
@@ -3229,8 +3238,16 @@ static void game_engine_rasterize_scoreboard(
 		color.red = 1.0f;
 		color.green = 0.75f;
 		color.blue = 0.3f;
-		usprintf(row_string, L"Vote to kick %s: %d of %d, %d s left%s", name, vote.votes, vote.needed,
-			vote.seconds_left, note);
+		if (vote.kind == _network_vote_end_game)
+		{
+			usprintf(row_string, L"Vote to end the game: %d yes, %d no, %d needed, %d s left%s", vote.votes,
+				vote.no_votes, vote.needed, vote.seconds_left, note);
+		}
+		else
+		{
+			usprintf(row_string, L"Vote to kick %s: %d yes, %d no, %d needed, %d s left%s", name, vote.votes,
+				vote.no_votes, vote.needed, vote.seconds_left, note);
+		}
 		scoreboard_draw_row(row_string, FALSE, &color, next_row++, top, left, FALSE);
 	}
 	/* port: the footer, under a rule across the scoreboard: where the scroll
@@ -6012,6 +6029,12 @@ static struct
 	short name_index;
 } game_engine_vehicle_homes[MAXIMUM_VEHICLE_HOMES];
 static short game_engine_vehicle_home_count = NONE;
+/* port: the homes whose vehicle waits for its pad to be clear, and the
+vehicles of a set changed in a game under way that go once nobody rides
+them (game_engine_vehicle_set_changed) */
+static boolean game_engine_vehicle_homes_waiting[MAXIMUM_VEHICLE_HOMES];
+static long game_engine_vehicles_leaving[MAXIMUM_VEHICLE_HOMES];
+static short game_engine_vehicles_leaving_count = 0;
 
 /* still on the pad the map put it on: further than this, and empty, it can
 come back */
@@ -6133,6 +6156,7 @@ static void game_engine_update_vehicle_respawn(
 			short home = game_engine_vehicle_home_count++;
 
 			game_engine_vehicle_homes[home].object_index = iterator.index;
+			game_engine_vehicle_homes_waiting[home] = FALSE;
 			game_engine_vehicle_homes[home].definition_index = object->definition_index;
 			game_engine_vehicle_homes[home].position = object->object.position;
 			object_get_orientation(iterator.index, &game_engine_vehicle_homes[home].forward,
@@ -6143,9 +6167,16 @@ static void game_engine_update_vehicle_respawn(
 	}
 	for (index = 0; index < game_engine_vehicle_home_count; index++)
 	{
-		long object_index = game_engine_vehicle_home_current(index);
-		struct unit_datum *vehicle = unit_try_and_get(object_index);
+		long object_index;
+		struct unit_datum *vehicle;
 		boolean waiting = TRUE;
+
+		/* (port: a home of a vehicle set changed whose pad is not yet clear:
+		game_engine_update_vehicle_set_change's) */
+		if (game_engine_vehicle_homes_waiting[index])
+			continue;
+		object_index = game_engine_vehicle_home_current(index);
+		vehicle = unit_try_and_get(object_index);
 
 		if (vehicle && !TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit))
 		{
@@ -6203,6 +6234,187 @@ static void game_engine_update_vehicle_respawn(
 	}
 }
 
+/* port: a vehicle set changed in a game under way (Host Controls' RULES:
+port/linux/game/network_host_rules.c), on the host. Every vehicle nobody
+rides goes, wrecks too, and the new set's are placed where the map places
+them, as the game's own placement does as the map starts
+(object_types_place_all, game_engine_vehicle_placement_allowed); they are the
+homes the vehicle respawn puts them back on. One somebody rides stays until
+it is empty, then goes, and a new vehicle whose pad is not clear waits for
+it. The clients get the host's objects (the distributed netcode), as they get
+a respawned vehicle. */
+
+/* a vehicle's pad clear: no living vehicle on it */
+#define VEHICLE_PAD_CLEAR_SQUARED 9.0f
+
+/* whether the object is deleted already, as the objects' update will (its
+datum still there until then) */
+static boolean game_engine_object_being_deleted(
+	long object_index)
+{
+	return TEST_FLAG(object_header_get(object_index)->flags, _object_header_being_deleted_bit);
+}
+
+static boolean game_engine_vehicle_pad_clear(
+	real_point3d const *position)
+{
+	struct object_iterator iterator;
+
+	object_iterator_new(&iterator, _object_mask_vehicle, 0);
+	while (object_iterator_next(&iterator))
+	{
+		struct object_datum *object = object_get(iterator.index);
+		real dx = object->object.position.x - position->x;
+		real dy = object->object.position.y - position->y;
+		real dz = object->object.position.z - position->z;
+
+		if (!TEST_FLAG(object->object.damage_flags, _object_dead_bit) &&
+			!game_engine_object_being_deleted(iterator.index) &&
+			dx * dx + dy * dy + dz * dz < VEHICLE_PAD_CLEAR_SQUARED)
+		{
+			return FALSE;
+		}
+	}
+	return TRUE;
+}
+
+/* the home's vehicle made on its pad (the respawn's way) */
+static void game_engine_vehicle_home_place(
+	short home)
+{
+	struct object_placement_data placement_data;
+
+	object_placement_data_new(&placement_data, game_engine_vehicle_homes[home].definition_index, NONE);
+	placement_data.position = game_engine_vehicle_homes[home].position;
+	placement_data.forward = game_engine_vehicle_homes[home].forward;
+	placement_data.up = game_engine_vehicle_homes[home].up;
+	game_engine_vehicle_homes[home].object_index = object_new(&placement_data);
+	if (game_engine_vehicle_homes[home].object_index != NONE)
+	{
+		object_claim_scenario_name(game_engine_vehicle_homes[home].object_index,
+			game_engine_vehicle_homes[home].name_index);
+	}
+	game_engine_vehicle_homes[home].idle_since = NONE;
+}
+
+void game_engine_vehicle_set_changed(
+	short *removed,
+	short *placed,
+	short *waiting)
+{
+	static long vehicles[MAXIMUM_VEHICLE_HOMES];
+	struct scenario *scenario = global_scenario_get();
+	struct object_iterator iterator;
+	struct tag_block *placements;
+	struct tag_block *palette;
+	long element_size;
+	short count = 0;
+	short index;
+
+	*removed = *placed = *waiting = 0;
+	if (!game_engine || network_game_distributed_client() || !scenario)
+		return;
+	/* (those nobody rides, and wrecks, go; those ridden once empty) */
+	object_iterator_new(&iterator, _object_mask_vehicle, 0);
+	while (object_iterator_next(&iterator) && count < MAXIMUM_VEHICLE_HOMES)
+	{
+		if (!game_engine_object_being_deleted(iterator.index))
+			vehicles[count++] = iterator.index;
+	}
+	game_engine_vehicles_leaving_count = 0;
+	for (index = 0; index < count; index++)
+	{
+		struct unit_datum *vehicle = unit_try_and_get(vehicles[index]);
+
+		if (!vehicle)
+			continue;
+		if (TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit) || game_engine_vehicle_empty(vehicle))
+		{
+			object_delete(vehicles[index]);
+			(*removed)++;
+		}
+		else
+			game_engine_vehicles_leaving[game_engine_vehicles_leaving_count++] = vehicles[index];
+	}
+	/* (the new set's, where the map places them: each a home) */
+	game_engine_vehicle_home_count = 0;
+	game_engine_vehicle_placement_begin();
+	placements = scenario_get_object_type_scenario_datums(scenario, _object_type_vehicle, &element_size);
+	palette = scenario_get_object_type_scenario_palette(scenario, _object_type_vehicle);
+	for (index = 0; index < MIN(placements->count, SHORT_MAX) && game_engine_vehicle_home_count < MAXIMUM_VEHICLE_HOMES;
+		index++)
+	{
+		struct scenario_object_datum *placement =
+			(struct scenario_object_datum *)tag_block_get_element_with_size(placements, index, element_size);
+		long definition_index;
+		long object_index = NONE;
+		short home;
+
+		if (!VALID_INDEX(placement->palette_entry_index, palette->count) ||
+			TEST_FLAG(placement->placement_flags, _scenario_object_placement_not_automatic_bit) ||
+			!custom_edition_vehicle_placement_allowed(placement) ||
+			!game_engine_vehicle_placement_allowed(placement, palette))
+		{
+			continue;
+		}
+		definition_index = game_engine_remap_object_definition(TAG_BLOCK_GET_ELEMENT(palette,
+			placement->palette_entry_index, struct scenario_object_palette_entry)->reference.index);
+		if (definition_index == NONE)
+			continue;
+		if (game_engine_vehicle_pad_clear(&placement->position))
+			object_index = object_new_from_scenario(placement, palette);
+		home = game_engine_vehicle_home_count++;
+		game_engine_vehicle_homes[home].object_index = object_index;
+		game_engine_vehicle_homes[home].definition_index = object_index != NONE ?
+			object_get(object_index)->definition_index : definition_index;
+		game_engine_vehicle_homes[home].position = placement->position;
+		vectors3d_from_euler_angles3d(&game_engine_vehicle_homes[home].forward, &game_engine_vehicle_homes[home].up,
+			&placement->rotation);
+		game_engine_vehicle_homes[home].idle_since = NONE;
+		game_engine_vehicle_homes[home].name_index = object_index != NONE ? object_get(object_index)->object.name_index :
+			VALID_INDEX(placement->name_index, scenario->object_names.count) ? placement->name_index : NONE;
+		game_engine_vehicle_homes_waiting[home] = object_index == NONE;
+		if (object_index != NONE)
+			(*placed)++;
+		else
+			(*waiting)++;
+	}
+}
+
+/* (each second, on the host) a changed set's ridden vehicles gone once
+empty, and its waiting ones placed once their pads are clear */
+static void game_engine_update_vehicle_set_change(
+	void)
+{
+	short index;
+
+	if (network_game_distributed_client() || game_time_get() % TICKS_PER_SECOND)
+		return;
+	for (index = 0; index < game_engine_vehicles_leaving_count; index++)
+	{
+		struct unit_datum *vehicle = unit_try_and_get(game_engine_vehicles_leaving[index]);
+
+		if (vehicle && !game_engine_object_being_deleted(game_engine_vehicles_leaving[index]) &&
+			!TEST_FLAG(vehicle->object.damage_flags, _object_dead_bit) && !game_engine_vehicle_empty(vehicle))
+		{
+			continue;
+		}
+		if (vehicle)
+			object_delete(game_engine_vehicles_leaving[index]);
+		game_engine_vehicles_leaving[index--] =
+			game_engine_vehicles_leaving[--game_engine_vehicles_leaving_count];
+	}
+	for (index = 0; index < game_engine_vehicle_home_count; index++)
+	{
+		if (game_engine_vehicle_homes_waiting[index] &&
+			game_engine_vehicle_pad_clear(&game_engine_vehicle_homes[index].position))
+		{
+			game_engine_vehicle_home_place(index);
+			game_engine_vehicle_homes_waiting[index] = FALSE;
+		}
+	}
+}
+
 void game_engine_update(
 	void)
 {
@@ -6213,6 +6425,8 @@ void game_engine_update(
 		game_engine_update_weapons();
 		game_engine_update_item_spawn();
 		game_engine_update_vehicle_respawn();
+		/* port: a vehicle set changed in the game (game_engine_vehicle_set_changed) */
+		game_engine_update_vehicle_set_change();
 
 		{
 			struct data_iterator player_iterator;
@@ -6985,6 +7199,23 @@ void game_engine_playlist_next(
 	return;
 }
 
+/* port: whether a bot left the game in progress (its player's datum stays
+for the scores, as a player's who quits: port/linux/game/bots.c) */
+static boolean game_engine_port_bot_left(
+	void)
+{
+	struct data_iterator iterator;
+	struct player_datum *player;
+
+	data_iterator_new(&iterator, player_data);
+	while ((player = (struct player_datum *)data_iterator_next(&iterator)) != NULL)
+	{
+		if (player->quit_out_of_game && bots_player_is_bot(iterator.datum_index))
+			return TRUE;
+	}
+	return FALSE;
+}
+
 boolean game_engine_should_end_game(
 	void)
 {
@@ -6993,7 +7224,12 @@ boolean game_engine_should_end_game(
 	/* port: Infection's round ends by its own rules (infection.c) */
 	if (infection_enabled())
 		return FALSE;
-	if (game_engine && !multiple_teams_alive())
+	/* port: not once bots have left it (the host took them out, or asked
+	for fewer), which may leave one team, or one player, alone: the game
+	goes on to its limits, for bots the host adds back or players who join
+	it in progress. The Xbox's game ended when the others quit, and a game
+	no bot left still does */
+	if (game_engine && !multiple_teams_alive() && !game_engine_port_bot_left())
 		should_end_game = TRUE;
 	/* port: the gametype's time limit (game_variant_options) */
 	if (game_engine && game_variant_options_get()->time_limit > 0 &&
@@ -7240,6 +7476,8 @@ short game_engine_player_get_custom_motion_sensor_positions(
 void game_engine_render_nav_points(
 	short local_player_index)
 {
+	/* port: Basic Training's spots to run to (port/linux/game/basic_training.c) */
+	basic_training_render_nav_points(local_player_index);
 	if (game_engine &&
 		global_variant.universal_variant.goal_radar == _radar_nav_point &&
 		local_player_index != NONE)
@@ -8610,6 +8848,22 @@ void game_engine_set_goal_object(
 			player_get(item->object.owner_player_index)->unit_index;
 	}
 	global_goal_objects[goal_index] = object_index;
+	/* (seen from the object as it is now: at 60 and 120 the goal is set in
+	a tick's work, and the object's sub-steps move it on before the frames
+	draw it, so the goal's place is held to the object as it was then, not
+	moved by how far the object has gone since; its nodes as they are, read
+	only: object_get_node_matrix poses a sub-step's view of them) */
+	if (object_index != NONE)
+	{
+		real_matrix4x3 const *nodes = (real_matrix4x3 const *)object_header_block_get(
+			object_index,
+			&object_get(object_index)->object.node_matrices);
+
+		matrix4x3_inverse_transform_point(
+			&nodes[0],
+			&global_goal[goal_index].position,
+			&global_goal_object_points[goal_index]);
+	}
 
 	return;
 }
@@ -8622,10 +8876,15 @@ real_point3d *game_engine_get_goal_drawn_position(
 {
 	/* (an object only of a goal set: game_engine_set_goal_position) */
 	long object_index = global_goal[goal_index].in_use ? global_goal_objects[goal_index] : NONE;
+	real_matrix4x3 const *drawn;
 
 	*position = global_goal[goal_index].position;
-	if (object_index != NONE && object_try_and_get(object_index))
-		render_interpolation_object_point(object_index, position);
+	/* (from the object's root node as a frame draws it) */
+	if (object_index != NONE && object_try_and_get(object_index) &&
+		(drawn = render_interpolation_object_node_matrices(object_index)) != NULL)
+	{
+		matrix4x3_transform_point(&drawn[0], &global_goal_object_points[goal_index], position);
+	}
 
 	return position;
 }
@@ -8906,6 +9165,9 @@ void game_engine_initialize_for_new_map(
 		game_engine_globals.next_team_index = 0;
 		csmemset(game_engine_betrayal_penalty, 0, sizeof(game_engine_betrayal_penalty));
 		game_engine_vehicle_home_count = NONE;
+		/* port: and a vehicle set changed in the last game's */
+		game_engine_vehicles_leaving_count = 0;
+		csmemset(game_engine_vehicle_homes_waiting, 0, sizeof(game_engine_vehicle_homes_waiting));
 		timeout_for_endgame_sound = 0;
 		game_engine_network_state_read = FALSE;
 		carnage_report_game_ticks = NONE;
@@ -10722,12 +10984,19 @@ void game_engine_postspawn_player_update(
 	/* port: an OpenCE gametype's mode's equipment (Gun Game's weapon,
 	Infection's skull: port/linux/game/game_modes.c) */
 	game_modes_postspawn(player_index);
+	/* port: Basic Training's player put at its chapter's place, with its
+	weapons (port/linux/game/basic_training.c) */
+	basic_training_postspawn(player_index);
 
 	return;
 }
 
 
 
+
+/* port: port/linux/game/hud_key_prompts.c's: a button's word in a message
+as its icon's name, which the HUD draws as the prompts draw the button */
+void hud_key_prompt_button_word(wchar_t *text, long length, wchar_t const *word, wchar_t const *icon);
 
 boolean game_engine_get_state_message(
 	long player_index,
@@ -10788,6 +11057,12 @@ boolean game_engine_get_state_message(
 				NONE,
 				message,
 				message_character_count);
+			/* port: its BACK the Back button's icon, which the HUD draws as
+			the prompts draw a button: the scoreboard's key while the
+			keyboard and mouse play, else the controller's Back (the string
+			is the map's, which names the button in words) */
+			if (result)
+				hud_key_prompt_button_word(message, message_character_count, L"BACK", L"%back-button");
 		}
 		else if (player->state_message != NONE)
 		{
@@ -10847,6 +11122,12 @@ boolean game_engine_should_spawn_player(
 		struct player_datum *player = player_get(player_index);
 
 		if (player->quit_out_of_game == TRUE)
+		{
+			should_spawn = FALSE;
+		}
+		/* port: Basic Training's bots out of its chapter stay out
+		(port/linux/game/basic_training.c) */
+		else if (basic_training_player_held(player_index))
 		{
 			should_spawn = FALSE;
 		}

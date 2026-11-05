@@ -24,10 +24,12 @@ the SPIR-V emitter's (xgpu_spirv.c), spelled for Metal and its conventions:
 - a texture and a sampler for each stage, [[texture(n)]] and [[sampler(n)]];
   Metal samplers have no LOD bias, so D3DTSS_MIPMAPLODBIAS is the lookup's
   (texture_lod_bias);
-- border colors Metal cannot hold (it has transparent black, opaque black
-  and opaque white; the motion tracker's is 0x46000000): the sampler clamps
-  to the edge, and the shader mixes the stage's color in where the
-  coordinates leave the texture (xgpu_msl_options border);
+- border colors, which Metal's samplers hold three of (transparent black,
+  opaque black and opaque white; the motion tracker's is 0x46000000): for
+  every one alike, so that the pipeline does not depend on the color
+  (xgpu_metal_border_axes), the sampler clamps to the edge and the shader
+  mixes the stage's color in where the coordinates leave the texture
+  (xgpu_msl_options border);
 - the VR mode's views are not (the Mac app is flat): a key's multiview is
   drawn as none, a layered render target as its first layer.
 */
@@ -45,6 +47,26 @@ draw reads the frame's, wherever its ring put them) */
 #define XGPU_MSL_BUFFER_DYNAMIC_LIGHTS 18
 #define XGPU_MSL_BUFFER_SAMPLES 19
 #define XGPU_MSL_BUFFER_DYNAMIC_LIGHT_CELLS 22
+/* the enhanced dynamic lights' world (xgpu.h: the structure's BSP, texel t
+the buffer's t), a buffer of its own: the cells' clusters' masks are the
+cells' (their texture's slice past them, in its order) */
+#define XGPU_MSL_BUFFER_DYNAMIC_LIGHT_WORLD 24
+/* display.ambient_occlusion: the occlusion of the 3D view, read at the pixel
+by the draws whose pixel key has it (xgpu.h's XGPU_AMBIENT_OCCLUSION_LIGHT_*;
+white where the backend found none) */
+#define XGPU_MSL_TEXTURE_AMBIENT_OCCLUSION 4
+/* display.ambient_occlusion "world" (xgpu_stream.h): the structure's
+distance field, its atlas of bricks (texture3d<float>, read through a
+constexpr linear sampler clamped to its edge) and its table of cells
+(texture3d<float>, RGBA8, read), and the window's block */
+#define XGPU_MSL_TEXTURE_WORLD_SDF 5
+#define XGPU_MSL_TEXTURE_WORLD_SDF_TABLE 6
+/* (the static scenery's pages of the level's occlusion, a 2D array) */
+#define XGPU_MSL_TEXTURE_WORLD_AO_SCENERY 7
+/* (the vehicles' occlusion fields' atlas: a 3D texture of four halves;
+past the combiner's places, 8 to 19) */
+#define XGPU_MSL_TEXTURE_WORLD_AO_OBJECTS 20
+#define XGPU_MSL_BUFFER_WORLD_AO 23
 
 /* the draw's values both stages read, laid out alike in C and in Metal
 (float4s, and floats in fours): d3d8_gl.c's draw uniforms, the per-pixel
@@ -75,6 +97,11 @@ struct xgpu_msl_uniforms
 	float texture_border[4][4];
 	float texture_border_linear[4];
 	float model_lights[XGPU_MODEL_LIGHT_COUNT][4];
+	/* display.ambient_occlusion "world" (xgpu.h): the draw's object, its
+	owner slot among the window's proxies (-1 none) and its reference, then
+	two spare; declared in the pixel shaders that read it alone, the last
+	member, so that the others' text is as it was */
+	float world_ao[4];
 };
 
 /* what the Metal Shading Language is written for (xgpu_msl.c):
@@ -83,8 +110,8 @@ struct xgpu_msl_uniforms
   backend counts with a visibility result buffer, and the shaders do
   nothing);
 - border: for each stage, the axes (bit 0 u, 1 v, 2 w) whose border color
-  the shader draws (its sampler clamping to the edge) where the sampler
-  cannot: part of the pipeline, as the pixel key is;
+  the shader draws (its sampler clamping to the edge): part of the
+  pipeline, as the pixel key is;
 - the pixel shaders' debugging settings, as the GLSL's. */
 struct xgpu_msl_options
 {

@@ -35,6 +35,7 @@ def test_info_plist():
                                                          "UIInterfaceOrientationLandscapeRight"]
     assert plist["UISupportedInterfaceOrientations~ipad"] == plist["UISupportedInterfaceOrientations"]
     assert plist["UIRequiresFullScreen"] is True
+    assert plist["CADisableMinimumFrameDurationOnPhone"] is True
     assert plist["UIFileSharingEnabled"] is True and plist["LSSupportsOpeningDocumentsInPlace"] is True
     assert plist["GCSupportsControllerUserInteraction"] is True
     assert plist["LSApplicationCategoryType"] == "public.app-category.games"
@@ -68,7 +69,7 @@ def test_entitlements_ask_for_no_jit():
 
 @built
 def test_app_contents():
-    for path in ("halo", "Info.plist", "brokers.txt", "shaders.metallib", "Assets.car", "Licenses/LICENSE.txt",
+    for path in ("halo", "Info.plist", "brokers.txt", "prepared.records", "openh1.assets", "shaders.metallib", "Assets.car", "Licenses/LICENSE.txt",
                  "touch/touch_button_classic_a.png", "touch/touch_caption.ttf"):
         assert (APP / path).is_file(), path
 

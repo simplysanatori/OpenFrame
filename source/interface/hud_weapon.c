@@ -83,6 +83,10 @@ symbols in this file:
 #include <math.h>
 #include <string.h>
 
+/* port: the high-res HUD's texture of some of a bitmap's sprites (the
+reticle's warnings), port/linux/game/hud_hires_tags.c */
+struct bitmap_data const *hud_hires_sprite_bitmap(struct bitmap_data const *bitmap, short sequence_index);
+
 #ifdef HALO_VR
 /* port/linux/game/vr_scope.c: a scope's view is shown in the VR mode,
 raised to an eye or smart-linked (a window about the reticle), showing
@@ -1348,7 +1352,9 @@ static void crosshairs_draw(
 												(short)(render.camera.window_bounds.y1 - render.camera.window_bounds.y0),
 												&placement);
 											hud_draw_bitmap(
-												bitmap,
+												/* port: drawn from the high-res HUD's texture of its
+												sprite where there is one */
+												sequence ? hud_hires_sprite_bitmap(bitmap, item->sequence_index) : bitmap,
 												&absolute_placement,
 												&placement,
 												sequence ?
@@ -1360,10 +1366,15 @@ static void crosshairs_draw(
 												in_multiplayer,
 												bitmap_group->type == _bitmap_group_type_interface_bitmaps,
 												/* port: a reticle, scaled with display.fov
-												(view_fov.c); a scope's picture keeps its
-												place */
-												state_index != _crosshair_state_zoom &&
-												!custom_edition_hud_warning(state_index));
+												(view_fov.c), but a piece of a scope's own
+												picture (drawn zoomed only) keeps to the view
+												as the picture does; the zoom's own picture
+												keeps its place */
+												state_index == _crosshair_state_zoom ||
+													custom_edition_hud_warning(state_index) ? FALSE :
+												TEST_FLAG(item->flags, _hud_crosshair_not_on_default_zoom_bit) ||
+													TEST_FLAG(item->flags, _hud_crosshair_show_sniper_data_bit) ?
+													HUD_CROSSHAIR_SCOPE_PIECE : TRUE);
 										}
 									}
 								}
@@ -1740,8 +1751,11 @@ static void render_weapon_hud(
 				real delta_y;
 				real delta_z;
 
-				unit_get_camera_position(unit_index, &position);
-				object_get_origin(target_object_index, &target_position);
+				/* port: both where they are drawn
+				(port/linux/game/render_interpolation.c), the numbers
+				moving with the view, not a tick's step at a time */
+				render_interpolation_unit_camera_position(unit_index, &position);
+				render_interpolation_object_origin(target_object_index, &target_position);
 				delta_x = position.x - target_position.x;
 				delta_y = position.y - target_position.y;
 				delta_z = position.z - target_position.z;

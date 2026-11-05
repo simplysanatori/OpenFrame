@@ -713,7 +713,10 @@ void _rasterizer_model_begin(
 				_rasterizer_geometry_atmospheric_fog_but_no_planar_fog_bit) ||
 			camera_plane_distance < 0.0f);
 
-		if (!local_sky_flag &&
+		/* port: (not in display.ambient_occlusion's depth pre-pass: the fog
+		screen draws its models again at the window's end, queued by its
+		own draw: render_ambient_occlusion_prepass) */
+		if (!local_sky_flag && !render_ambient_occlusion_prepass &&
 			rasterizer_environment_fog_screen_model_begin(parameters))
 		{
 			local_environment_fog_screen_flag = TRUE;
@@ -2344,6 +2347,16 @@ void _rasterizer_model_draw(
 					(boolean)TEST_FLAG(
 						shader_model->model.flags,
 						_shader_model_true_atmospheric_fog_bit));
+				/* port: display.hdr: the self-illumination, which combiner
+				stage 1 adds to the light (its constant), glows past paper
+				white (port/linux/src/xgpu_hdr.h) */
+				halo_hdr_draw_kind(
+					!local_sky_flag &&
+					(self_illumination_color.red>0.0f ||
+						self_illumination_color.green>0.0f ||
+						self_illumination_color.blue>0.0f) ?
+						HALO_HDR_KIND_SELF_ILLUMINATION | HALO_HDR_KIND_SELF_ILLUMINATION_STAGES(1<<1) :
+						HALO_HDR_KIND_NONE);
 
 				IDirect3DDevice8_SetRenderState(
 					global_d3d_device,
@@ -2433,6 +2446,7 @@ void _rasterizer_model_draw(
 								vertex_buffer);
 					}
 				}
+				halo_hdr_draw_kind(HALO_HDR_KIND_NONE); /* port: (drawn) */
 			}
 
 			if (local_environment_fog_screen_flag)
@@ -2478,8 +2492,11 @@ struct transparent_geometry_group *_rasterizer_model_transparent_geometry_submit
 	boolean alpha_blended_decal;
 	boolean submit_decals;
 
+	/* port: (nothing queued by display.ambient_occlusion's depth pre-pass:
+	the window's own draw queues it, render_ambient_occlusion_prepass) */
 	if (rasterizer_debug_options.draw_models &&
-		rasterizer_debug_options.draw_model_transparent_geometry)
+		rasterizer_debug_options.draw_model_transparent_geometry &&
+		!render_ambient_occlusion_prepass)
 	{
 		alpha_blended_decal =
 			shader &&

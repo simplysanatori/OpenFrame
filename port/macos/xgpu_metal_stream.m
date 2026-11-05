@@ -114,6 +114,8 @@ static struct
 	tracking's serial then; a target's copy bound (checked at each draw) */
 	struct xgpu_stream_texture_stage stages[4];
 	BOOL textures_dirty, feedback_bound;
+	/* display.ambient_occlusion's texture is bound for the draws */
+	BOOL occlusion_bound;
 	uint32_t textures_serial;
 	/* the copy of a target drawn into that a draw samples: of which
 	texture, as of which of its draws */
@@ -129,6 +131,10 @@ static struct
 	uint32_t back_buffer;
 	uint32_t uniforms_serial;
 	BOOL uniforms_set, preparing;
+	/* a map's preparation made (a draw's pipeline not made after it is
+	missed: pipeline_missed), and the draws missed so */
+	BOOL prepared;
+	uint32_t pipeline_misses;
 	/* the dynamic state as last set (the passes of the stream's own set it
 	again after them) */
 	struct xgpu_metal_dynamic_state dynamic;
@@ -138,6 +144,8 @@ static struct
 	uint32_t halo_vertex, halo_pixel;
 	BOOL halo_failed;
 	uint32_t lights_none[2];
+	/* their world (none: lights_world_none's header of no nodes) */
+	uint32_t lights_world, lights_world_none;
 } stream;
 
 void xgpu_metal_stream_set_shaders(const struct xgpu_metal_stream_shaders *shaders)
@@ -439,8 +447,8 @@ static void shot_half_floats(struct stream_target *entry, const char *path)
 	snprintf(name, sizeof(name), "%s.encoded.txt", path);
 	if ((file = fopen(name, "w")) != NULL)
 	{
-		fprintf(file, "paper_white %.6f peak %.6f output %d mode %d\n", (double)frame.paper_white, (double)frame.peak,
-			frame.output, frame.mode);
+		fprintf(file, "paper_white %.6f peak %.6f output %d mode %d ui %.6f\n", (double)frame.paper_white,
+			(double)frame.peak, frame.output, frame.mode, (double)frame.ui);
 		fclose(file);
 	}
 	free(halves);
@@ -605,9 +613,10 @@ static void textures_bind(void)
 /* ---------- pipelines */
 
 /* the per-pixel lighting's lights' registers (xgpu_backend.h's
-XGPU_MODEL_LIGHT_REGISTER: c[-82], c[-79] to c[-69]) */
+XGPU_MODEL_LIGHT_REGISTER: c[-82], c[-79] to c[-69], c[-57]) */
 #define MODEL_LIGHT_FIRST (96 - 82)
 #define MODEL_LIGHT_LAST (96 - 69)
+#define MODEL_LIGHT_OWN_LIGHTS (96 - 57)
 
 static void stream_set_constants(void *context, const struct xgpu_stream_constants *record)
 {
@@ -619,7 +628,8 @@ static void stream_set_constants(void *context, const struct xgpu_stream_constan
 	if (count > XGPU_METAL_VERTEX_CONSTANT_COUNT - record->first)
 		count = XGPU_METAL_VERTEX_CONSTANT_COUNT - record->first;
 	memcpy(stream.constants[record->first], record->values, (size_t)count * sizeof(stream.constants[0]));
-	if (record->first <= MODEL_LIGHT_LAST && record->first + count > MODEL_LIGHT_FIRST)
+	if ((record->first <= MODEL_LIGHT_LAST && record->first + count > MODEL_LIGHT_FIRST) ||
+		(record->first <= MODEL_LIGHT_OWN_LIGHTS && record->first + count > MODEL_LIGHT_OWN_LIGHTS))
 		stream.uniforms_dirty = YES;
 	xgpu_metal_set_vertex_constants(record->first, count, &record->values[0][0]);
 }
@@ -826,6 +836,35 @@ static void stream_set_vertices(void *context, const struct host_render_vertex_i
 	memcpy(stream.constant_attributes, input->attributes, sizeof(stream.constant_attributes));
 }
 
+static uint32_t bytes_hash(const void *data, size_t size)
+{
+	const unsigned char *bytes = data;
+	uint32_t hash = 2166136261u;
+	size_t index;
+
+	for (index = 0; index < size; index++)
+		hash = (hash ^ bytes[index]) * 16777619u;
+	return hash;
+}
+
+/* A map's preparation should make every pipeline its draws need before
+play: a draw whose pipeline is not made is logged with what tells it
+apart (as Vulkan's: xgpu_vulkan_stream.c), the settings' parts of it
+(xgpu_draw_derive) among them */
+static void pipeline_missed(const struct xgpu_stream_pipeline_key *key)
+{
+	stream.pipeline_misses++;
+	host_logf(HOST_LOG_WARN, "metal: pipeline missed map preparation: vertex %08x%08x, key %08x, pixel %08x "
+		"(lighting %u, occlusion %u, hdr %x, per-pixel %u, lights %u, samples %u/%u, colour %u, depth %u, "
+		"blend %u/%u/%u, mask %x, stencil %u, views %u), total %u", (unsigned)key->vertex_program[1],
+		(unsigned)key->vertex_program[0], bytes_hash(key, sizeof(*key)), bytes_hash(&key->pixel, sizeof(key->pixel)),
+		(unsigned)key->lighting, (unsigned)key->pixel.ambient_occlusion, (unsigned)key->pixel.hdr,
+		(unsigned)key->pixel.per_pixel_lighting, (unsigned)key->pixel.dynamic_lights, (unsigned)key->samples,
+		(unsigned)key->pixel.alpha_test_samples, (unsigned)key->color_format, (unsigned)key->depth_format,
+		(unsigned)key->blend, (unsigned)key->blend_source, (unsigned)key->blend_destination,
+		(unsigned)key->color_mask, (unsigned)key->stencil_test, (unsigned)key->views, stream.pipeline_misses);
+}
+
 /* the pipeline and layout for a draw: set_vertices's, or immediate mode's
 (integers: the inputs read as integers); NO if it cannot be drawn */
 static BOOL draw_prepare(const struct xgpu_metal_vertex_attribute *attributes, const uint16_t *strides,
@@ -856,8 +895,32 @@ static BOOL draw_prepare(const struct xgpu_metal_vertex_attribute *attributes, c
 		xgpu_metal_prepare(&pipeline);
 		return NO;
 	}
+	if (stream.prepared && !xgpu_metal_pipeline_known(&pipeline))
+		pipeline_missed(&stream.definition->key);
 	uniforms_update();
 	textures_bind();
+	/* (display.ambient_occlusion: the occlusion the draw lights by, a texel
+	at each of the target's pixels) */
+	if (stream.definition->pixel_program.ambient_occlusion)
+	{
+		struct xgpu_metal_sampler sampler;
+
+		memset(&sampler, 0, sizeof(sampler));
+		sampler.min_filter = sampler.mag_filter = XGPU_METAL_FILTER_POINT;
+		sampler.mip_filter = XGPU_METAL_MIP_NONE;
+		sampler.address_u = sampler.address_v = sampler.address_w = XGPU_METAL_ADDRESS_CLAMP;
+		sampler.max_anisotropy = 1;
+		xgpu_metal_set_texture(XGPU_METAL_TEXTURE_AMBIENT_OCCLUSION, xgpu_metal_post_ambient_occlusion_texture(), &sampler);
+		stream.occlusion_bound = YES;
+	}
+	else if (stream.occlusion_bound)
+	{
+		/* (and none for a draw that does not: a draw put aside reads
+		nothing the frame wrote, xgpu_metal.m, and an object's shadow drawn
+		after the surfaces would otherwise be thought to read it) */
+		xgpu_metal_set_texture(XGPU_METAL_TEXTURE_AMBIENT_OCCLUSION, 0, NULL);
+		stream.occlusion_bound = NO;
+	}
 	if (target_get(stream.color))
 		target_get(stream.color)->written++;
 	memcpy(pipeline.attributes, attributes, sizeof(pipeline.attributes));
@@ -1044,6 +1107,17 @@ static void lights_none_bind(void)
 			(struct xgpu_metal_source){ XGPU_METAL_SOURCE_NONE, 0, 0, 0 };
 	}
 	xgpu_metal_set_dynamic_lights(sources[0], sources[1]);
+	if (!stream.lights_world_none)
+	{
+		static const uint32_t none[4];
+
+		stream.lights_world_none = xgpu_metal_buffer_create(sizeof(none));
+		if (stream.lights_world_none)
+			xgpu_metal_buffer_write(stream.lights_world_none, 0, none, sizeof(none), 1);
+	}
+	if (!stream.lights_world && stream.lights_world_none)
+		xgpu_metal_set_dynamic_light_world((struct xgpu_metal_source){ XGPU_METAL_SOURCE_BUFFER, 0, 16,
+			stream.lights_world_none });
 }
 
 static int stream_dynamic_lights_prepare(void *context)
@@ -1067,6 +1141,24 @@ static void stream_dynamic_lights_upload(void *context, const struct xgpu_stream
 		lights_none_bind();
 	else
 		xgpu_metal_set_dynamic_lights(block, copied);
+}
+
+/* the world (xgpu.h), into a buffer of its own made the first time with room
+for the most, written in the frame's order */
+static void stream_dynamic_lights_world(void *context, const struct xgpu_stream_dynamic_lights_world *record)
+{
+	const void *texels = host_pointer(record->texels);
+
+	(void)context;
+	if (!texels || !record->count || record->count > XGPU_METAL_STREAM_DYNAMIC_LIGHT_WORLD_TEXELS)
+		return;
+	if (!stream.lights_world)
+		stream.lights_world = xgpu_metal_buffer_create(XGPU_METAL_STREAM_DYNAMIC_LIGHT_WORLD_TEXELS * 16);
+	if (!stream.lights_world)
+		return;
+	xgpu_metal_buffer_write(stream.lights_world, 0, texels, record->count * 16, 1);
+	xgpu_metal_set_dynamic_light_world((struct xgpu_metal_source){ XGPU_METAL_SOURCE_BUFFER, 0,
+		XGPU_METAL_STREAM_DYNAMIC_LIGHT_WORLD_TEXELS * 16, stream.lights_world });
 }
 
 /* the glows' functions, made the first time; 0 if they cannot be */
@@ -1244,6 +1336,7 @@ target, from just before the record) */
 static void stream_anti_alias(void *context, const struct xgpu_stream_anti_alias *record)
 {
 	struct stream_target *target = target_get(record->target);
+	uint32_t kind;
 
 	(void)context;
 	if (!target || (target->description.format != XGPU_METAL_FORMAT_BGRA8 &&
@@ -1257,8 +1350,39 @@ static void stream_anti_alias(void *context, const struct xgpu_stream_anti_alias
 		return;
 	}
 	target->written++;
+	kind = xgpu_metal_pass_kind(XGPU_METAL_PASS_ANTI_ALIASING);
 	xgpu_metal_post_anti_alias(record->smaa != 0, target->texture, target->description.format,
 		target->description.width, target->description.height, record->corners);
+	xgpu_metal_pass_kind(kind);
+	stream_state_restore();
+}
+
+/* display.panini over a window's 3D view, after its anti-aliasing and
+before the HUD: the target's texture. A multisampled target stays
+multisampled, the HUD's draws going on into its samples: the pass reads its
+pixels resolved and draws into its samples (the front end changes a
+target's samples only between frames: made again mid-frame, it would lose
+the view) */
+static void stream_panini(void *context, const struct xgpu_stream_panini *record)
+{
+	struct stream_target *target = target_get(record->target);
+	uint32_t kind;
+
+	(void)context;
+	if (!target || (target->description.format != XGPU_METAL_FORMAT_BGRA8 &&
+		target->description.format != XGPU_METAL_FORMAT_RGBA16F) || target->description.depth_or_layers > 1)
+		return;
+	if (stream.preparing)
+	{
+		/* (made as the map loads, as the game's pipelines are) */
+		(void)xgpu_metal_post_panini_prepare(target->description.samples);
+		return;
+	}
+	target->written++;
+	kind = xgpu_metal_pass_kind(XGPU_METAL_PASS_PANINI);
+	xgpu_metal_post_panini(target->texture, target->description.format, target->description.width,
+		target->description.height, target->description.samples, record->corners, record->projection);
+	xgpu_metal_pass_kind(kind);
 	stream_state_restore();
 }
 
@@ -1272,11 +1396,21 @@ static void stream_hdr(void *context, const struct xgpu_stream_hdr *record)
 {
 	(void)context;
 	host_metal_hdr_state(record->active != 0, record->mode == XGPU_HDR_MODE_PUNCHY ? XGPU_HDR_MODE_PUNCHY :
-		XGPU_HDR_MODE_FAITHFUL, (int)record->paper_white);
+		XGPU_HDR_MODE_FAITHFUL, (int)record->paper_white_nits, (int)record->paper_white, (int)record->ui_nits);
 	/* (the tone map's function and its pipeline for the back buffer's pass,
 	made as HDR is chosen, not in the middle of a frame) */
 	if (record->active)
 		(void)xgpu_metal_post_prepare_hdr(XGPU_METAL_FORMAT_D24S8, 0);
+}
+
+/* display.gamma: the presentation curves an SDR frame by it */
+static void stream_gamma(void *context, uint32_t gamma)
+{
+	float value;
+
+	(void)context;
+	memcpy(&value, &gamma, sizeof(value));
+	host_metal_gamma(value);
 }
 
 /* a window's 3D view tone mapped, in the pass that drew it, before the HUD
@@ -1288,6 +1422,7 @@ static void stream_tone_map(void *context, const struct xgpu_stream_tone_map *re
 	uint32_t samples = target ? target->description.samples : 0;
 	struct xgpu_hdr_frame frame;
 	float hdr[4];
+	uint32_t kind;
 
 	(void)context;
 	if (!target || target->description.format != XGPU_METAL_FORMAT_RGBA16F || target->description.depth_or_layers > 1)
@@ -1302,12 +1437,100 @@ static void stream_tone_map(void *context, const struct xgpu_stream_tone_map *re
 	host_metal_hdr_frame(&frame);
 	hdr[0] = (float)frame.mode;
 	hdr[1] = frame.peak;
-	hdr[2] = hdr[3] = 0.0f;
+	/* (the view's light over the UI's white) */
+	hdr[2] = frame.ui;
+	hdr[3] = 0.0f;
 	target->written++;
+	kind = xgpu_metal_pass_kind(XGPU_METAL_PASS_TONE_MAP);
 	xgpu_metal_post_tone_map(target->texture, target->description.width, target->description.height,
 		depth ? depth->texture : 0, depth ? depth->description.format : XGPU_METAL_FORMAT_NONE, samples,
 		record->corners, hdr);
+	xgpu_metal_pass_kind(kind);
 	stream_state_restore();
+}
+
+/* display.ambient_occlusion "world": the structure's distance field's
+slices (the decoder has checked their bounds and size) and each window's
+block (xgpu_metal_world_ao.c) */
+static void stream_world_ao_field(void *context, const struct xgpu_stream_world_ao_field *record)
+{
+	(void)context;
+	xgpu_metal_world_ao_field(record->part, record->width, record->height, record->depth, record->z_first,
+		record->z_count, record->width && record->size ? host_pointer(record->data) : NULL);
+}
+
+static void stream_world_ao_window(void *context, const struct xgpu_stream_world_ao_window *record)
+{
+	(void)context;
+	xgpu_metal_world_ao_window(record->active ? &record->block : NULL);
+}
+
+/* display.ambient_occlusion of a window's 3D view (xgpu_metal_post.c), from
+the depth target drawn with it, its opaque surfaces' depth alone
+(d3d8_device.c's pre-pass), which the surfaces' draws then light by; or the
+occlusion last found in the view's place (debug.ambient_occlusion_view);
+none over a multisampled target */
+static void stream_ambient_occlusion(void *context, const struct xgpu_stream_ambient_occlusion *record)
+{
+	struct stream_target *target = target_get(record->target);
+	struct stream_target *depth = stream.color == record->target ? target_get(stream.depth) : NULL;
+	uint32_t kind;
+
+	(void)context;
+	/* (none, white, unless it is found) */
+	if (record->quality != XGPU_AMBIENT_OCCLUSION_SHOW && !stream.preparing)
+		xgpu_metal_post_ambient_occlusion_none();
+	if (!target || target->description.depth_or_layers > 1 || target->description.samples > 1 || !depth ||
+		depth->description.samples > 1 || record->quality < XGPU_AMBIENT_OCCLUSION_SUBTLE ||
+		record->quality > XGPU_AMBIENT_OCCLUSION_SHOW)
+		return;
+	if (stream.preparing)
+	{
+		(void)xgpu_metal_post_ambient_occlusion_prepare(target->description.format, depth->description.format);
+		return;
+	}
+	kind = xgpu_metal_pass_kind(XGPU_METAL_PASS_OCCLUSION_UPSAMPLE);
+	if (record->quality == XGPU_AMBIENT_OCCLUSION_SHOW)
+	{
+		target->written++;
+		xgpu_metal_post_ambient_occlusion_show(target->texture, target->description.format, target->description.width,
+			target->description.height, record->corners);
+	}
+	else
+		xgpu_metal_post_ambient_occlusion(target->texture, target->description.format, target->description.width,
+			target->description.height, depth->texture, depth->description.format, record->corners, (int)record->quality,
+			record->camera);
+	xgpu_metal_pass_kind(kind);
+	stream_state_restore();
+}
+
+/* the game's renderer's category of the draws from now on
+(XGPU_STREAM_CATEGORY's value: rasterizer.h's _rasterizer_profile_*), as the
+kind of pass HALO_METAL_PASS_TIMES sums them under */
+static void stream_category(void *context, uint32_t category)
+{
+	/* (_rasterizer_profile_clear to _screen_flash) */
+	static const uint8_t kinds[29] =
+	{
+		XGPU_METAL_PASS_SKY, XGPU_METAL_PASS_SKY, XGPU_METAL_PASS_WORLD,
+		/* (the environment's lightmaps to its reflections) */
+		XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD,
+		XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD,
+		XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_WORLD,
+		XGPU_METAL_PASS_WORLD,
+		/* (its transparents and fog) */
+		XGPU_METAL_PASS_TRANSPARENTS, XGPU_METAL_PASS_TRANSPARENTS, XGPU_METAL_PASS_TRANSPARENTS,
+		/* (water and its decals, detail objects, the queued transparents) */
+		XGPU_METAL_PASS_WATER, XGPU_METAL_PASS_WATER, XGPU_METAL_PASS_WORLD, XGPU_METAL_PASS_TRANSPARENTS,
+		/* (the lens flares, the screen's effect; the HUD and the screen's flash) */
+		XGPU_METAL_PASS_EFFECTS, XGPU_METAL_PASS_EFFECTS, XGPU_METAL_PASS_EFFECTS, XGPU_METAL_PASS_EFFECTS,
+		XGPU_METAL_PASS_HUD, XGPU_METAL_PASS_HUD,
+	};
+	uint32_t number = category & ~XGPU_STREAM_CATEGORY_PREPASS;
+
+	(void)context;
+	xgpu_metal_pass_kind((category & XGPU_STREAM_CATEGORY_PREPASS) ? XGPU_METAL_PASS_PREPASS :
+		number < sizeof(kinds) ? kinds[number] : XGPU_METAL_PASS_OTHER);
 }
 
 /* ---------- visibility tests, frames */
@@ -1323,7 +1546,8 @@ static void stream_visibility_end(void *context, const struct xgpu_stream_visibi
 	(void)context;
 	/* (the count written for the game is of its pixels: divided by the
 	samples one of them is, as the GL backend's) */
-	xgpu_metal_visibility_end(record->slot, record->area * (float)(record->samples > 1 ? record->samples : 1));
+	xgpu_metal_visibility_end(record->slot, record->area * (float)(record->samples > 1 ? record->samples : 1),
+		record->test);
 }
 
 static void stream_present(void *context, uint32_t back_buffer)
@@ -1349,6 +1573,7 @@ static uint32_t stream_prepared(void *context)
 {
 	(void)context;
 	stream.preparing = NO;
+	stream.prepared = YES;
 	return (uint32_t)(xgpu_metal_prepared() * 1000.0 + 0.5);
 }
 
@@ -1466,13 +1691,25 @@ const struct host_render_backend *xgpu_metal_stream_backend(void)
 		backend.loading_art = host_metal_loading_art;
 		backend.loading_scene = host_metal_loading_scene;
 		backend.loading_progress = host_metal_loading_progress;
+		backend.loading_mode = host_metal_loading_mode;
+		backend.loading_caption = host_metal_loading_caption;
 		backend.dynamic_lights_prepare = stream_dynamic_lights_prepare;
 		backend.dynamic_lights_upload = stream_dynamic_lights_upload;
 		backend.dynamic_lights_halos = stream_dynamic_lights_halos;
+		backend.dynamic_lights_world = stream_dynamic_lights_world;
 		backend.anti_aliasing_prepare = stream_anti_aliasing_prepare;
 		backend.anti_alias = stream_anti_alias;
 		backend.hdr = stream_hdr;
 		backend.tone_map = stream_tone_map;
+		backend.ambient_occlusion = stream_ambient_occlusion;
+		backend.gamma = stream_gamma;
+		backend.category = stream_category;
+		backend.panini = stream_panini;
+		/* display.ambient_occlusion "world" (#578, docs/world-ao.md): the
+		field's 3D texture (XGPU_METAL_TEXTURE_WORLD_SDF) and the window's
+		block (XGPU_METAL_BUFFER_WORLD_AO): xgpu_metal_world_ao.c */
+		backend.world_ao_field = stream_world_ao_field;
+		backend.world_ao_window = stream_world_ao_window;
 	}
 	return &backend;
 }

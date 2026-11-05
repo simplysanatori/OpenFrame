@@ -66,8 +66,9 @@ next (the one on screen not counted) */
 #define FRAME_PACING_QUEUED 1
 /* the longest the game waits for the display to take a frame: a display
 that takes none (a window covered, minimized, between the desktop and
-fullscreen) must not stop the game */
-#define FRAME_PACING_WAIT_MAXIMUM_NS 100000000ull
+fullscreen) must not stop the game, nor one that pauses for a few refreshes
+hold it longer than two at 60 Hz (100 ms froze an iPhone's game in play) */
+#define FRAME_PACING_WAIT_MAXIMUM_NS 34000000ull
 /* the frames whose start to ready times the budget is the most of, and the
 time added to it */
 #define FRAME_PACING_COSTS 128
@@ -204,6 +205,26 @@ static FRAME_PACING_UNUSED uint64_t frame_pacing_start_time(uint64_t latch, uint
 		return 0;
 	target = latch + (uint64_t)(pending + 1) * period;
 	return target > budget ? target - budget : 0;
+}
+
+/* a display that takes no frames while its window is hidden (a Mac's on
+another desktop, covered or minimized: its link calls seldom or not at all,
+and nothing it presents reaches the screen) is stood in for by the host's own
+refreshes on the grid of its last ones, so that the game goes on at the
+display's pace and phase, and the display's first refresh back finds the
+frame started for it: the latch after last (its period on) nearest the time
+a take now (margin before its latch) is for, the ones passed skipped as a
+display skips them. now and last on one clock; 0: no grid yet */
+static FRAME_PACING_UNUSED uint64_t frame_pacing_next_latch(uint64_t last, uint64_t period, uint64_t now,
+	uint64_t margin)
+{
+	uint64_t steps = 1;
+
+	if (!last || !period)
+		return 0;
+	if (now + margin > last + period)
+		steps = (now + margin - last + period / 2) / period;
+	return last + steps * period;
 }
 
 /* the refreshes each frame is shown for, at a display's refresh rate (frames

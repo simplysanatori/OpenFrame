@@ -10,7 +10,10 @@ every machine (OpenCE's too) understands: nothing new is sent.
   host_map) is an entry of the rotation's grammar (server_rotation.c:
   map[:gametype[+rule=value...]]), checked as the server checks it (its map
   on disk, a Custom Edition one's in custom_maps; its gametype built,
-  server_gametypes.c). In the lobby it is set at once, as the director sets
+  server_gametypes.c). A map alone (MAPS' CURRENT) keeps the game's
+  gametype, its score to win, time limit and rules (the lobby's record as it
+  is when the change is set); a playlist's entry without one is Slayer, as
+  the server's rotation's is. In the lobby it is set at once, as the director sets
   its entry (the map's name and the variant in the host's game record, sent
   to every machine; map sharing gives it to those without it). In a game,
   NOW ends the game and starts the new one as Restart round starts it
@@ -52,6 +55,8 @@ is tools/harness/tests/test_host_game.py's.
 #include "custom_edition_maps.h"
 #include "bots.h"
 #include "network_host_game.h"
+#include "network_host_rules.h"
+#include "network_admin.h"
 #include "server_gametypes.h"
 
 #include <stdio.h>
@@ -445,6 +450,47 @@ boolean network_host_game_ban_parse(
 	return name[0] != 0;
 }
 
+boolean network_host_game_entry_keeps(
+	char const *text)
+{
+	return text && !strchr(text, ':');
+}
+
+boolean network_host_game_variant_kept(
+	struct server_entry const *entry,
+	struct network_game const *game,
+	struct game_variant *variant,
+	struct game_variant_options *options)
+{
+	if (entry->gametype[0] || !game)
+		return FALSE;
+	*variant = game->variant;
+	*options = game->variant_options;
+	return TRUE;
+}
+
+short network_host_game_gametype_find(
+	struct host_game_gametype const *gametypes,
+	short count,
+	wchar_t const *shown)
+{
+	short index, at;
+
+	if (!shown || !shown[0])
+		return NONE;
+	for (index = 0; index < count; index++)
+	{
+		wchar_t const *listed = gametypes[index].shown;
+
+		for (at = 0; at < HOST_GAME_GAMETYPE_SHOWN_SIZE - 1 && listed[at] && listed[at] == shown[at]; at++)
+		{
+		}
+		if (at == HOST_GAME_GAMETYPE_SHOWN_SIZE - 1 ? !shown[at] : listed[at] == shown[at])
+			return index;
+	}
+	return NONE;
+}
+
 /* ---------- where the host is */
 
 /* a player's host of a network game, co-op's too */
@@ -520,6 +566,9 @@ static void host_game_apply_limits(
 		options->time_limit = host_game.minutes;
 	host_game.score = NONE;
 	host_game.minutes = NONE;
+	/* (and the rules' changes that waited for it: network_host_rules.c) */
+	network_host_rules_apply_waiting(variant, TRUE);
+	(void)options;
 }
 
 /* the lobby's game set to the entry's, as the director sets it
@@ -546,7 +595,9 @@ static boolean host_game_apply(
 		error(_error_log, "host: %s cannot be played: %s", entry->text, checked.rejected);
 		return FALSE;
 	}
-	if (!server_gametype_build(entry->gametype, entry->rules, entry->rule_count, &variant, &options, reason,
+	/* (a map alone: the lobby's own gametype, score, time and rules kept) */
+	if (!network_host_game_variant_kept(entry, network_game_server_get_game(server), &variant, &options) &&
+		!server_gametype_build(entry->gametype, entry->rules, entry->rule_count, &variant, &options, reason,
 		sizeof(reason)))
 	{
 		console_warning("host: %s cannot be played: %s", entry->text, reason);
@@ -559,7 +610,8 @@ static boolean host_game_apply(
 	player_ui_set_game_variant(&variant);
 	player_ui_set_game_variant_options(&options);
 	network_game_server_change_game_variant(server, &variant);
-	error(_error_log, "host: the lobby's game is %s (%s)", entry->map_name, entry->gametype);
+	error(_error_log, "host: the lobby's game is %s (%s)", entry->map_name,
+		entry->gametype[0] ? entry->gametype : "its gametype kept");
 	return TRUE;
 }
 
@@ -800,6 +852,11 @@ boolean network_host_game_change(
 	}
 	if (!host_game_entry(text, &entry, reason, reason_size))
 		return FALSE;
+	/* (a map alone, not a playlist's: the game's gametype, score to win,
+	time limit and rules kept, as the lobby has them when it is set:
+	host_game_apply) */
+	if (playlist_index == NONE && network_host_game_entry_keeps(text))
+		entry.gametype[0] = 0;
 	/* (in the lobby: at once, whenever it was asked for) */
 	if (network_host_game_in_lobby())
 	{
@@ -875,7 +932,8 @@ boolean network_host_game_lobby_take(
 	if (applied && index != NONE)
 		host_game.index = index;
 	/* (limits asked for, with no new game: on the lobby's as it is) */
-	if (!applied && !network_host_game_cooperative() && (host_game.score != NONE || host_game.minutes != NONE))
+	if (!applied && !network_host_game_cooperative() && (host_game.score != NONE || host_game.minutes != NONE ||
+		network_host_rules_waiting()))
 		host_game_apply_limits_to_lobby();
 	return applied;
 }
@@ -935,6 +993,14 @@ static void host_game_gametype_shown(
 	}
 }
 
+void network_host_game_gametype_text(
+	char const *name,
+	wchar_t *text,
+	short size)
+{
+	host_game_gametype_shown(name, NULL, 0, text, size);
+}
+
 void network_host_game_entry_shown(
 	struct server_entry const *entry,
 	wchar_t *text,
@@ -951,6 +1017,24 @@ void network_host_game_entry_shown(
 	wchar_t map[64], gametype[HOST_GAME_GAMETYPE_SHOWN_SIZE];
 	short index;
 
+	/* (a map alone: the game's own gametype, as it is now) */
+	if (!entry->gametype[0])
+	{
+		struct network_game_server *server = global_network_game_server_get();
+		struct network_game *game = server ? network_game_server_get_game(server) : NULL;
+		wchar_t const *description = game ? game->variant.human_readable_game_description : L"";
+
+		menu_map_shown(entry->level[0] ? entry->level : entry->map_name, map, NUMBEROF(map));
+		for (index = 0; index < NUMBEROF(gametype) - 1 &&
+			index < NUMBEROF(game->variant.human_readable_game_description) && description[index]; index++)
+		{
+			gametype[index] = description[index];
+		}
+		gametype[index] = 0;
+		usnprintf(text, size - 1, L"%s \x00B7 %s", map, gametype);
+		text[size - 1] = 0;
+		return;
+	}
 	for (index = 0; index < NUMBEROF(kept); index++)
 	{
 		if (kept[index].text[0] && !strcmp(kept[index].text, entry->text))
@@ -1116,7 +1200,7 @@ short network_host_game_lobby_players(
 		entry->ping = NONE;
 		view.bot = bots_machine_is_bot(machine_index) != 0;
 		view.own = !view.bot && machine_index == own_machine;
-		view.bot_removable = view.bot;
+		view.bot_removable = view.bot && !bots_matchmaking_on();
 		view.teams = teams;
 		view.team_moves = teams;
 		if (view.bot)
@@ -1187,15 +1271,10 @@ boolean network_host_game_kick_player(
 
 	if (!TEST_FLAG(actions, ban ? _host_controls_ban : _host_controls_kick))
 		return FALSE;
-	/* (a lobby's bot out, bots.count one less, as a game's) */
+	/* (a lobby's bot out, bots.count one fewer than play, as a game's) */
 	if (entry->player_index == NONE && bots_machine_is_bot(entry->machine_index))
 	{
-		char text[16];
-		long count = bots_wanted_count();
-
-		snprintf(text, sizeof(text), "%ld", count > 0 ? count - 1 : 0);
-		if (!config_write("bots.count", text))
-			console_warning("host_controls: could not set bots.count");
+		network_host_controls_bots_one_fewer();
 		return network_game_server_port_bots_remove(global_network_game_server_get(), entry->machine_index);
 	}
 	/* (the ban's line: its reason, and its end) */
@@ -1422,6 +1501,12 @@ boolean network_host_game_console(
 
 	if (network_host_game_command(expression, result))
 		return TRUE;
+	/* (a dedicated server's admin's: network_admin.c) */
+	if (network_admin_console(expression, result))
+		return TRUE;
+	/* (the rules: network_host_rules.c) */
+	if (network_host_rules_console(expression, result))
+		return TRUE;
 	if ((rest = host_game_word_text(expression, "host_say")) != NULL)
 	{
 		snprintf(text, sizeof(text), "%s", rest);
@@ -1446,6 +1531,52 @@ boolean network_host_game_console(
 		}
 		else
 			console_printf(FALSE, "%d player%s moved", moved, moved == 1 ? "" : "s");
+		return TRUE;
+	}
+	/* (the BOTS tab's count and skill: network_host_controls.c) */
+	if ((rest = host_game_word_text(expression, "host_bots")) != NULL)
+	{
+		long count = atol(rest);
+		short kind = NONE;
+		long number;
+
+		/* (a number, or as the lobby's BOTS: none, add <n>, fill <n>) */
+		if (rest[0] >= '0' && rest[0] <= '9')
+			kind = count ? _host_bots_add : _host_bots_none;
+		else if (!strncmp(rest, "none", 4))
+			kind = _host_bots_none;
+		else if (!strncmp(rest, "add ", 4) && rest[4] >= '0' && rest[4] <= '9')
+			kind = _host_bots_add, count = atol(rest + 4);
+		else if (!strncmp(rest, "fill ", 5) && rest[5] >= '0' && rest[5] <= '9')
+			kind = _host_bots_fill, count = atol(rest + 5);
+		if (kind == NONE)
+		{
+			kind = network_host_controls_bot_choice(network_host_controls_bots_chosen(), &number);
+			console_printf(FALSE, "bots: %s %ld, %s", kind == _host_bots_fill ? "fill to" :
+				kind == _host_bots_add ? "add" : "none", number,
+				bots_matchmaking_on() ? "the matchmaking playlist's" : "bots.count, bots.make_room, bots.fill_to");
+			*result = TRUE;
+			return TRUE;
+		}
+		*result = network_host_controls_bots_tab() && network_host_controls_choose_bots(kind, count);
+		if (*result)
+			console_printf(FALSE, "bots set");
+		else
+		{
+			console_warning("host_bots: give none, add <1 to %d> or fill <2 to %d>, as the host of a network game "
+				"(not co-op, not matchmaking)", BOTS_MAXIMUM, BOTS_MAXIMUM);
+		}
+		return TRUE;
+	}
+	if ((rest = host_game_word_text(expression, "host_bot_skill")) != NULL)
+	{
+		short skill = network_host_controls_bot_skill_named(rest);
+
+		*result = skill != NONE && network_host_controls_set_bot_skill(skill);
+		if (*result)
+			console_printf(FALSE, "bot skill set");
+		else
+			console_warning("host_bot_skill: give easy, normal, heroic or legendary, as the host of a network game");
 		return TRUE;
 	}
 	if ((rest = host_game_word_text(expression, "host_score_limit")) != NULL ||
@@ -1626,8 +1757,8 @@ boolean network_host_game_command(
 		host_game_command_entry(text, entry, sizeof(entry));
 		if (!entry[0])
 		{
-			console_warning("%s: give a map, and a gametype: %s bloodgulch ctf", next ? "host_map_next" : "host_map",
-				next ? "host_map_next" : "host_map");
+			console_warning("%s: give a map, and a gametype (none: the game's kept): %s bloodgulch ctf",
+				next ? "host_map_next" : "host_map", next ? "host_map_next" : "host_map");
 			*result = FALSE;
 			return TRUE;
 		}

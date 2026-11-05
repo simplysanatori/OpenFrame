@@ -48,7 +48,10 @@ game record's players, and its changes of map, teams, limits and the
 playlist are network_host_game.c's; after a game, the next game it has
 (a change asked for, the playlist's) is set in the lobby and started here.
 
-Clients never see it (network_host_controls_available). The pure parts
+Clients never see it (network_host_controls_available), but a dedicated
+server's admins, whose Host Controls show the server's game and ask the
+server for each change (network_admin.c): the scoreboard's kick, ban and
+team move are asked of the server too. The pure parts
 (network_host_controls_*_for, _step, _parse) are
 tools/harness/tests/test_host_controls.py's.
 */
@@ -74,6 +77,8 @@ tools/harness/tests/test_host_controls.py's.
 #include "network_chat.h"
 #include "network_host_controls.h"
 #include "network_host_game.h"
+#include "network_host_rules.h"
+#include "network_admin.h"
 #include "latency_meter.h"
 #include "bots.h"
 
@@ -373,29 +378,26 @@ static boolean host_controls_player_bot(
 }
 
 /* the bots' host-owned bots in a network game (bots.c's): whether the bot
-can be taken out by the host (it hosts the game), and taken out, bots.count
-one less so that none takes its place */
+can be taken out by the host (it hosts the game, and not a matchmaking
+game's, whose playlist fills it), and taken out, bots.count one less than
+play so that none takes its place */
 static boolean host_controls_bot_removable(
 	long player_index)
 {
 	struct player_datum *player = player_index != NONE ? player_try_and_get(player_index) : NULL;
 
 	return player && !player->quit_out_of_game && global_network_game_server_get() &&
-		bots_player_is_bot(player_index);
+		bots_player_is_bot(player_index) && !bots_matchmaking_on();
 }
 
 static boolean host_controls_bot_remove(
 	long player_index)
 {
 	struct player_datum *player = player_index != NONE ? player_try_and_get(player_index) : NULL;
-	long count = bots_wanted_count();
-	char text[16];
 
 	if (!player || !host_controls_bot_removable(player_index))
 		return FALSE;
-	snprintf(text, sizeof(text), "%ld", count > 0 ? count - 1 : 0);
-	if (!config_write("bots.count", text))
-		console_warning("host_controls: could not set bots.count");
+	network_host_controls_bots_one_fewer();
 	return network_game_server_port_bots_remove(global_network_game_server_get(),
 		host_controls_player_game_machine(player));
 }
@@ -436,6 +438,14 @@ unsigned long network_host_controls_player_actions(
 	struct player_datum *player = player_index != NONE ? player_try_and_get(player_index) : NULL;
 	struct host_controls_player_view view;
 
+	/* (an admin's: the server's word, but its mute, which the scoreboard
+	would take for this machine's) */
+	if (!network_host_controls_available() && network_admin_remote())
+	{
+		struct host_controls_player entry;
+
+		return network_admin_player(player_index, &entry) ? entry.actions & ~FLAG(_host_controls_mute) : 0;
+	}
 	if (!player || player->quit_out_of_game || !network_host_controls_available())
 		return 0;
 	view.bot = host_controls_player_bot(player);
@@ -501,6 +511,14 @@ boolean network_host_controls_kick(
 
 	if (!TEST_FLAG(actions, ban ? _host_controls_ban : _host_controls_kick) || !player)
 		return FALSE;
+	/* (an admin's: asked of the server, a ban for ever as the host's) */
+	if (!network_host_controls_available())
+	{
+		struct host_controls_player entry;
+
+		return network_admin_player(player_index, &entry) && network_admin_send(ban ? _network_admin_ban :
+			_network_admin_kick, entry.slot, entry.name, 0, NULL);
+	}
 	if (host_controls_player_bot(player))
 		return host_controls_bot_remove(player_index);
 	/* (the console's kick and ban: network_server_manager.c) */
@@ -552,6 +570,14 @@ boolean network_host_controls_move_team(
 
 	if (!player || !TEST_FLAG(network_host_controls_player_actions(player_index), _host_controls_move_team))
 		return FALSE;
+	/* (an admin's: asked of the server) */
+	if (!network_host_controls_available())
+	{
+		struct host_controls_player entry;
+
+		return network_admin_player(player_index, &entry) &&
+			network_admin_send(_network_admin_move_team, entry.slot, entry.name, 0, NULL);
+	}
 	team = player->team_index == 1 ? 0 : 1;
 	/* (a living player dies first, as a player who quits does: no kill, no
 	death counted, every machine seeing it as the host's other deaths) */
@@ -665,34 +691,225 @@ void network_host_controls_set_opence_joins(
 		network_standard_set_opence_joins(allowed);
 }
 
-/* ---------- the bots' rows: their count, skill and teams, MAKE ROOM and,
-with it on, FILL TO, as Server Setup's BOTS screen has them (bots.c's
-settings, written to config.toml as they change: the lobby and the game in
-progress read them, network_server_manager.c) */
+/* ---------- the bots: Host Controls' BOTS tab (its rows: their count,
+BOTS (NONE, ADD n or FILL TO n, as the lobby's BOTS), SKILL, TEAMS, BALANCE
+TEAMS, TEAM TACTICS; then the bots that play).
+Each row writes bots.c's setting to config.toml as it changes, which the
+host reads as it goes: the lobby's bots join and leave at once
+(network_server_manager.c's network_game_server_port_bots), a game in
+progress' one at a time (network_game_server_port_bots_ingame, a bot joining
+as a player who joins it in progress does), the skill and the team play
+each tick (bots.c, bots_tactics.c). A matchmaking game's count, room and
+fill are its playlist's (bots_set_matchmaking), and stay. */
 
 enum
 {
-	_host_bot_row_count,
-	_host_bot_row_skill,
-	_host_bot_row_teams,
-	_host_bot_row_make_room,
-	_host_bot_row_fill_to,
-	NUMBER_OF_HOST_BOT_ROWS,
-	/* (bots.c's settings' ranges) */
-	HOST_BOT_SKILLS = 4,
+	/* (the BOTS choices' numbers: one at a time to HOST_BOT_CHOICE_STEPPED,
+	then HOST_BOT_CHOICE_STEP at a time to BOTS_MAXIMUM; ADD's from 1,
+	FILL TO's from 2) */
+	HOST_BOT_CHOICE_STEPPED = 16,
+	HOST_BOT_CHOICE_STEP = 4,
+	HOST_BOT_ADD_LEAST = 1,
 	HOST_BOT_FILL_LEAST = 2,
-	HOST_BOT_FILL_MOST = 16,
 };
 
-short network_host_controls_bot_rows(
+static char const *const host_controls_bot_skill_names[HOST_BOT_SKILLS] = { "easy", "normal", "heroic", "legendary" };
+
+/* how many numbers a kind's choices have, from least */
+static short host_controls_bot_numbers(
+	long least)
+{
+	return (short)(HOST_BOT_CHOICE_STEPPED - least + 1 +
+		(BOTS_MAXIMUM - HOST_BOT_CHOICE_STEPPED) / HOST_BOT_CHOICE_STEP);
+}
+
+/* the number of a kind's choices at index, from least */
+static long host_controls_bot_number(
+	long least,
+	short index)
+{
+	long stepped = HOST_BOT_CHOICE_STEPPED - least + 1;
+
+	return index < stepped ? least + index :
+		HOST_BOT_CHOICE_STEPPED + (index - stepped + 1) * HOST_BOT_CHOICE_STEP;
+}
+
+short network_host_controls_bot_choice_count(
+	void)
+{
+	return (short)(1 + host_controls_bot_numbers(HOST_BOT_ADD_LEAST) + host_controls_bot_numbers(HOST_BOT_FILL_LEAST));
+}
+
+short network_host_controls_bot_choice(
+	short choice,
+	long *number)
+{
+	short adds = host_controls_bot_numbers(HOST_BOT_ADD_LEAST);
+
+	*number = 0;
+	if (choice <= 0 || choice >= network_host_controls_bot_choice_count())
+		return _host_bots_none;
+	if (choice <= adds)
+	{
+		*number = host_controls_bot_number(HOST_BOT_ADD_LEAST, (short)(choice - 1));
+		return _host_bots_add;
+	}
+	*number = host_controls_bot_number(HOST_BOT_FILL_LEAST, (short)(choice - 1 - adds));
+	return _host_bots_fill;
+}
+
+void network_host_controls_bot_choice_words(
+	short choice,
+	wchar_t *text,
+	short size)
+{
+	long number;
+	short kind = network_host_controls_bot_choice(choice, &number);
+
+	if (kind == _host_bots_add)
+		usnprintf(text, size - 1, L"ADD %ld", number);
+	else if (kind == _host_bots_fill)
+		usnprintf(text, size - 1, L"FILL TO %ld", number);
+	else
+		usnprintf(text, size - 1, L"NONE");
+	text[size - 1] = 0;
+}
+
+short network_host_controls_bot_choice_of(
+	long count,
+	boolean make_room,
+	long fill_to)
+{
+	short adds = host_controls_bot_numbers(HOST_BOT_ADD_LEAST);
+	short choices = network_host_controls_bot_choice_count();
+	short kind = !count ? _host_bots_none :
+		make_room && count >= MIN(fill_to - 1, BOTS_MAXIMUM) ? _host_bots_fill : _host_bots_add;
+	long wanted = kind == _host_bots_fill ? fill_to : count;
+	short best = 0;
+	short choice;
+
+	/* (the kind's choice of the most not past it, else its least: settings
+	written by hand fall between the choices) */
+	for (choice = 1; kind != _host_bots_none && choice < choices; choice++)
+	{
+		long number;
+
+		if (network_host_controls_bot_choice(choice, &number) != kind)
+			continue;
+		if (!best || number <= wanted)
+			best = choice;
+	}
+	return best;
+}
+
+short network_host_controls_bot_choice_step(
+	short choice,
+	short step)
+{
+	/* (no wrapping round: the ends stay, so that a count stepped past its
+	most never becomes none) */
+	long stepped = (long)choice + step;
+	long last = network_host_controls_bot_choice_count() - 1;
+
+	return (short)(stepped < 0 ? 0 : stepped > last ? last : stepped);
+}
+
+long network_host_controls_bot_count_step(
+	long count,
+	short step,
+	long humans,
+	long most_players)
+{
+	/* (no wrapping round: the fewest none, the most BOTS_MAXIMUM, or as
+	many as the game holds beside its players) */
+	long most = MIN(BOTS_MAXIMUM, MAX(most_players - humans, 0));
+	long stepped = count + step;
+
+	return stepped < 0 ? 0 : stepped > most ? most : stepped;
+}
+
+long network_host_controls_bot_count_removed(
+	long count,
+	long playing)
+{
+	/* (fewer playing than asked for, the game full or not yet started: one
+	fewer than play, so that the bot taken out does not come back) */
+	long left = MIN(count, playing) - 1;
+
+	return left < 0 ? 0 : left;
+}
+
+short network_host_controls_bot_skill_named(
+	char const *text)
+{
+	short skill;
+
+	for (skill = 0; skill < HOST_BOT_SKILLS; skill++)
+	{
+		char const *name = host_controls_bot_skill_names[skill];
+		short index;
+
+		for (index = 0; name[index]; index++)
+		{
+			char character = text[index];
+
+			if (character >= 'A' && character <= 'Z')
+				character = (char)(character - 'A' + 'a');
+			if (character != name[index])
+				break;
+		}
+		if (!name[index] && (!text[index] || text[index] == ' ' || text[index] == ')' || text[index] == '"'))
+			return skill;
+	}
+	return NONE;
+}
+
+boolean network_host_controls_bots_tab(
+	void)
+{
+	/* (the host's alone, never in co-op: the bots play no campaign) */
+	return network_host_controls_available() && !network_host_game_cooperative();
+}
+
+boolean network_host_controls_bots_play(
 	void)
 {
 	/* (a game the bots play: Slayer's) */
 	struct network_game_server *server = global_network_game_server_get();
 
-	if (!server || !bots_play_game_engine(network_game_server_get_game(server)->variant.game_engine_index))
+	return server && bots_play_game_engine(network_game_server_get_game(server)->variant.game_engine_index);
+}
+
+/* the host's game's bots playing, and its players */
+static long host_controls_bots_playing(
+	long *humans)
+{
+	struct network_game_server *server = global_network_game_server_get();
+	long bots = 0;
+	long players = server ? network_game_server_port_bots_humans(server, &bots, NULL) : 0;
+
+	if (humans)
+		*humans = players;
+	return bots;
+}
+
+short network_host_controls_bot_rows(
+	short *rows,
+	short maximum)
+{
+	short count = 0;
+	short row;
+
+	if (!network_host_controls_bots_tab())
 		return 0;
-	return bots_make_room() ? NUMBER_OF_HOST_BOT_ROWS : _host_bot_row_fill_to;
+	for (row = 0; row < NUMBER_OF_HOST_BOT_ROWS && count < maximum; row++)
+	{
+		/* (BALANCE TEAMS in a team game whose teams may be arranged) */
+		if (row == _host_bot_row_balance && !network_host_game_teams_arrangeable())
+			continue;
+		rows[count++] = row;
+	}
+	return count;
 }
 
 void network_host_controls_bot_row(
@@ -703,44 +920,59 @@ void network_host_controls_bot_row(
 	short size)
 {
 	static wchar_t const *const skills[HOST_BOT_SKILLS] = { L"EASY", L"NORMAL", L"HEROIC", L"LEGENDARY" };
-	long count = bots_wanted_count();
+	boolean lobby = network_host_controls_in_lobby();
+	boolean matchmaking = bots_matchmaking_on() != 0;
+	long playing = host_controls_bots_playing(NULL);
+	long number;
+	short kind = network_host_controls_bot_choice(network_host_controls_bots_chosen(), &number);
 
 	label[0] = value[0] = help[0] = 0;
 	switch (row)
 	{
 	case _host_bot_row_count:
 		usnprintf(label, size - 1, L"BOTS");
-		if (count)
-			usnprintf(value, size - 1, L"%ld", count);
+		network_host_controls_bot_choice_words(network_host_controls_bots_chosen(), value, size);
+		if (matchmaking)
+			usnprintf(help, size - 1, L"The playlist fills the game with bots. %ld play now.", playing);
+		else if (kind == _host_bots_fill)
+			usnprintf(help, size - 1, L"Bots fill the game to %ld players, and leave as players join: %ld play "
+				L"now.", number, playing);
+		else if (kind == _host_bots_add)
+			usnprintf(help, size - 1, L"%ld bots play beside the players, who keep their places: %ld play now.",
+				number, playing);
 		else
-			usnprintf(value, size - 1, L"NONE");
-		usnprintf(help, size - 1, L"The most bots that play. Your computer plays them.");
+			usnprintf(help, size - 1, L"No bots. ADD puts bots beside the players; FILL TO fills the empty "
+				L"places with bots, who leave as players join.");
 		break;
 	case _host_bot_row_skill:
-		usnprintf(label, size - 1, L"BOT SKILL");
+		usnprintf(label, size - 1, L"SKILL");
 		usnprintf(value, size - 1, L"%s", skills[bots_skill() < HOST_BOT_SKILLS ? bots_skill() : 1]);
-		usnprintf(help, size - 1, L"How well the bots play.");
+		usnprintf(help, size - 1, L"How well every bot plays: how soon it reacts, how well it aims. At once.");
 		break;
 	case _host_bot_row_teams:
-		usnprintf(label, size - 1, L"BOT TEAMS");
+		usnprintf(label, size - 1, L"TEAMS");
 		usnprintf(value, size - 1, bots_teams() == _bots_teams_against ? L"AGAINST YOU" : L"EVEN");
-		usnprintf(help, size - 1, L"In a team game, bots on both teams, or all against you.");
+		usnprintf(help, size - 1, lobby ? L"In a team game, bots on both teams, or all against you." :
+			L"In a team game, bots on both teams, or all against you: the bots that join from now. BALANCE "
+			L"TEAMS moves those playing.");
 		break;
-	case _host_bot_row_make_room:
-		usnprintf(label, size - 1, L"MAKE ROOM FOR PLAYERS");
-		usnprintf(value, size - 1, bots_make_room() ? L"ON" : L"OFF");
-		usnprintf(help, size - 1, L"A bot leaves as a player joins, and comes back as one leaves.");
+	case _host_bot_row_balance:
+		usnprintf(label, size - 1, L"BALANCE TEAMS");
+		usnprintf(help, size - 1, lobby ? L"Evens the teams' numbers, moving as few players as it can." :
+			L"Evens the teams' numbers, and their scores. Those who move die and respawn.");
 		break;
-	case _host_bot_row_fill_to:
-		usnprintf(label, size - 1, L"FILL TO");
-		usnprintf(value, size - 1, L"%ld", bots_fill_to());
-		usnprintf(help, size - 1, L"The players and bots the bots fill the game to.");
+	case _host_bot_row_tactics:
+		usnprintf(label, size - 1, L"TEAM TACTICS");
+		usnprintf(value, size - 1, config_boolean("bots.tactics") ? L"ON" : L"OFF");
+		usnprintf(help, size - 1, L"In a team game, a team's bots play together: they spread out, cover each "
+			L"other and fall back together. At once.");
 		break;
 	}
 	label[size - 1] = value[size - 1] = help[size - 1] = 0;
 }
 
-/* (a value stepped round its range: -1 left, 1 right or A) */
+/* (a value stepped through its range: -1 left, 1 right or A; at its ends
+no further, as the menus' spinners) */
 static long host_controls_bot_step(
 	long value,
 	long least,
@@ -748,44 +980,133 @@ static long host_controls_bot_step(
 	short step)
 {
 	value += step;
-	return value < least ? most : value > most ? least : value;
+	return value < least ? least : value > most ? most : value;
 }
 
-void network_host_controls_bot_row_step(
+/* a setting written: FALSE (said) if it could not be */
+static boolean host_controls_bot_write(
+	char const *name,
+	char const *text)
+{
+	if (config_write(name, text))
+		return TRUE;
+	console_warning("host_controls: could not set %s", name);
+	return FALSE;
+}
+
+short network_host_controls_bots_chosen(
+	void)
+{
+	return network_host_controls_bot_choice_of(bots_wanted_count(), bots_make_room() != 0, bots_fill_to());
+}
+
+boolean network_host_controls_choose_bots(
+	short kind,
+	long number)
+{
+	char text[16];
+
+	if (bots_matchmaking_on() || (kind != _host_bots_none && (number < 1 || number > BOTS_MAXIMUM)) ||
+		(kind == _host_bots_fill && number < HOST_BOT_FILL_LEAST))
+	{
+		return FALSE;
+	}
+	/* (FILL TO: as many bots as fill the game, bots.count the most) */
+	snprintf(text, sizeof(text), "%ld", kind == _host_bots_add ? number : kind == _host_bots_fill ? (long)BOTS_MAXIMUM : 0L);
+	if (!host_controls_bot_write("bots.count", text))
+		return FALSE;
+	if (kind == _host_bots_none)
+		return TRUE;
+	if (kind == _host_bots_fill)
+	{
+		snprintf(text, sizeof(text), "%ld", number);
+		if (!host_controls_bot_write("bots.fill_to", text))
+			return FALSE;
+	}
+	return host_controls_bot_write("bots.make_room", kind == _host_bots_fill ? "true" : "false");
+}
+
+boolean network_host_controls_set_bots(
+	long count)
+{
+	long humans;
+
+	host_controls_bots_playing(&humans);
+	if (!network_host_controls_bots_tab() || bots_matchmaking_on() || count < 0 ||
+		count != network_host_controls_bot_count_step(count, 0, humans, HALO_PORT_MAXIMUM_NETWORK_PLAYERS))
+	{
+		return FALSE;
+	}
+	return network_host_controls_choose_bots(count ? _host_bots_add : _host_bots_none, count);
+}
+
+boolean network_host_controls_set_bot_skill(
+	short skill)
+{
+	if (!network_host_controls_bots_tab() || skill < 0 || skill >= HOST_BOT_SKILLS)
+		return FALSE;
+	return host_controls_bot_write("bots.skill", host_controls_bot_skill_names[skill]);
+}
+
+boolean network_host_controls_bot_row_step(
 	short row,
 	short step)
 {
-	static char const *const skills[HOST_BOT_SKILLS] = { "easy", "normal", "heroic", "legendary" };
-	char text[16];
-	char const *name = NULL;
-
-	text[0] = 0;
+	if (!network_host_controls_bots_tab())
+		return FALSE;
 	switch (row)
 	{
 	case _host_bot_row_count:
-		name = "bots.count";
-		snprintf(text, sizeof(text), "%ld", host_controls_bot_step(bots_wanted_count(), 0, BOTS_MAXIMUM, step));
-		break;
-	case _host_bot_row_skill:
-		name = "bots.skill";
-		snprintf(text, sizeof(text), "%s", skills[host_controls_bot_step(bots_skill(), 0, HOST_BOT_SKILLS - 1, step)]);
-		break;
-	case _host_bot_row_teams:
-		name = "bots.teams";
-		snprintf(text, sizeof(text), "%s", bots_teams() == _bots_teams_against ? "even" : "against");
-		break;
-	case _host_bot_row_make_room:
-		name = "bots.make_room";
-		snprintf(text, sizeof(text), "%s", bots_make_room() ? "false" : "true");
-		break;
-	case _host_bot_row_fill_to:
-		name = "bots.fill_to";
-		snprintf(text, sizeof(text), "%ld", host_controls_bot_step(MIN(bots_fill_to(), HOST_BOT_FILL_MOST),
-			HOST_BOT_FILL_LEAST, HOST_BOT_FILL_MOST, step));
-		break;
+	{
+		/* (the lobby's BOTS' choices, at the ends no further) */
+		short chosen = network_host_controls_bots_chosen();
+		short stepped = network_host_controls_bot_choice_step(chosen, step);
+		long number;
+		short kind = network_host_controls_bot_choice(stepped, &number);
+
+		return stepped != chosen && network_host_controls_choose_bots(kind, number);
 	}
-	if (name && !config_write(name, text))
-		console_warning("host_controls: could not set %s", name);
+	case _host_bot_row_skill:
+	{
+		short skill = (short)host_controls_bot_step(bots_skill(), 0, HOST_BOT_SKILLS - 1, step);
+
+		return skill != bots_skill() && network_host_controls_set_bot_skill(skill);
+	}
+	case _host_bot_row_teams:
+		return host_controls_bot_write("bots.teams", bots_teams() == _bots_teams_against ? "even" : "against");
+	case _host_bot_row_tactics:
+		return host_controls_bot_write("bots.tactics", config_boolean("bots.tactics") ? "false" : "true");
+	default:
+		/* (BALANCE TEAMS: Host Controls' own, host_controls_menu.inc) */
+		return FALSE;
+	}
+}
+
+short network_host_controls_bots(
+	struct host_controls_player *bots,
+	short maximum)
+{
+	static struct host_controls_player players[HALO_PORT_MAXIMUM_NETWORK_PLAYERS];
+	short count = network_host_controls_players(players, HALO_PORT_MAXIMUM_NETWORK_PLAYERS);
+	short shown = 0;
+	short index;
+
+	for (index = 0; index < count && shown < maximum; index++)
+	{
+		if (players[index].tag == _host_controls_tag_bot)
+			bots[shown++] = players[index];
+	}
+	return shown;
+}
+
+void network_host_controls_bots_one_fewer(
+	void)
+{
+	/* (ADD those left, FILL TO too: the bots no longer fill the game, or
+	the one taken out would come back) */
+	long left = network_host_controls_bot_count_removed(bots_wanted_count(), host_controls_bots_playing(NULL));
+
+	network_host_controls_choose_bots(left ? _host_bots_add : _host_bots_none, left);
 }
 
 /* ---------- opening */
@@ -794,7 +1115,7 @@ boolean network_host_controls_open(
 	long player_index,
 	short tab)
 {
-	if (!network_host_controls_available())
+	if (!network_host_controls_available() && !network_admin_remote())
 	{
 		console_warning("host_controls: only the host of a network game under way has them");
 		return FALSE;
@@ -842,7 +1163,7 @@ boolean network_host_controls_open_command(
 	char const *text)
 {
 	/* (host_controls_menu.inc's tabs, in their order) */
-	static char const *const tabs[] = { "players", "game", "maps", "playlist", "bans" };
+	static char const *const tabs[] = { "players", "game", "maps", "playlist", "bans", "bots", "rules" };
 	struct data_iterator iterator;
 	struct player_datum *player;
 	long chosen = NONE;
@@ -903,7 +1224,7 @@ boolean network_host_controls_shown(
 	void)
 {
 	return host_controls.screen_time && system_milliseconds() - host_controls.screen_time < HOST_CONTROLS_SHOWN_TIME &&
-		network_host_controls_available();
+		(network_host_controls_available() || network_admin_remote());
 }
 
 boolean network_host_controls_take_opening(
@@ -946,6 +1267,7 @@ void network_host_controls_update(
 	if (!server)
 		host_controls.teams_locked = FALSE;
 	network_host_game_update();
+	network_host_rules_update();
 	/* (a game played, its lobby reached after it by the host's A on its
 	scores: the next game, a change asked for or the playlist's, set there
 	and started; none, and the host picks it as before) */

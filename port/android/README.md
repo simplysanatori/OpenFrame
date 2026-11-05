@@ -137,7 +137,10 @@ renderer's [README](../linux/vulkan/README.md).
 
 The game needs the `maps/` folder from an Xbox disc image (`.xiso` or
 `.iso`) of any version of the game. The app extracts `maps/` from the disc
-image. The app keeps the data in `/sdcard/Android/data/com.openh1.openh1/files`.
+image, and its movies (`bink/`, for `display.movies`) when it has them
+(`XisoExtractor.java`). The app keeps the data in
+`/sdcard/Android/data/com.openh1.openh1/files`; to add the movies to data
+installed before, copy the disc's `bink` folder there, beside `maps`.
 
 To install the data with the app:
 
@@ -157,7 +160,7 @@ To install the data from a computer:
 | Item | Location in `/sdcard/Android/data/com.openh1.openh1/files` |
 | --- | --- |
 | Saved games (`z:\` and `u:\`) | `save` |
-| Mods (`docs/mods.md`) | `mods`: `adb push <mod folder> /sdcard/Android/data/com.openh1.openh1/files/mods/`; the main menu's Mods orders them and turns them off |
+| Mods (`docs/mods.md`) | `mods`: `adb push <mod folder> /sdcard/Android/data/com.openh1.openh1/files/mods/`; Settings > Mods > Manage Mods orders them and turns them off |
 | Log | `debug.txt` |
 | Settings | `config.toml` |
 
@@ -258,7 +261,9 @@ first swipe from an edge in full screen only shows the system bars.
 
 A tap during a cinematic that can be skipped skips it, as A does. On the
 on-screen keyboard, tap a key to press it, "B =BACK" to cancel and
-"A =ENTER" to accept the name.
+"A =ENTER" to accept the name. A menu's text field (the server browser's
+search, a game's name, a password, a friend code) brings up Android's own
+keyboard while it is typed into; its Enter keeps what was typed.
 
 ### Touch controls
 
@@ -324,8 +329,8 @@ controls' scene (`port/linux/game/touch_game.c`, `TouchContext.java`):
 - Crouch is tapped on and off by default, not held: it sits under the left
   thumb beside the stick, so a tap crouches until Crouch is tapped again,
   Jump is pressed, a vehicle's seat is taken or the player dies, and the
-  button shows held meanwhile. The setting `input.touch_crouch` makes it a
-  button to hold instead.
+  button shows held meanwhile. Settings, Controls, Touch Crouch
+  (`input.touch_crouch`) makes it a button to hold instead.
 - Each button press gives a short, light tap of the vibrator, with the
   vibration on ("General"), on top of the game's own rumble.
 
@@ -410,6 +415,14 @@ number of the display's refreshes, 30 to 60 frames each second (60 at 60 or
 120 Hz, 45 at 90 Hz), and the Classic look is drawn where the graphics
 settings are not set (refer to "Battery saver" in
 [port/linux/README.md](../linux/README.md#battery-saver)).
+`display.low_latency` (`"auto"`: on) starts each frame just in time for the
+refresh it is shown at, with no frames queued ahead of the display, so that
+a touch is on screen a refresh or two sooner with vsync on (the phone's
+default). It reads when each frame reached the screen from
+`VK_GOOGLE_display_timing` (or `VK_KHR_present_wait`); on a device with
+neither it does nothing, and the frames queue as before (refer to "Low
+latency with vsync" in
+[port/linux/README.md](../linux/README.md#low-latency-with-vsync)).
 These settings are only for Android:
 
 | Setting | Function |
@@ -700,6 +713,41 @@ assembly of the port is necessary:
 - The symbol aliases in `guest/libc/src_include/features.h`. The Darwin
   target does not accept alias attributes.
 
+## Pages of 16 KB
+
+Android 15 and later run on kernels with 16 KB pages too (some devices,
+and the developer option "Boot with 16 KB page size"), and Google Play
+requires apps to support them. The app does:
+
+- Its native libraries (`libmain.so`, `libSDL3.so`) are linked with
+  `-z max-page-size=16384`: every loadable segment is 16 KB aligned. The
+  build checks this (`tools/android_elf_alignment.py`), and the APK stores
+  them uncompressed on 16 KB boundaries (the Android Gradle Plugin's
+  default; `zipalign -c -P 16 -v 4` checks the APK).
+- The guest maps and protects its memory in 4 KB pages (its musl, and the
+  Xbox memory of `port/linux/src/xbox_memory.c`). The host asks the
+  kernel's page size (`sysconf`) and keeps each 4 KB guest page's
+  protection itself (`host/host_memory.c`, or `host/host_memory_base.c`
+  with the base register): a host page gets the union of its guest pages'
+  protections, it is mapped while any of them is, and a guest page mapped
+  into a host page in use is zeroed in place. The pools hand out whole host
+  pages. A file is mapped only in whole host pages, and the image's pages
+  are changed only in whole host pages.
+- The write tracking protects host pages (`host/host_memory_watch.c`): a
+  write marks the whole 16 KB as written. The guest asks that size
+  (`memory_watch_page_size`), and the vertex mirror
+  (`port/linux/src/d3d8_device.c`) uses it as its page, so that a page the
+  game rewrites every frame does not share its protection with a mirrored
+  page beside it. The preparations' records keep their pages in 4 KB units,
+  played back as the pages that hold them, so the stock records serve both.
+- The stack guards are whole host pages.
+
+`tools/test_host_pages.py` runs the guest's memory and the write tracking
+on simulated kernels of 16 KB and 64 KB pages (each call that such a kernel
+refuses is counted), and `tools/harness/tests/test_mirror_pages.py` the
+vertex mirror. The Linux arm64 build shares this: its kernels may have 16 KB
+or 64 KB pages.
+
 ## Find problems
 
 - Enter `adb logcat -s halo` to see the log of the port and the errors of
@@ -717,7 +765,9 @@ assembly of the port is necessary:
 
 ## Limits
 
-- Bink video is not available. The game skips the movies.
+- The Xbox's Bink movies play only with `display.movies` on and the files
+  in the data root's `bink` folder (`port/linux/README.md`); otherwise the
+  game skips them.
 - The device must let the app reserve the fixed guest addresses, from
   `0x80000000` to `0xa4000000`. If ART uses them, the app shows a message
   (refer to "The fixed addresses").
@@ -725,10 +775,6 @@ assembly of the port is necessary:
   controls appear when no controller is connected; their size follows the
   height of the screen (larger on a tablet than on a phone), never smaller
   than a finger.
-- Kernels with 16 KB pages (a developer option of Android 15) do not
-  operate. The Xbox memory uses 4 KB pages. A build with
-  `configure.py --guest-base` keeps the guest's 4 KB pages on larger ones
-  (`host/host_memory_base.c`), but it was not tested on Android.
 - The x86 Android emulator runs the app through its ARM translation. The
   translation cannot deliver the page faults that the renderer uses to
   notice changed textures and vertices. On the emulator the app compares

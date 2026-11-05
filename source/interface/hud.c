@@ -86,6 +86,7 @@ symbols in this file:
 #include "game/players.h"
 #include "interface/hud.h"
 #include "interface/hud_definitions.h"
+#include "interface/hud_draw.h"
 #include "interface/hud_messaging.h"
 #include "interface/hud_unit.h"
 #include "interface/hud_weapon.h"
@@ -111,6 +112,8 @@ symbols in this file:
 #include "network_coop.h" /* port: port/linux/game/network_coop.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
 #include "network_party.h" /* port: port/linux/game/network_party.c */
+#include "network_votekick.h" /* port: port/linux/game/network_votekick.c */
+#include "basic_training.h" /* port: port/linux/game/basic_training.c */
 #include "text/font_group.h"
 #include "text/text_group.h"
 #include "units/unit_definitions.h"
@@ -408,6 +411,12 @@ static void hud_show_action_response(
 
 		return;
 	}
+
+	/* port: no prompt for an action whose object is gone (object_get of it
+	was a null pointer); players_handle_deleted_object lets such an action
+	go, and this keeps the HUD safe from any way round it */
+	if (player->action_object_index != NONE && !object_try_and_get(player->action_object_index))
+		return;
 
 	if (player->action_object_index == NONE)
 	{
@@ -981,13 +990,17 @@ static void hud_draw_friendly_indicator(
 			0);
 		if (_texture_cache_bitmap_get_hardware_format(bitmap, FALSE, TRUE))
 		{
-			position.x =
-				(short)fast_ftol(screen_position.x) - render.camera.viewport_bounds.x0;
-			position.y =
-				(short)fast_ftol(screen_position.y) - render.camera.viewport_bounds.y0;
+			/* port: where the point is, not the nearest whole unit, that
+			it keeps to the teammate (hud_draw_mark_begin) */
+			hud_draw_mark_begin(
+				screen_position.x - render.camera.viewport_bounds.x0,
+				screen_position.y - render.camera.viewport_bounds.y0,
+				&position);
+			/* port: over the game's own far distance, not display.draw_
+			distance's (far_clip.c): the fade's distance stays the same */
 			depth_factor = 1.0f -
 				((-view_position.z - render.frustum.z_near) * 100.0f) /
-				(render.frustum.z_far - render.frustum.z_near);
+				(MIN(render.frustum.z_far, rasterizer_globals.far_clip_distance) - render.frustum.z_near);
 			fade = PIN(depth_factor, 0.075000003f, 1.0f);
 			clip.x0 = 0.0f;
 			clip.x1 = 1.0f;
@@ -995,8 +1008,13 @@ static void hud_draw_friendly_indicator(
 			clip.y1 = 1.0f;
 #ifdef HALO_VR
 			/* port: in VR, drawn in each eye over the teammate */
-			if (!vr_render_world_mark(&head_position, (real)position.x, (real)position.y))
+			if (!vr_render_world_mark(&head_position,
+				screen_position.x - render.camera.viewport_bounds.x0,
+				screen_position.y - render.camera.viewport_bounds.y0))
+			{
+				hud_draw_mark_end();
 				return;
+			}
 #endif
 			interface_draw_bitmap(
 				bitmap,
@@ -1005,6 +1023,7 @@ static void hud_draw_friendly_indicator(
 				1.0f,
 				0.0f,
 				1.0f);
+			hud_draw_mark_end();
 		}
 	}
 
@@ -1218,12 +1237,27 @@ static void hud_draw_player_name(
 	matrix4x3_transform_point(&render.frustum.world_to_view, &head_position, &view_position);
 	if (!render_camera_view_to_screen(&render.camera, &render.frustum, &view_position, &screen_position))
 		return;
-	x = (short)fast_ftol(screen_position.x) - render.camera.viewport_bounds.x0;
-	y = (short)fast_ftol(screen_position.y) - render.camera.viewport_bounds.y0;
+	/* (where the point is, not the nearest whole unit, that the name keeps
+	to the player: hud_draw_mark_begin) */
+	{
+		point2d whole;
+
+		hud_draw_mark_begin(
+			screen_position.x - render.camera.viewport_bounds.x0,
+			screen_position.y - render.camera.viewport_bounds.y0,
+			&whole);
+		x = whole.x;
+		y = whole.y;
+	}
 #ifdef HALO_VR
 	/* port: in VR, drawn in each eye over the player's head */
-	if (!vr_render_world_mark(&head_position, (real)x, (real)y))
+	if (!vr_render_world_mark(&head_position,
+		screen_position.x - render.camera.viewport_bounds.x0,
+		screen_position.y - render.camera.viewport_bounds.y0))
+	{
+		hud_draw_mark_end();
 		return;
+	}
 #endif
 	if (indicator)
 	{
@@ -1280,6 +1314,7 @@ static void hud_draw_player_name(
 		icon.y1 = (short)(icon.y0 + size);
 		network_voice_draw_icon(&icon, FALSE, color.alpha);
 	}
+	hud_draw_mark_end();
 
 	return;
 }
@@ -1625,6 +1660,10 @@ void hud_draw_screen(
 		network_chat_draw(render.local_player_index);
 		/* port: a party invite from a player of the game, and its key */
 		network_party_draw(render.local_player_index);
+		/* port: the players' vote running, its box (F1 yes, F2 no) */
+		network_votekick_draw(render.local_player_index);
+		/* port: Basic Training's step, its progress and its skip buttons */
+		basic_training_draw(render.local_player_index);
 	}
 
 	rasterizer_hud_end();

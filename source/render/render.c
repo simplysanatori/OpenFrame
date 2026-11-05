@@ -91,6 +91,9 @@ symbols in this file:
 /* port: static transparent part links for the newly loaded model tags. */
 #include "models/models.h"
 #include "structure_culling.h" /* port: port/linux/game/structure_culling.c */
+#include "panini.h" /* port: port/linux/game/panini.c */
+#include "near_clip.h" /* port: port/linux/game/near_clip.c */
+#include "world_ao.h" /* port: port/linux/game/world_ao.c */
 
 #ifdef HALO_VR
 #include "../../port/linux/src/vr.h"
@@ -154,6 +157,8 @@ static boolean render_preparing_frame; /* port: enumerate a view without drawing
 
 extern short global_screenshot_count;
 
+/* port: display.ambient_occlusion's depth pre-pass is being drawn (render_window) */
+boolean render_ambient_occlusion_prepass = FALSE;
 boolean render_contrails_enabled = TRUE;
 boolean render_particles_enabled = TRUE;
 boolean render_particle_systems_enabled = TRUE;
@@ -233,6 +238,10 @@ void render_initialize_for_new_map(
 	frames the menus and the loading drew before, as many as the loading
 	took, made two runs of one game differ */
 	render.frame_index = 0;
+	/* port: and no leaf of the map before's: a camera in no leaf is drawn
+	from the leaf it was last drawn in (structure_visibility_find_camera),
+	which in another map is any leaf, or none */
+	render.leaf_index = NONE;
 	/* port: preserve retail's energy-then-two-sided-glass compositing. */
 	models_fix_transparent_part_links();
 	render_objects_initialize_for_new_map();
@@ -397,6 +406,7 @@ static void render_window(
 {
 	struct rasterizer_window_begin_parameters parameters;
 	short rendered_cluster_index;
+	boolean ambient_occlusion; /* port: (below) */
 
 	profile_render_window_start(TRUE);
 	render.scene_index++;
@@ -417,6 +427,9 @@ static void render_window(
 	(port/linux/game/render_enumerate.c) */
 	render_enumerate_structure();
 	player_effect_get_screen_flash(local_player_index, &parameters.screen_flash);
+	/* port: display.panini, the view drawn through it with this projection
+	(port/linux/game/panini.c) */
+	panini_window_begin(local_player_index, rasterizer_target, rasterizer_camera, &parameters.frustum);
 	rasterizer_window_begin(&parameters);
 
 	if (!bink_playback_in_progress())
@@ -442,11 +455,61 @@ static void render_window(
 #endif
 		first_person_weapon_render_update();
 		lights_preprocess_scene();
+		/* port: display.ambient_occlusion, which multiplies the opaque
+		surfaces' ambient light alone, as they shade: their depth drawn
+		first, alone, and the occlusion found from it (not in the VR mode's
+		eye or scope passes, whose targets have a layer for each eye). The
+		same draws as below (the objects' transparent parts, widgets and
+		fog left for below: render_ambient_occlusion_prepass), into a depth
+		target of their own (port/linux/src/d3d8_device.c) */
+		ambient_occlusion = rasterizer_target == _render_target_primary &&
+#ifdef HALO_VR
+			!render_vr_eye_pass && !render_vr_scope_pass &&
+#endif
+			halo_screen_ambient_occlusion_begin();
+		if (ambient_occlusion)
+		{
+			float projection[4];
+
+			render_ambient_occlusion_prepass = TRUE;
+			render_objects();
+			render_enumerate_models();
+			structure_render_preprocess();
+			structure_render_lightmaps();
+			render_ambient_occlusion_prepass = FALSE;
+			projection[0] = parameters.frustum.projection_matrix[0][0];
+			projection[1] = parameters.frustum.projection_matrix[1][1];
+			projection[2] = parameters.frustum.projection_matrix[2][0];
+			projection[3] = parameters.frustum.projection_matrix[2][1];
+			halo_screen_ambient_occlusion(
+				rasterizer_camera->viewport_bounds.x0,
+				rasterizer_camera->viewport_bounds.y0,
+				rasterizer_camera->viewport_bounds.x1,
+				rasterizer_camera->viewport_bounds.y1,
+				parameters.frustum.z_near,
+				parameters.frustum.z_far,
+				projection);
+		}
+		/* port: display.ambient_occlusion "world": the window's proxies and
+		the field's place handed to the shaders' ambient slot before the
+		opaque surfaces shade (port/linux/game/world_ao.c; the objects' draws
+		say which they are: world_ao_object_begin), taken away after the
+		lightmap pass, which the later passes never read */
+		world_ao_window_begin(local_player_index, rasterizer_target, &render.camera.position.x);
 		render_objects();
 		/* port: and through every model's parts */
 		render_enumerate_models();
-		structure_render_preprocess();
+		if (!ambient_occlusion)
+		{
+			structure_render_preprocess();
+		}
 		structure_render_lightmaps();
+		/* port: (display.ambient_occlusion: in the light drawn so far alone) */
+		if (ambient_occlusion)
+		{
+			halo_screen_ambient_occlusion_end();
+		}
+		world_ao_window_end();
 #ifdef HALO_VR
 		/* the scope's view: no lens flares (their visibility tests are the
 		eyes', counted per frame), nor the objects' shadows, which a few
@@ -594,6 +657,9 @@ static void render_window(
 				rasterizer_camera->viewport_bounds.y0,
 				rasterizer_camera->viewport_bounds.x1,
 				rasterizer_camera->viewport_bounds.y1);
+			/* port: and drawn through display.panini's projection, the HUD
+			not (port/linux/game/panini.c) */
+			panini_window_draw();
 		}
 		interface_draw_screen();
 		/* port: and every HUD's (port/linux/game/render_enumerate.c) */
@@ -621,6 +687,7 @@ static void render_window(
 	}
 	/* port: the loading transition too (port/linux/game/render_enumerate.c) */
 	render_enumerate_loading_screen();
+	panini_window_end(); /* port */
 	rasterizer_window_end();
 	profile_render_window_end();
 
@@ -698,6 +765,18 @@ static void render_player_frame(
 			sizeof(rectangle2d)));
 
 	render_camera_build_frustum_bounds(camera, &frustum_bounds);
+	/* port: a wide field of view's near plane brought nearer, so that its
+	corners do not cut a wall beside the player (port/linux/game/near_
+	clip.c), from the whole view's bounds (not a screenshot's tile); the
+	VR mode's eyes keep their own */
+#ifdef HALO_VR
+	if (!render_vr_eye_pass && !render_vr_scope_pass)
+#endif
+	{
+		camera->z_near = render_near_clip_distance(camera, &frustum_bounds);
+		window->rasterizer_camera.z_near =
+			render_near_clip_distance(&window->rasterizer_camera, &frustum_bounds);
+	}
 
 	if (screenshot_combined_index != NULL)
 	{
@@ -963,6 +1042,10 @@ void render_frame(
 	parameters.game_time_sec = render_interpolation_game_time_sec(game_time_get());
 	rasterizer_frame_begin(&parameters);
 	rasterizer_windows_begin();
+	/* port: display.ambient_occlusion "world": the scene's objects as drawn
+	this frame, the field's upload continued (port/linux/game/world_ao.c;
+	nothing unless it is on) */
+	world_ao_frame_begin();
 
 	for (window_index = 0; window_index < window_count; window_index++)
 	{

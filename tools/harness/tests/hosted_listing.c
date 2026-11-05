@@ -184,13 +184,8 @@ static boolean game_engine_running(void) { return TRUE; }
 static boolean game_engine_has_teams(void) { return FALSE; }
 static boolean game_engine_can_score(void) { return TRUE; }
 static boolean network_standard_hosting(void) { return TRUE; }
-static short network_host_controls_bot_rows(void) { return 0; }
-static void network_host_controls_bot_row(short row, wchar_t *label, wchar_t *value, wchar_t *help, short size)
-{
-	(void)row; (void)label; (void)value; (void)help; (void)size;
-}
-static void network_host_controls_bot_row_step(short row, short step) { (void)row; (void)step; }
 static boolean network_host_controls_restarting(void) { return FALSE; }
+static boolean network_host_rules_available(void) { return FALSE; }
 static boolean network_host_controls_end_game(void) { return TRUE; }
 static boolean network_host_controls_restart(void) { return TRUE; }
 static boolean network_host_controls_teams_locked(void) { return FALSE; }
@@ -229,10 +224,24 @@ static boolean network_host_game_limits_waiting(long *score, short *minutes)
 static boolean network_host_game_set_limits(long score, short minutes) { (void)score; (void)minutes; return TRUE; }
 static boolean network_host_game_announce(char const *text) { (void)text; return TRUE; }
 
+/* an admin's Host Controls (host_controls_menu.inc's, network_admin.c's):
+this machine hosts, and is no dedicated server's admin */
+static boolean host_remote(void) { return FALSE; }
+static boolean host_flag(short flag) { (void)flag; return FALSE; }
+static boolean host_lobby(void) { return network_host_controls_in_lobby(); }
+static boolean host_ask(short verb, void const *player, long number, char const *text)
+{
+	(void)verb; (void)player; (void)number; (void)text;
+	return FALSE;
+}
+static boolean host_next(struct server_entry *entry, boolean *now) { return network_host_game_next(entry, now); }
+
 /* Host Controls' screen state (host_controls_menu.inc's host_menu) */
 static struct
 {
 	short tab, first;
+	/* (MAPS' gametype: CHANGE MAP... opens it on CURRENT) */
+	short gametype;
 	boolean focus_first;
 	short game_rows[MAXIMUM_HOST_GAME_ROWS];
 	short game_row_count;

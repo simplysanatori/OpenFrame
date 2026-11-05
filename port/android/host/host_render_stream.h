@@ -84,9 +84,24 @@ struct host_render_backend
 	/* display.hdr (xgpu_hdr.h): its state, and a 3D view's tone map */
 	void (*hdr)(void *context, const struct xgpu_stream_hdr *record);
 	void (*tone_map)(void *context, const struct xgpu_stream_tone_map *record);
+	/* display.ambient_occlusion over a 3D view (none: not drawn) */
+	void (*ambient_occlusion)(void *context, const struct xgpu_stream_ambient_occlusion *record);
 	/* display.picture_position: the picture n pixels from the top of a
 	taller window (n + 1) or centered (0) */
 	void (*picture_top)(void *context, uint32_t top);
+	/* display.gamma: the setting (a float's bits), from the next present on */
+	void (*gamma)(void *context, uint32_t gamma);
+	/* the game's renderer's category of the draws from now on
+	(XGPU_STREAM_CATEGORY's value), for the GPU's timing */
+	void (*category)(void *context, uint32_t category);
+	/* display.panini: a 3D view drawn again through the Panini projection
+	(none: not drawn) */
+	void (*panini)(void *context, const struct xgpu_stream_panini *record);
+	/* display.ambient_occlusion "world" (docs/world-ao.md): the block the
+	opaque surfaces' ambient light reads from here on, and slices of the
+	field (its bytes: host_pointer(record->data)); none: not drawn */
+	void (*world_ao_window)(void *context, const struct xgpu_stream_world_ao_window *record);
+	void (*world_ao_field)(void *context, const struct xgpu_stream_world_ao_field *record);
 
 	void (*target_create)(void *context, const struct xgpu_stream_target_create *record);
 	void (*target_delete)(void *context, uint32_t target);
@@ -110,6 +125,11 @@ struct host_render_backend
 	/* the pipeline the draws use from now on; nonzero if it is made (its
 	state goes back to the guest: XGPU_STREAM_PIPELINE_*) */
 	int (*pipeline)(void *context, uint32_t id, const struct xgpu_stream_pipeline_define *definition);
+	/* pipeline id's stand-in (0 none; its definition): drawn with until
+	id's is made, and always while a map is prepared (none: id's made as
+	any other's) */
+	void (*pipeline_stand_in)(void *context, uint32_t id, uint32_t stand_in,
+		const struct xgpu_stream_pipeline_define *definition);
 	/* the latest of each, whichever changed */
 	void (*draw_state)(void *context, const struct xgpu_stream_dynamic_state *dynamic,
 		const struct xgpu_stream_draw_uniforms *uniforms, uint32_t uniforms_serial);
@@ -141,11 +161,18 @@ struct host_render_backend
 	void (*loading_scene)(void *context, const void *data, uint32_t bytes);
 	/* the load's progress, 0 to 1 (unchecked: the backend clamps it) */
 	void (*loading_progress)(void *context, float progress);
+	/* the sweep following the progress (1, the Xbox's) or looping (0) */
+	void (*loading_mode)(void *context, int follow_progress);
+	/* a line under the words: its coverage, width by height (checked;
+	copied before returning); NULL clears it */
+	void (*loading_caption)(void *context, const unsigned char *coverage, uint32_t width, uint32_t height);
 
 	/* nonzero if the block and cells are made */
 	int (*dynamic_lights_prepare)(void *context);
 	void (*dynamic_lights_upload)(void *context, const struct xgpu_stream_dynamic_lights_upload *record);
 	void (*dynamic_lights_halos)(void *context, const struct xgpu_stream_dynamic_lights_halos *record);
+	/* the world (xgpu.h), checked: its texels inside the stream */
+	void (*dynamic_lights_world)(void *context, const struct xgpu_stream_dynamic_lights_world *record);
 
 	int (*vr_supported)(void *context);
 	/* PREPARED: waits until the shaders and pipelines of the draws so far are
@@ -246,10 +273,13 @@ the frame reached the screen with its input time
 host_render_stream_latency: nanoseconds of CLOCK_MONOTONIC, the game's. */
 void host_render_stream_display_paced(int paced);
 /* display.hdr: the display shows HDR (xgpu_hdr.h's XGPU_HDR_DISPLAY_HEADROOM),
-and its headroom now (1 for none), for the guest to read between frames
-(the ring's display_hdr and display_headroom: any thread, at any time,
-before or while a stream is open) */
-void host_render_stream_display_hdr(int hdr, float headroom);
+its headroom (1 for none: now, or the display's potential, its peak), and
+its SDR white in nits (the system's,
+white_reported, or the one the encoding takes where it gives none), for the
+guest to read between frames (the ring's display_hdr, display_headroom,
+display_white and display_white_reported: any thread, at any time, before
+or while a stream is open) */
+void host_render_stream_display_hdr(int hdr, float headroom, float white_nits, int white_reported);
 uint64_t host_render_stream_frame_input(void);
 void host_render_stream_frame_taken(void);
 /* the display has latched a refresh's frame (taken one or not) at latch;

@@ -157,6 +157,7 @@ struct game_options;
 #include "items/items.h"
 #include "items/projectiles.h"
 #include "main/main.h"
+#include "menu_pictures.h" /* port: port/linux/game/menu_pictures_render.c */
 #include "main/console.h"
 #include "math/real_math.h"
 #include "memory/data.h"
@@ -165,6 +166,7 @@ struct game_options;
 #include "objects/object_lights.h"
 #include "objects/objects.h"
 #include "objects/widgets/antenna.h"
+#include "objects/widgets/flags.h"
 #include "objects/widgets/widgets.h"
 #include "physics/breakable_surfaces.h"
 #include "physics/collision_usage.h"
@@ -188,6 +190,7 @@ struct game_options;
 #endif
 #include "profile_sections.h" /* port: port/linux/include/profile_sections.h */
 #include "sim_rate.h" /* port: port/linux/game/sim_rate.c */
+#include "basic_training.h" /* port: port/linux/game/basic_training.c */
 
 /* network_game_globals.c's */
 boolean network_game_distributed_client(void);
@@ -396,12 +399,17 @@ static void game_tick_macro_step(
 	speed swings it far wider than a tick's step does. The frames between the
 	ticks are drawn from what each tick leaves (antenna.c). */
 	profile_scope(game_tick_antennas_section, antennas_update(seconds_per_tick);)
+	/* ... and so is a flag's cloth (flags.c): stepped a frame at a time, its
+	pulls come several times a tick and it thrashes */
+	flags_tick(seconds_per_tick);
 	profile_scope(game_tick_first_person_section,
 		lock_global_random_seed();
 		rumble_update();
 		first_person_weapons_update();
 		unlock_global_random_seed();)
 	profile_scope(game_tick_game_engine_section, game_engine_update();)
+	/* port: Basic Training's steps and chapters (port/linux/game/basic_training.c) */
+	basic_training_tick();
 	profile_scope(game_tick_editor_section, editor_update();)
 	/* port: in network co-op only the host runs the scripts. A client running
 	them would place the map's actors and objects a second time and make
@@ -947,6 +955,13 @@ void game_precache_new_map(
 			{
 				map_status = cache_files_precache_map_status(
 					&game_globals->loading_progress);
+				/* port: not for a map of the menus' pictures: the loading screen
+				of their pass is up (port/linux/game/menu_pictures_render.c) */
+				if (menu_pictures_preparing())
+				{
+					Sleep(1);
+					continue;
+				}
 				main_pregame_render();
 				main_rasterizer_throttle();
 				main_present_frame();
@@ -1035,9 +1050,15 @@ void game_frame(
 	real dt)
 {
 	real frame_dt;
+	/* port: the game time of the Xbox's shortest frame, for the particles: it
+	drew at most 30 frames a second, two vertical blanks each (main.c) */
+	real xbox_frame_dt = game_time_get_speed() / (real)TICKS_PER_SECOND;
 
 	if (game_globals->players_are_double_speed)
+	{
 		frame_dt = dt * 0.5f;
+		xbox_frame_dt *= 0.5f;
+	}
 	else
 		frame_dt = dt;
 
@@ -1047,7 +1068,7 @@ void game_frame(
 		game_globals->active);
 
 	collision_log_begin_period(1);
-	particles_update(frame_dt);
+	particles_update(frame_dt, xbox_frame_dt);
 	contrails_update(frame_dt);
 	particle_systems_update(frame_dt);
 	widgets_update(frame_dt);

@@ -20,14 +20,14 @@ CASES = ["outside-near", "outside-far", "outside-side", "crossing-kept",
          "walk-fallback", "walk-planes", "walk-camera-radius", "walk-facing", "walk-near-first", "set-tests", "set-tests-unloaded", "console-local", "walk-unit-forward",
          "source-fog-rejected", "source-fog-straddling", "debug-record", "dispose-empty", "mirror-far", "build-budget",
           "rejected-bucket-visits", "compact-allocation-failure", "overlay-truncation", "default-mask", "debug-letterbox",
-          "walk-profile", "missing-subcluster-warning", "debug-stale-data"]
+          "walk-profile", "missing-subcluster-warning", "debug-stale-data", "switch-kept", "copy-build", "copy-thread"]
 CONTROLS = {
     "text-under-letterbox": (("bounds.y0 = (render.camera.viewport_bounds.y1 - render.camera.viewport_bounds.y0) / 8 + 2;", "bounds.y0 = 0;"), "structure_culling_render_debug", "debug-letterbox"),
     "drop-default-bucket-facing": (("FLAG(_structure_culling_bucket_facing_bit)", "0"), "structure_culling_tests", "default-mask"),
     "overlay-no-cap": (("if (count >= STRUCTURE_CULLING_MAXIMUM_DEBUG_TRIANGLES)", "if (count >= LONG_MAX)"), "structure_culling_render_debug", "overlay-truncation"),
-    "compact-with-realloc": (("allocation = malloc(final_size ? final_size : 1);", "allocation = realloc(structure_culling.allocation, final_size ? final_size : 1);"), "structure_culling_structure_bsp_loaded", "compact-allocation-failure"),
+    "compact-with-realloc": (("allocation = malloc(final_size ? final_size : 1);", "allocation = realloc(data->allocation, final_size ? final_size : 1);"), "structure_culling_build_end", "compact-allocation-failure"),
     "scan-rejected-bucket": (("if (bucket_reason && !structure_culling_debug_enabled)", "if (FALSE)"), "structure_culling_traverse", "rejected-bucket-visits"),
-    "drop-build-budget": (("if (size >= STRUCTURE_CULLING_BUILD_BUDGET)", "if (FALSE)"), "structure_culling_structure_bsp_loaded", "build-budget"),
+    "drop-build-budget": (("if (size >= STRUCTURE_CULLING_BUILD_BUDGET)", "if (FALSE)"), "structure_culling_build_begin", "build-budget"),
     "mirror-use-far": (("if (render.camera.z_near == 0.0f)", "if (FALSE)"), "structure_culling_traverse", "mirror-far"),
     "free-null-allocation": (("if (structure_culling.allocation)", "if (TRUE)"), "structure_culling_dispose", "dispose-empty"),
     "record-drawn": (("surface_index, keep);", "surface_index, keep || !reason);"), "structure_culling_record", "debug-record"),
@@ -50,18 +50,23 @@ CONTROLS = {
     "keep-invalid-vertices": (("if (from_surface_list && !testable)", "if (FALSE)"), "structure_culling_gather_pairings", "out-of-range-surfaces"),
     "use-owner-in-group": (("from_surface_list ? group_material : surface_materials[surface_index]", "surface_materials[surface_index]"), "structure_culling_gather_pairings", "group-material"),
     "drop-missing-owner": (("if (from_surface_list && !testable)", "if (material_index < 0 || (from_surface_list && !testable))"), "structure_culling_gather_pairings", "missing-owner"),
-    "scratch-total-capacity": (("size += largest_group_count * scratch_unit_size;", "size += capacity * scratch_unit_size;"), "structure_culling_structure_bsp_loaded", "load-small-group-scratch"),
+    "scratch-total-capacity": (("size += largest_group_count * scratch_unit_size;", "size += capacity * scratch_unit_size;"), "structure_culling_build_begin", "load-small-group-scratch"),
     "last-group-maximum": (("MAX(*maximum_group_count, count)", "count"), "structure_culling_build_lists", "load-small-group-scratch"),
     "sort-descending": (("distances[order[j - 1]] > distances[entry]", "distances[order[j - 1]] < distances[entry]"), "structure_culling_order_clusters", "cluster-order"),
+    "rebuild-kept": (("structure_culling = *kept;", "free(kept->allocation);"), "structure_culling_switch", "switch-kept"),
     "drop-structure-check": (("structure_culling.structure == structure &&", "TRUE &&"), "structure_culling_data_matches", "stale-structure"),
     "ignore-zero-mask": (("!structure_culling_tests || ", ""), "structure_culling_traverse", "walk-fallback"),
-    "use-fog-far": (("rasterizer_globals.far_clip_distance", "render.camera.z_far"), "structure_culling_traverse", "walk-planes"),
+    "use-fog-far": (("render_far_clip_distance()", "render.camera.z_far"), "structure_culling_traverse", "walk-planes"),
     "skip-forward-normalization": (("scale_vector3d(&render.camera.forward, 1.0f / square_root(magnitude_squared3d(&render.camera.forward)),\n\t\t&planes[_structure_culling_frustum_plane_far].n);", "planes[_structure_culling_frustum_plane_far].n = render.camera.forward;"), "structure_culling_traverse", "walk-unit-forward"),
     "drop-source-box": (("if (bucket->source_bounds && !render_frustum_cube_visible", "if (FALSE && bucket->source_bounds && !render_frustum_cube_visible"), "structure_culling_traverse", "source-fog-rejected"),
     "clamp-finer-box": (("render_frustum_cube_visible(frustum, bucket->source_bounds, FALSE)", "render_frustum_cube_visible(frustum, &bucket->bounds, FALSE)"), "structure_culling_traverse", "source-fog-straddling"),
     "skip-profile-enter": (("profile_enter((*section));", ""), "structure_culling_traverse", "walk-profile"),
     "skip-profile-exit": (("profile_exit((*section));", ""), "structure_culling_traverse", "walk-profile"),
     "draw-stale-counters": (("if (!structure_culling_data_matches(structure))", "if (FALSE)"), "structure_culling_render_debug", "debug-stale-data"),
+    "copy-read-in-place": (("((work) ? (work)->offset : 0)", "0"), "STRUCTURE_CULLING_READ", "copy-build"),
+    "copy-bounds-in-copy": (("(real_rectangle3d const *)((byte const *)parent_bounds - work->offset)", "parent_bounds"), "structure_culling_build_group", "copy-build"),
+    "copy-points-in-place": (("structure_culling_pairing_points(structure, work->data->materials, work->offset, pairing, work->points);", "structure_culling_pairing_points(structure, work->data->materials, 0, pairing, work->points);"), "structure_culling_build_group", "copy-build"),
+    "copy-no-wait": (("\tstructure_culling_job_wait(structure_bsp_index);\n\tkept = ", "\tkept = "), "structure_culling_switch", "copy-thread"),
     "skip-missing-warning": (("if (!warned_about_missing_subclusters)", "if (FALSE && !warned_about_missing_subclusters)"), "structure_visibility_compute", "missing-subcluster-warning"),
 }
 
@@ -73,14 +78,24 @@ def generated(control=None):
              "structure_culling_cone_build", "structure_culling_cone_facing", "structure_culling_box_test",
              "structure_culling_split_class", "structure_culling_split_compare", "structure_culling_split_range",
              "structure_culling_split", "structure_culling_gather_pairings", "structure_culling_set_camera_radius",
-             "structure_culling_dispose", "structure_culling_pairing_points", "structure_culling_bounds_add",
-             "structure_culling_build_group", "structure_culling_build_lists", "structure_culling_structure_bsp_loaded"]
+             "structure_culling_dispose", "structure_culling_switch", "structure_culling_pairing_points",
+             "structure_culling_bounds_add", "structure_culling_build_group", "structure_culling_build_lists",
+             "structure_culling_build_begin", "structure_culling_build_end", "structure_culling_builder_main",
+             "structure_culling_builder_start", "structure_culling_job_wait", "structure_culling_wait",
+             "structure_culling_build", "structure_culling_structure_bsp_loaded", "structure_culling_structure_bsp_read"]
     names += ["structure_culling_order_clusters", "structure_culling_data_matches", "structure_culling_record",
               "structure_culling_traverse", "structure_culling_set_tests", "structure_culling_debug",
               "structure_culling_render_debug"]
     parts = {name: function(source, name) for name in names}
+    # the reads through a build's offset, and the builder thread's state
+    macro = re.search(r"^#define STRUCTURE_CULLING_READ\(.*?\n(?:.*\\\n)*.*\n", source, re.M).group(0)
+    jobs = source[source.index("enum\n{\n\t_structure_culling_job_none"):
+                  source.index("static struct structure_culling_job structure_culling_jobs[STRUCTURE_CULLING_KEPT_BSPS];")]
+    jobs += "static struct structure_culling_job structure_culling_jobs[STRUCTURE_CULLING_KEPT_BSPS];\n"
+    if control == "copy-read-in-place":
+        macro = mutated(macro, *CONTROLS[control][0])
     parts["hs_expression_changes_no_game"] = function(read("source/hs/hs.c"), "hs_expression_changes_no_game")
-    if control and control not in ("drop-default-bucket-facing", "skip-missing-warning"):
+    if control and control not in ("drop-default-bucket-facing", "skip-missing-warning", "copy-read-in-place"):
         (before, after), name, _ = CONTROLS[control]
         if control == "different-planes":
             # Each point outside a different plane wrongly becomes sufficient.
@@ -112,6 +127,8 @@ def generated(control=None):
     if control == "drop-default-bucket-facing":
         default = mutated(default, *CONTROLS[control][0])
     types += "\nstatic struct structure_culling_data structure_culling;\n" + default + "\n"
+    types += re.search(r"^#define STRUCTURE_CULLING_KEPT_BSPS .+$", source, re.M).group(0) + "\n"
+    types += "static struct structure_culling_data structure_culling_kept[STRUCTURE_CULLING_KEPT_BSPS];\n"
     types += "static long structure_culling_submitted, structure_culling_outside, structure_culling_facing;\n"
     types += "static real structure_culling_camera_radius;\n"
     types += "static boolean structure_culling_debug_enabled;\nstatic unsigned long structure_culling_recorded[2][4096];\n"
@@ -133,7 +150,12 @@ static void fixture_visibility_surface_walk(struct structure_bsp *structure)
 {
     static boolean warned_about_missing_subclusters, warned_about_environment_surfaces;
 """ + surface_walk
-    return (("types.inc", types), ("under_test.inc", sign + "\n" + helpers + "\n" + "\n".join(parts.values()) + "\n" + surface_walk))
+    prototypes = ("static void structure_culling_job_wait(short structure_bsp_index);\n"
+                  "void structure_culling_wait(void);\n"
+                  "static long structure_culling_build_lists(struct structure_bsp *structure,"
+                  " struct structure_culling_workspace *work, long *maximum_group_count);\n")
+    return (("types.inc", types), ("under_test.inc", sign + "\n" + macro + jobs + prototypes + helpers + "\n" +
+                                   "\n".join(parts.values()) + "\n" + surface_walk))
 
 
 @pytest.mark.parametrize("case", CASES)

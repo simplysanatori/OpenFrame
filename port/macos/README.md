@@ -338,7 +338,10 @@ of each 4 KB page of the guest. A host page gets the union of the
 protections of its four guest pages, stays mapped while any of them is,
 and a guest page mapped into a host page in use is zeroed in place. The
 write tracking (`host_memory_watch.c`) protects host pages, so a write
-marks the whole 16 KB as written.
+marks the whole 16 KB as written; the vertex mirror's pages are the
+tracking's (`memory_watch_page_size`). Android's and Linux's memory without
+the base register (`host_memory.c`) keeps its pages so too, on kernels of
+16 KB pages.
 
 ### System calls
 
@@ -403,7 +406,15 @@ render thread is), run by a `CAMetalDisplayLink`: at
 each refresh of the display, the link hands over a drawable, and the
 thread draws the oldest frame queued (with vsync off, the newest) into it,
 letterboxed to the frame's shape, and presents it. A ProMotion display's rate follows the frames, up
-to its highest; a fixed display's is its own. With battery saver on
+to its highest; a fixed display's is its own. An iPhone's link asks for
+its highest rate alone, and halves it while the frames do not keep up
+(`rate_adapt`): a second of play in which more than 10% of the refreshes
+showed no new frame (a fight the GPU or the phone's heat cannot hold at
+120) runs the link at 60, every frame then shown for two refreshes evenly,
+not some for one and some for two; the full rate is tried again after
+5 s, a hold that doubles (to 80 s) at each try that fails and starts again
+once 120 has held for 10 s. `HALO_METAL_ADAPTIVE_RATE=0`: the full rate
+always. With battery saver on
 (`display.battery_saver`, `host_metal_battery_saver`), the link runs at a
 whole fraction of the display's rate, 30 to 60 frames a second (60 at
 60 or 120 Hz: a ProMotion display slows to it). When a frame ends, its
@@ -493,7 +504,7 @@ the Mac's default (taken as the window opens, and as Settings change it),
 the display does not pace the game: it draws as many frames as
 `display.max_fps` allows (twice the window's display's refresh rate by
 default, following the window to another display), as on Linux and
-Windows (`platform_video_swap`, a press starting the next frame at once),
+Windows (`platform_video_swap`, whose wait no input ends: #543),
 and each refresh shows the newest frame queued, the older one dropped. The
 link still presents only at its refreshes, so nothing tears, in a window
 or fullscreen. The newest frame is taken 3 ms before the link's deadline
@@ -509,9 +520,8 @@ of their own beat against the display's: the frame shown was then one just
 drawn or one an interval older, and up to 20% of the refreshes stepped by
 more than 4 ms. The budget's changes move the phase by 0.5 ms a refresh at
 most; the last 2 ms of each wait are a time constraint thread's sleep (an
-ordinary timed wait ended up to 8 ms late); a press wakes the wait at once
-(#264), but not in the half step before a shown frame, which it would only
-make late. With
+ordinary timed wait ended up to 8 ms late); no press ends the wait (#543:
+a frame begun at a press was one more than the limit). With
 battery saver on, the display link paces the game at its slower rate, vsync
 or not (frames spaced by the clock alone came at the link's rate but not in
 step with it: on a 60 Hz M2, 15% of the refreshes showed no new frame).
@@ -596,6 +606,26 @@ GPU's time a frame says little about the work. To measure the work:
   span includes others'. `HALO_METAL_PASSES_SPLIT=1` makes each draw of
   those frames a pass of its own (up to 1024 a frame), logged with its shaders, blend, depth,
   viewport and textures (size, format, levels, filters and anisotropy).
+- `HALO_METAL_PASS_TIMES=<n>`: every nth frame timed so (unpaced, for the
+  work's time), each pass's time summed by what it draws, and logged as a
+  table every 20 timed frames (`metal: pass times over 20 frames`): each
+  kind's median, mean and most milliseconds a frame, its passes a frame and
+  the other kinds drawn in them. The kinds are the game's renderer's
+  categories (`rasterizer.h`'s, sent with the command stream's `CATEGORY`
+  records: the sky, `ao pre-pass` (`display.ambient_occlusion`'s), the world,
+  its transparents, water, effects, the HUD, `other` outside them) and the
+  backend's own passes (`ao depth`, `ao`, `ao blur`, `ao upsample`,
+  `tone map`, `anti-aliasing`, `panini`), with the passes put aside
+  (`aside`: the shadows' and mip chains' small targets), the blits
+  (`copies`) and the picture's copy for the presentation (`present`). A
+  render pass's time is its fragment stage's (the GPU runs the vertex
+  stages of later passes ahead), from its start, or the end of the passes
+  that started before it, to its end: the kinds' times add up to the time
+  the GPU was busy with the frame (`busy`), whatever else the GPU did
+  between (another app's work). A pass's kind is the one its first draw had:
+  the 3D view's after the occlusion is one pass, its transparents, water
+  and HUD in it; `HALO_METAL_PASS_TIMES_SPLIT=1` ends the timed frames'
+  passes where the kind changes, at the cost of their stores and loads.
 - `HALO_METAL_CAPTURE=<frame>:<file>.gputrace` (with `MTL_CAPTURE_ENABLED=1`)
   writes that frame and the next, the first's presentation included, as a
   GPU trace document for Xcode (its shader profiler and counters).
@@ -674,8 +704,12 @@ command stream's backend table. They run on one thread, the render thread.
   thread: each is made on a queue (user-initiated QoS) once its shaders
   are, during a map's loading screen for the draws it is shown first
   (`display.prepare_shaders`: the stream's PREPARE and PREPARED records).
-  A draw whose pipeline was not made so waits for it, logged and counted
-  ("made while drawing"): a draw is never skipped. The archive is written,
+  The map is prepared again in play when a setting changes its draws'
+  pipelines (`port/linux/game/render_enumerate.c`). A draw whose pipeline
+  was not made so is skipped until its pipeline is made on the queue (a
+  frame or two), logged with what tells the draw apart and counted
+  ("pipeline missed"), as Vulkan's is: waited for, a burst of them stopped
+  the frame for up to 117 ms on an M2. The archive is written,
   on a background queue, after a map's preparation and as the process
   ends (host_exit), never in play: a new archive each time, as Metal's
   archiver cannot write one that was read or written and has had pipelines
@@ -690,7 +724,13 @@ command stream's backend table. They run on one thread, the render thread.
   clears' and the presentation's functions, the NV2A combiner as one
   function whose configuration is function constants
   (`xgpu_metal_combiner.c`), and the pixel programs of the renderer's
-  manifest (`port/assets/render`) that the combiner cannot draw. A shader is
+  manifest (`port/assets/render`) that the combiner cannot draw, each of its
+  draws derived under every setting that changes a draw (multisampling's
+  samples, HDR, each pixel's lighting, the enhanced dynamic lights, the
+  ambient occlusion: `xgpu_manifest_derive`, the front end's own derivation).
+  The manifest is recorded in the run that makes the shipped records
+  (`tools/prepared_records.py`), and `tools/test_render_manifest.py` fails
+  where a record's draw is not one of its own. A shader is
   looked up there by its name (its MSL source's hash). A pixel program is
   the combiner's function specialised for its configuration
   (`newFunctionWithName:constantValues:`, on the queue: about 0.2 ms, 10 ms
@@ -717,6 +757,13 @@ command stream's backend table. They run on one thread, the render thread.
   GPUs have no 24-bit depth), depth kept reversed, 1 - the game's
   (`xgpu_backend.h`, "Reversed depth"). An upload writes a texture at once where no
   work the GPU still has reads it, else it is a blit in the frame's order.
+  A buffer (the mirrored vertices' segments) written while the GPU's work
+  still reads it, and no blit of the GPU's still writes, is renamed
+  instead: another buffer of its size (one the GPU is done with, kept for
+  it) takes its place, with its contents and the bytes written, and the
+  work already encoded reads the old one. A blit there would end the 3D
+  view's pass, as it did about once every four frames of a fight in Blood
+  Gulch.
   A multisampled target draws into a multisampled attachment resolved into
   it at each pass's end. A new target is cleared when it is made (black;
   depth the far plane, stencil 0): Apple's GPUs give a new private texture no contents
@@ -735,9 +782,11 @@ command stream's backend table. They run on one thread, the render thread.
   for an attachment that a clear of the whole of it came first for. Other
   clears are quads drawn through a clear pipeline (of the channels
   cleared).
-- **Aside passes.** A pass of a small target (a quarter of the open pass's
-  pixels at most, the open one at least 512x512: an object's shadow and its
-  blur, a mip chain) begun while the large pass is open would end it: its
+- **Aside passes.** A pass of another target (the open pass's at least
+  512x512: an object's shadow and its blur, a mip chain, and the game's
+  2048x2048 targets that it draws in four passes in the middle of the 3D
+  view, larger than the view at a phone's resolution) begun while the
+  large pass is open would end it: its
   colour, depth and stencil stored and loaded again when the game comes back,
   tens of megabytes at the screen's size each time. Where the small pass
   draws into nothing the frame's command buffer has written and its draws
@@ -753,7 +802,13 @@ command stream's backend table. They run on one thread, the render thread.
   `aside_continue`), the 3D view and the HUD then one pass, which a
   phone's GPU pays least for and MSAA needs to resolve its samples in tile
   memory: at 2796x1290 on an M1, MSAA 4x went from 9.1 to 5.2 ms of the
-  GPU a frame, and one or two pixels of a shot differ.
+  GPU a frame, and one or two pixels of a shot differ. A recording of a
+  fight in Blood Gulch (16 players, 3728x1720, MSAA 4x, HDR), replayed as
+  iOS plays it: with the 2048x2048 targets' passes put aside too, the 3D
+  view's pass was resumed (its samples, depth and stencil loaded again)
+  0.02 times a frame, from 1.3 (up to 8), and the GPU's time went from 12.8
+  to 6.8 ms a frame; up to 24 pixels of a shot differ, by at most 12 of
+  255 (with the Mac's break, none).
   `HALO_METAL_ASIDE_BREAK=1` or `0` chooses on either. `HALO_METAL_ASIDE=0`:
   no aside passes. HALO_METAL_STATS counts them.
 - **Frame-end discards.** A tile-based GPU (Apple's) stores each pass's
@@ -847,6 +902,24 @@ command stream's backend table. They run on one thread, the render thread.
   `tools/metal_post_shaders.py`); the functions are in the app's library,
   their pipelines made as the setting is chosen and as a map is
   prepared.
+- **Ambient occlusion** (`display.ambient_occlusion`): the Vulkan
+  backend's GTAO (`tools/vulkan_post_shaders.py`) in passes Apple's GPUs
+  draw cheaply (`xgpu_metal_post.c`): the stencil's marks drawn into a mask
+  of two bytes a pixel; the distances and the mask taken into one texture at
+  the occlusion's resolution (half the target's each way: a Retina
+  display's points), the only pixels the occlusion reads them at, so that
+  its scattered reads stay in a texture a quarter of the target's size; the
+  occlusion, its blur along x and y, and the occlusion filtered up into a
+  byte a pixel, the pixel's distance read from the depth target. The
+  occlusion, the blur and the filtering are compiled in Metal's relaxed
+  maths (`#pragma METAL fp math_mode(relaxed)`, by
+  `tools/metal_post_shaders.py`): in safe maths, their arcsines,
+  exponentials and divides cost three times their reads. The occlusion's
+  texture is unbound for the draws that do not read it, so that the
+  objects' shadows drawn after the surfaces are still put aside. On an M2
+  at 3420x2146, unpaced (`HALO_METAL_PASS_TIMES`), a frame's GPU time with
+  "strong" over none: a10's hangar 3.3 ms (was 10 to 12), a30's landing
+  1.1 ms (was 5.1).
 
 ### Tests
 

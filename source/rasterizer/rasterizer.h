@@ -722,6 +722,12 @@ void rasterizer_dynamic_lit_geometry_draw(
 void rasterizer_psuedo_dynamic_screen_quad_draw(
 	struct rasterizer_dynamic_screen_geometry_parameters *parameters,
 	struct dynamic_screen_vertex *vertices);
+/* port: (rasterizer.c) */
+void rasterizer_screen_offset_set(
+	real i,
+	real j);
+void rasterizer_screen_offset_get(
+	real_vector2d *offset);
 #ifndef RASTERIZER_WIDGET_SIGNATURES_OWNED
 #endif
 void rasterizer_profile_enable(
@@ -771,6 +777,10 @@ boolean rasterizer_memory_pool_initialize(void);
 void rasterizer_memory_pool_begin(void);
 void *rasterizer_memory_alloc(const void *src, unsigned long size);
 const void *rasterizer_memory_alloc_const(const void *src, unsigned long size);
+/* port: (memory kept for the window, and the queue's released) */
+const void *rasterizer_memory_alloc_const_for_window(const void *src, unsigned long size);
+boolean rasterizer_memory_pool_half_spent(void);
+void rasterizer_memory_pool_release_queued(void);
 void rasterizer_memory_pool_end(void);
 void rasterizer_memory_pool_dispose(void);
 

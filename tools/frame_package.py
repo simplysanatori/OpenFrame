@@ -61,8 +61,11 @@ LICENSES = {
     "mbedtls-LICENSE.txt": "port/third_party/mbedtls/LICENSE",
     "miniupnpc-LICENSE.txt": "port/third_party/miniupnpc/LICENSE",
     "Overpass-OFL.txt": "port/assets/fonts/Overpass-OFL.txt",
+    "Hack-LICENSE.txt": "port/assets/fonts/Hack-LICENSE.txt",
+    "OpenCE-OFL.txt": "port/assets/fonts/OpenCE-OFL.txt",
     "expat-COPYING.txt": "port/third_party/expat/COPYING",
     "opus-COPYING.txt": "port/third_party/opus/COPYING",
+    "ffmpeg-COPYING.LGPLv2.1.txt": "port/third_party/ffmpeg/COPYING.LGPLv2.1",
     "lucide-LICENSE.txt": "port/assets/icons/lucide/LICENSE",
 }
 # the files an install never writes over (the player's)
@@ -169,6 +172,8 @@ def main() -> int:
         "openh1.desktop": ROOT / "port/assets/linux/openh1.desktop",
         **{f"steam-{art.name}": art for art in sorted((ROOT / "port/assets/steam/openh1-vr").glob("*.png"))},
         "brokers.txt": ROOT / "port/assets/network/brokers.txt",
+        "prepared.records": ROOT / "port/assets/prepared/prepared.records",
+        "openh1.assets": args.build / "openh1.assets",
         "README.md": FRAME_DIR / "README.md",
         **{name: ROOT / source for name, source in LICENSES.items()},
     }

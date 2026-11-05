@@ -168,19 +168,34 @@ boolean passenger_camera_reticle_begin(short local_player_index, long weapon_ind
 		point_from_line3d(&origin, &direction, 128.0f, &target);
 	if (!render_camera_world_to_screen(&render.camera, &render.frustum, &target, &screen))
 		return FALSE;
+	/* (where the shot lands in the drawn view, from the middle; the
+	screen's place is display.panini's) */
 	reticle_offset.x = screen.x - (render.camera.window_bounds.x0 + render.camera.window_bounds.x1) * 0.5f;
 	reticle_offset.y = screen.y - (render.camera.window_bounds.y0 + render.camera.window_bounds.y1) * 0.5f;
 	reticle_active = TRUE;
 	return TRUE;
 }
 
-void passenger_camera_reticle_offset(point2d *point)
+boolean passenger_camera_reticle_offset(point2d *point, real reticle_scale, real_vector2d *rest)
 {
+	rest->i = 0.0f;
+	rest->j = 0.0f;
+	/* (hud_draw.c scales the reticle about the view's centre by
+	reticle_scale, offset and all, so the offset is given at the HUD's own
+	size to land there) */
+	if (!(reticle_scale > 0.0f))
+		reticle_scale = 1.0f;
 	if (reticle_active)
 	{
-		point->x = (short)(point->x + reticle_offset.x);
-		point->y = (short)(point->y + reticle_offset.y);
+		real x = point->x + reticle_offset.x / reticle_scale;
+		real y = point->y + reticle_offset.y / reticle_scale;
+
+		point->x = (short)floorf(x);
+		point->y = (short)floorf(y);
+		rest->i = (x - point->x) * reticle_scale;
+		rest->j = (y - point->y) * reticle_scale;
 	}
+	return reticle_active;
 }
 
 void passenger_camera_reticle_end(void)
