@@ -4,7 +4,7 @@ OpenFrame is the Steam Frame fork of [OpenH1](https://github.com/OpenH1/OpenH1):
 Halo: Combat Evolved with OpenXR VR, drawn with Vulkan (Mesa's Turnip on the Frame's Adreno), run in
 the Frame's own SteamVR. This folder (`steam-frame/`) is the Frame packaging layer: build, install,
 launch wrapper, logs, release. It touches nothing under `source/`, `port/`, `tools/` or
-`configure.py`. The branch `steam-frame` began at OpenH1's release tag `build-734`; its current base is `build-769`.
+`configure.py`. The branch `steam-frame` began at OpenH1's release tag `build-734`; its current base is `build-1615`.
 
 Everything below is what the scripts do. What has been run and measured on a Frame is in
 [What is confirmed](#what-is-confirmed).
@@ -92,7 +92,7 @@ over `config.toml`.
 ## Release
 
 ```
-steam-frame/release.sh --version 1.0.0   # steam-frame/release/openframe-1.0.0-linux-arm64.tar.gz + SHA256SUMS (the script's default version)
+steam-frame/release.sh --version 1.1.0   # steam-frame/release/openframe-1.1.0-linux-arm64.tar.gz + SHA256SUMS (the script's default version)
 ```
 
 Needs a finished build. The tarball has the game, the library, the scripts, `brokers.txt`, `art/` (if it
@@ -103,8 +103,8 @@ licence texts (`licenses/`, `LICENSE*`, `COPYING*`, `THIRD-PARTY-NOTICES.md`) ar
 ## Privacy check
 
 ```
-steam-frame/tools/privacy-check.sh              # our files since build-769 (the base)
-steam-frame/tools/privacy-check.sh --history    # commits after build-769: lines, authors, messages
+steam-frame/tools/privacy-check.sh              # our files since build-1615 (the base)
+steam-frame/tools/privacy-check.sh --history    # commits after build-1615: lines, authors, messages
 steam-frame/tools/privacy-check.sh TARBALL|DIR
 ```
 
@@ -139,8 +139,8 @@ shipped defaults, in the first campaign level:
   hitch (OpenH1: a freeze of one to two seconds).
 - Recentring (both grips, SteamVR's own, and the automatic one at each level start), the menus in front of
   you, and the HUD layout defaults.
-- The controls in the README: the right stick press (bullet time once enabled, else zoom), flick up
-  (sprint), hold down for 0.8 s (third person), the left stick click while sprinting (slide), reload by
+- The controls in the README: the right stick press (zoom), flick down (bullet time, once enabled),
+  flick up (sprint), hold down for 0.8 s (third person), the left stick click while sprinting (slide), reload by
   X or the left-hip magazine, and no stick eject.
 
 The figures are for 90 Hz in the first level; other refresh rates and levels are not measured here.
