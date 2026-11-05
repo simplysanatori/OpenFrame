@@ -348,14 +348,6 @@ taken since the memory of those past it went back to the system
 (texture_cache_size_for_map) */
 static long texture_cache_map_pages = HALO_PORT_TEXTURE_CACHE_XBOX_MAP_PAGE_COUNT;
 static long texture_cache_backed_pages = HALO_PORT_TEXTURE_CACHE_XBOX_MAP_PAGE_COUNT;
-/* port: what a map's preparation read and waited for
-(texture_cache_preparation_statistics) */
-static struct
-{
-	long loads;
-	unsigned long bytes;
-	double wait_seconds;
-} texture_cache_preparation;
 /* port: the platform layer's (port/linux/src/port_config.c) */
 int config_boolean(char const *name);
 
@@ -522,6 +514,16 @@ static void texture_cache_preparation_checkpoint(void *const *bound)
 		}
 	}
 }
+
+/* port: what a map's preparation read and waited for
+(texture_cache_preparation_statistics; here, beside the preparation's
+checkpoint, which tools/test_preparation.py compiles with it) */
+static struct
+{
+	long loads;
+	unsigned long bytes;
+	double wait_seconds;
+} texture_cache_preparation;
 
 /* port: what the preparation begun last read (render_enumerate.c's log) */
 void texture_cache_preparation_statistics(long *loads, unsigned long *bytes, double *wait_seconds)
