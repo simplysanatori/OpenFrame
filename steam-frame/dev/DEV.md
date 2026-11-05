@@ -139,7 +139,7 @@ shipped defaults, in the first campaign level:
   hitch (OpenH1: a freeze of one to two seconds).
 - Recentring (both grips, SteamVR's own, and the automatic one at each level start), the menus in front of
   you, and the HUD layout defaults.
-- The controls in the README: the right stick press (zoom), flick down (bullet time, once enabled),
+- The controls in docs/CONTROLS.md: the right stick press (zoom), flick down (bullet time, once enabled),
   flick up (sprint), hold down for 0.8 s (third person), the left stick click while sprinting (slide), reload by
   X or the left-hip magazine, and no stick eject.
 
