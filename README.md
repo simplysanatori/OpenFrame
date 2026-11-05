@@ -75,6 +75,10 @@ To update, install a newer tarball the same way. Your maps, saves and settings s
 
 The installer changes nothing outside `~/Games/OpenFrame`, `~/.local/share/OpenFrame`, the Steam shortcut and SteamVR's settings for that shortcut. To remove OpenFrame, run `~/Games/OpenFrame/app/tools/uninstall.sh`. It keeps your data folder unless you pass `--purge`.
 
+## Install with Frametanium
+
+If you use [Frametanium](https://github.com/Cogential/frametanium), add `simplysanatori/OpenFrame` there. It downloads the release, runs its `install.sh` and updates it when I publish a new version. Copy the 24 `.map` files of your Xbox disc into `~/.local/share/OpenFrame/maps` yourself; the installer sets up the settings file for that folder. Without maps it still installs and says so.
+
 ## First run
 
 On the first start the game makes your profile and its cache of map data, about 800 MB, in `~/.local/share/OpenFrame/saves`.
