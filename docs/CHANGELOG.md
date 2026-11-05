@@ -56,7 +56,7 @@ All of this is OpenH1's work. I merged it and set it up for the Frame.
 
 ## 1.0.0 (October 2026)
 
-The first release of OpenFrame: Halo: Combat Evolved in VR, running natively on the Valve Steam Frame. It is my Steam Frame version of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo for Arm64 Linux with an OpenXR VR mode, with VR features from other people's Halo VR work brought in and credited. If you have played OpenH1's own Frame build, this is the same game, set up for the Frame, and it runs better. You need the maps from your own Xbox disc; no game data is included.
+The first release of OpenFrame: Halo: Combat Evolved in VR for the Steam Frame, running natively. It is my Steam Frame version of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo for Arm64 Linux with an OpenXR VR mode, with VR features from other people's Halo VR work brought in and credited. If you have played OpenH1's own Frame build, this is the same game, set up for the Frame, and it runs better. You need the maps from your own Xbox disc; no game data is included.
 
 ### The game on the Frame
 

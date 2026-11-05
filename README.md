@@ -1,6 +1,6 @@
 # OpenFrame
 
-Halo: Combat Evolved in VR, running natively on the Valve Steam Frame.
+Halo: Combat Evolved in VR for the Steam Frame, running natively.
 
 OpenFrame is my Steam Frame version of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo: Combat Evolved. The game is the Xbox build's own code, compiled for Arm64 Linux, drawn with Vulkan, and shown in VR through the Frame's own SteamVR. You do not need an emulator, Lepton, an APK or a PC. On top of OpenH1 I added the Frame setup, faster loads, settings tuned for 90 Hz, controls made for the Frame controllers, and VR features from other people's Halo VR work.
 

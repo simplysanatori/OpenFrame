@@ -1,6 +1,6 @@
 # OpenFrame 1.1.0
 
-Halo: Combat Evolved in VR, running natively on the Valve Steam Frame. OpenFrame is my Steam Frame version of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo built for Arm64 Linux with an OpenXR VR mode. This release moves it to OpenH1 `build-1615`. That brings in a lot of OpenH1's work since 1.0.0. The controls and the VR features from 1.0.0 stay as they were. You need the maps from your own Xbox disc; no game data is included.
+Halo: Combat Evolved in VR for the Steam Frame, running natively. OpenFrame is my Steam Frame version of [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo built for Arm64 Linux with an OpenXR VR mode. This release moves it to OpenH1 `build-1615`. That brings in a lot of OpenH1's work since 1.0.0. The controls and the VR features from 1.0.0 stay as they were. You need the maps from your own Xbox disc; no game data is included.
 
 ## What came with OpenH1 build-1615
 
