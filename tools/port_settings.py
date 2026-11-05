@@ -426,7 +426,7 @@ VR_SCREENS["vr_gestures"] = {
     "rows": [
         ("BULLET TIME BINDING:", "vr.bullet_time_binding",
          [("FLICK DOWN", "flick_down"), ("CLICK, HELD", "click_hold"), ("STICK CLICK", "stick_click"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("DOUBLE FLICK UP", "double_flick"), ("HOLD UP", "hold"), ("OFF", "off")],
-         "Flick down: flick the turning stick down, let go before 0.8 s (a hold is the third person; the click is always the zoom). Click, held: the click zooms, held 0.4 s it is bullet time. Stick click: the click is bullet time, no zoom. Up is sprint.",
+         "Flick down: flick the turning stick down, let go before 0.8 s (a hold is the third person; the click is always the zoom). Click, held: a short click zooms as you let go, held 0.4 s it is bullet time. Stick click: the click is bullet time, no zoom. Both only on foot in first person, offline. Up is sprint.",
          None),
         ("THIRD PERSON BINDING:", "vr.third_person_binding",
          [("HOLD", "hold"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("OFF", "off")],
@@ -459,7 +459,7 @@ VR_SCREENS["vr_hands"] = {
         ("SWING TO MELEE:", "vr.melee_gesture", ON_OFF,
          "A hard swing of the right controller melees, as\nB does; with its grip held, a softer one will do.", None),
         ("GRENADE THROW:", "vr.grenade_throw", [("HAND", "gesture"), ("BOTH", "both"), ("TRIGGER", "button")],
-         "Hand: hold the left grip, draw the hand back and\nlet go. Both: or the left trigger. Trigger: only it.",
+         "Hand: hold the left grip, draw the hand back, swing\nand let go. Both: or the left trigger. Trigger: only it.",
          None),
         ("HAPTICS:", "vr.weapon_haptics",
          [("OFF", "0"), *((f"{round(haptics * 100)}%", f"{haptics:g}") for haptics in (0.25, 0.5, 0.75, 1))],

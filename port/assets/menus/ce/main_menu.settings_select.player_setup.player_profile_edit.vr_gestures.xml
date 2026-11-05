@@ -56,7 +56,7 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/help_strings">
 		<string text=""/>
-		<string text="Flick down: flick the turning stick down, let go before 0.8 s (a hold is the third person; the click is always the zoom). Click, held: the click zooms, held 0.4 s it is bullet time. Stick click: the click is bullet time, no zoom. Up is sprint."/>
+		<string text="Flick down: flick the turning stick down, let go before 0.8 s (a hold is the third person; the click is always the zoom). Click, held: a short click zooms as you let go, held 0.4 s it is bullet time. Stick click: the click is bullet time, no zoom. Both only on foot in first person, offline. Up is sprint."/>
 		<string text="Hold: hold the turning stick down (it switches on or off, whatever THIRD PERSON says). Double flick: flick it down twice (bullet time then moves to a double flick up). Off: not from the stick."/>
 	</strings>
 </menus>

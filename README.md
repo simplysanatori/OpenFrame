@@ -103,15 +103,15 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Right trigger | Fire |
 | Left trigger | Second weapon in a Banshee. On foot you throw grenades by hand (GRENADE THROW set to BOTH: the trigger throws too; TRIGGER: only the trigger throws) |
 | Left stick | Move |
-| Left stick click | Crouch while you hold it (CROUCH set to TOGGLE: a tap crouches until you press it again). You stay crouched at a full push of the stick (CROUCH WALK). While sprinting, slide (PARKOUR on) |
+| Left stick click | Crouch while you hold it. With CROUCH set to TOGGLE, a quick tap keeps you crouched until you press it again, jump, take a seat or die; a longer press still crouches only while held. You stay crouched at a full push of the stick (CROUCH WALK). While sprinting, slide (PARKOUR on) |
 | Right stick, left and right | Turn, in steps or smoothly |
 | Right stick, flick up | Sprint on or off (SPRINT set to TOGGLE) |
 | Right stick, flick down | Bullet time on or off (BULLET TIME on) |
 | Right stick, held down 0.8 seconds | Third person on or off. Needs no setting |
-| Right stick, pressed in | Zoom, each time you press it, in bullet time as well |
+| Right stick, pressed in | Zoom, each time you press it, in bullet time as well. With SCOPES set to SMART-LINK (the default) the zoom opens a magnified window around the reticle. With AT THE EYE it changes the magnification of a scope held to your eye. With OFF nothing is magnified in the headset |
 | Right stick, while you are dead | Move the death camera round your body (the default death view) |
 | **A** | Jump |
-| **B** | Melee. A hard swing of the right controller melees too |
+| **B** | Melee. A hard swing of the right controller melees too, and so does a softer one with the right grip held. With FISTS on and no weapon in your hand, the swing is a punch instead |
 | **X** | Action and reload. Hold to pick up a weapon |
 | **Y** | Switch weapon |
 | Left bumper | Flashlight |
@@ -119,21 +119,21 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | D-pad | Menus |
 | **View** | Back, and the multiplayer scoreboard |
 | **Menu** | Pause |
-| Both grips, held | Recentre |
-| Right grip | Draw a weapon from a holster, over the shoulder or at the hip |
+| Both grips, held | Recentre. The game also recentres by itself at each level start and after a cinematic, and opens menus in front of you (AUTO RECENTRE, on by default) |
+| Right grip | Draw a weapon from a holster, over the shoulder or at the hip. Drawing it also switches to it |
 | Left grip on a long gun's foregrip | Aim it with both hands |
-| Left grip at the left hip | Take a magazine. The old one drops out of the weapon by itself; push the new one in to load. The shotgun takes shells one at a time; the rocket launcher's tubes are behind your left shoulder |
-| Left grip held, swung and let go | Throw a grenade where your hand threw it |
-| A raised scope at your eye | Look through it, magnified (SCOPES set to AT THE EYE) |
+| Left grip at the left hip | Take a magazine, when the weapon has room for one. The old one drops out of the weapon by itself; push the new one in to load. The shotgun takes shells one at a time; the rocket launcher's tubes are behind your left shoulder |
+| Left grip held, hand drawn back, swung forward and let go | Throw a grenade the way your hand threw it |
+| The sniper rifle's or the pistol's scope raised to your eye | Look through it, magnified (SCOPES set to AT THE EYE) |
 | Right grip on a weapon on the ground | Pick it up, or swap it for the one in your hand |
 | Either hand pushed into a control | Press it |
 | Both hands low on an overturned vehicle, lifted together | Flip it. With `vr.vehicle_flip = "button"` in config.toml, X flips it instead |
 | Grip a vehicle's holds and pull | Climb in or out. X works as ever |
 | Both grips on a Ghost's handles or a Warthog's wheel | Steer it |
 
-A flick counts when the right stick goes within about 34 degrees of straight up or down. A diagonal push only turns you. With SPRINT set to TOGGLE or BULLET TIME on, turning pauses while the stick is inside that cone, so a flick never turns you. The gestures work on foot, aiming with the controllers, with no menu open. A flick up switches sprint at the moment of the push. A flick down switches bullet time as you let go. The press zooms once for each press. There is no magazine eject on the stick: reload with **X**, or take a magazine from your left hip. Sprint, bullet time and the third person show a label on the HUD when they switch.
+A flick counts when the right stick goes within about 34 degrees of straight up or down. A diagonal push only turns you. With SPRINT set to TOGGLE or BULLET TIME on, turning pauses while the stick is pushed up inside that cone. With BULLET TIME on, it also pauses while the stick is pushed down inside it. Once a hold has switched the third person, turning pauses until you let go. The gestures work on foot, aiming with the controllers, with no menu open. A flick up switches sprint at the moment of the push. A flick down switches bullet time as you let go. The press zooms once for each press. The click bindings on the GESTURES page only take the click on foot, in first person, in a game where bullet time works. There is no magazine eject on the stick: reload with **X**, or take a magazine from your left hip. Sprint, bullet time and the third person show a label on the HUD when they switch.
 
-Sprint, bullet time, parkour, fists, weapon pull, prop throw and hand swap come from moistman42069's mod and are each off until you turn them on in VR Setup. The third person needs no setting. The GESTURES page, under MOVEMENT AND COMFORT, has other bindings for bullet time and the third person. [docs/CONTROLS.md](docs/CONTROLS.md) explains how each one is used, and [docs/openframe-features.md](docs/openframe-features.md) has every setting.
+Sprint, bullet time, parkour, fists, weapon pull, prop throw and hand swap come from moistman42069's mod and are each off until you turn them on in VR Setup. They work only in a game on your own Frame, such as the campaign: not online, in split screen, in games with bots, or in the VR Tutorial, which has bots. The third person needs no setting. The GESTURES page, under MOVEMENT AND COMFORT, has other bindings for bullet time and the third person. [docs/CONTROLS.md](docs/CONTROLS.md) explains how each one is used, and [docs/openframe-features.md](docs/openframe-features.md) has every setting.
 
 ## Settings
 

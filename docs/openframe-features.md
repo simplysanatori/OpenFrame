@@ -374,7 +374,8 @@ gun could not fire); a flick down is bullet time's
 ### Sprint
 
 Runs faster than the game's run, on foot and standing (not crouched), forward
-and sideways (not backing), accelerating faster with it. The view's field is
+or on a diagonal (not backing, and not with the stick pushed mostly
+sideways: past 0.6), accelerating faster with it. The view's field is
 unchanged. `source/units/bipeds.c` multiplies the tick's speeds for the first
 local player (`vr_sprint_speed_scale`).
 
