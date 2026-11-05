@@ -79,6 +79,10 @@ The installer changes nothing outside `~/Games/OpenFrame`, `~/.local/share/OpenF
 
 If you use [Frametanium](https://github.com/Cogential/frametanium), add `simplysanatori/OpenFrame` there. It downloads the release, runs its `install.sh` and updates it when I publish a new version. Copy the 24 `.map` files of your Xbox disc into `~/.local/share/OpenFrame/maps` yourself; the installer sets up the settings file for that folder. Without maps it still installs and says so.
 
+## Install with FrameDrop
+
+[FrameDrop](https://framedropvr.com) can install this too: [Install with FrameDrop](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Fsimplysanatori%2FOpenFrame%2Freleases%2Flatest%2Fdownload%2Fopenframe.framedrop.json). The release has a `openframe-<version>-framedrop-linux-arm64.zip` and a `openframe.framedrop.json` for it. FrameDrop unpacks the zip on the Frame and adds its own library entry, which runs the `run.sh` in the zip. The first time it runs, and again after an update, `run.sh` runs `install.sh` with the Steam shortcut step turned off, so you get FrameDrop's entry and no second one from the installer, and then starts OpenFrame through its launch wrapper. Copy the maps of your own Xbox disc into `~/.local/share/OpenFrame/maps` first, or run `install.sh --maps DIR` once.
+
 ## First run
 
 On the first start the game makes your profile and its cache of map data, about 800 MB, in `~/.local/share/OpenFrame/saves`.
