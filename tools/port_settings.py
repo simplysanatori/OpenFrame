@@ -369,7 +369,7 @@ VR_SCREENS["vr_comfort"] = {
     "help_top": 366,
     "rows": [
         ("TURNING:", "vr.turn", [("SNAP", "snap"), ("SMOOTH", "smooth")],
-         "How the right stick turns you: in steps, or\ncontinuously.", None),
+         "How the turning stick turns you: in steps, or\ncontinuously.", None),
         ("SNAP TURN ANGLE:", "vr.snap_turn_angle",
          [(f"{angle} DEGREES", str(angle)) for angle in (15, 22.5, 30, 45, 60, 90)],
          "How far each snap turn turns you.", None),
@@ -411,7 +411,7 @@ VR_SCREENS["vr_comfort"] = {
          [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
          "How fast the world runs in bullet time.", None),
         ("GESTURES...", None, VR_GESTURES,
-         "Which press or stick gesture starts bullet time and\nswitches the third person (beside a passthrough tool).",
+         "Which press or stick gesture starts bullet time and\nswitches the third person.",
          None),
     ],
 }
@@ -426,7 +426,7 @@ VR_SCREENS["vr_gestures"] = {
     "rows": [
         ("BULLET TIME BINDING:", "vr.bullet_time_binding",
          [("FLICK DOWN", "flick_down"), ("CLICK, HELD", "click_hold"), ("STICK CLICK", "stick_click"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("DOUBLE FLICK UP", "double_flick"), ("HOLD UP", "hold"), ("OFF", "off")],
-         "Flick down: flick the turning stick down, let go before 0.8 s (a hold is the third person; the click is always the zoom). Click, held: the click zooms, held 0.4 s it is bullet time (a passthrough tool's held click fires too). Stick click: the click is bullet time, no zoom. Up is sprint.",
+         "Flick down: flick the turning stick down, let go before 0.8 s (a hold is the third person; the click is always the zoom). Click, held: the click zooms, held 0.4 s it is bullet time. Stick click: the click is bullet time, no zoom. Up is sprint.",
          None),
         ("THIRD PERSON BINDING:", "vr.third_person_binding",
          [("HOLD", "hold"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("OFF", "off")],
@@ -450,7 +450,7 @@ VR_SCREENS["vr_hands"] = {
         ("AIM ASSIST:", "vr.aim_assist", [("OFF", "0"), ("WEAK", "0.5"), ("ON", "1"), ("STRONG", "1.5")],
          "Near an enemy your aim is slow to leave it, and\nzoomed, it is drawn gently toward it.", None),
         ("SCOPES:", "vr.scope_view", [("OFF", "off"), ("SMART-LINK", "smartlink"), ("AT THE EYE", "eye")],
-         "Smart-link: the right stick's click zooms on your\nvisor. At the eye: raise the scope to your eye.", None),
+         "Smart-link: the turning stick's click zooms on your\nvisor. At the eye: raise the scope to your eye.", None),
         ("HOLSTERS:", "vr.holsters", ON_OFF,
          "Reach over your right shoulder for a long gun, or\nto your right hip for a pistol, and grip to draw it.",
          None),

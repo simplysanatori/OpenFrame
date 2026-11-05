@@ -8,43 +8,46 @@ You need the maps from your own Xbox disc of Halo: Combat Evolved. No game data 
 
 ## Status
 
-Version 1.0.0, the first release. I play the campaign on my Steam Frame at 90 Hz, both eyes at 0.9 of SteamVR's recommended resolution with eye-tracked foveation, and the first level's firefights hold the display's 90 Hz most of the time. The menus and the HUD open in front of you and fit the Frame's view.
+Version 1.1.0, on OpenH1's `build-1615`. I play the campaign on my Steam Frame at 90 Hz, both eyes at 0.9 of SteamVR's recommended resolution with eye-tracked foveation. The menus and the HUD open in front of you and fit the Frame's view.
 
-**Compared with OpenH1's own Frame build.** OpenH1 ignored SteamVR's recentre, so the menu could sit off to one side and the view could start outside your body. The HUD's corners sat partly outside the Frame's view. The world froze for one to two seconds each time a level moved on to its next section, and the first level took about 17 seconds to load. Here recentring works and the game recentres itself at each level start, the HUD fits, a section change is a short hitch, and the first level loads in about 5 seconds. In the heaviest firefight of the first level, OpenH1's resolution and foveation averaged about 77 fps; mine average 86 to 89. That is less work for the GPU every frame.
+**Compared with OpenH1's own Frame build when I started.** OpenH1 ignored SteamVR's recentre, so the menu could sit off to one side and the view could start outside your body. The HUD's corners sat partly outside the Frame's view. Here recentring works, the game recentres itself at each level start, and the HUD fits. In the heaviest firefight of the first level, OpenH1's resolution and foveation averaged about 77 fps; mine averaged 86 to 89 in 1.0.0. That is less work for the GPU every frame.
 
 Known issues:
 
-- Big fights with many explosions fall into the 60s for as long as the fight lasts.
-- The first few seconds after a level loads run slower.
 - The campaign has one save slot. Starting a new game overwrites it (see [Files](#files)).
 - In bullet time the sound plays at normal speed.
+- The launch wrapper can only set SteamVR's refresh rate and smoothing when the game starts from the Steam library.
 
-## What this adds over OpenH1 build-769
+## What this adds over OpenH1
 
-OpenH1 already plays Halo in VR on the Frame. OpenFrame began at OpenH1's `build-734` and is now on `build-769`. I changed the setup around it, tuned it, and brought in features:
+OpenH1 already plays Halo in VR on the Frame. OpenFrame began at OpenH1's `build-734` and is now on `build-1615`. I changed the setup around it, tuned it, and brought in features:
 
 - An installer, a Steam library entry and a launch wrapper that sets SteamVR's per-app settings at every launch: the refresh rate, no throttling, no motion smoothing.
 - Its own data folder, apart from OpenH1's, and OpenH1's self-updater switched off so it never swaps this build for OpenH1.
-- Defaults for the Frame: 0.9 resolution, a 0.4 foveation area, the GPU rendering straight to memory, and the HUD's corners where the Frame's view can see them.
+- Defaults for the Frame: 0.9 resolution, a 0.4 foveation area, the GPU rendering straight to memory, the HUD's corners where the Frame's view can see them, and CROUCH WALK on.
 - Faster section changes and loads: the shader preparation for each section no longer walks every light, and Xbox maps get a larger texture cache.
 - Recentring that works, an automatic recentre at each level start, menus in front of you, and a cryo tube tutorial that counts head looks.
-- Right-stick gestures for sprint, third person and bullet time, made for the Frame controllers.
-- VR Setup split into pages, with a HUD layout page of sliders and a refresh rate choice of 72, 90 or 120 Hz.
+- Right-stick gestures for sprint, third person and bullet time, made for the Frame controllers. No magazine eject on the stick.
+- VR Setup split into pages, with a HUD layout page of sliders, a GESTURES page and a refresh rate choice of 72, 90 or 120 Hz.
 - From moistman42069's Halo VR mod, rewritten for OpenH1: sprint, bullet time, third person on foot, slide, wall jump and wall run, fists with stagger and parry, weapon pull, prop throw, hand swap, the wrist HUD, and the comfort vignette on foot.
 
-### What came with OpenH1 build-769
+### What came with OpenH1 build-1615
 
-OpenH1's own fixes between `build-734` and `build-769` are in this release:
+OpenH1's own work up to `build-1615` is in this release. All of it is OpenH1's:
 
-- Lights past the 128-per-window cap no longer drop lit objects.
-- A portal corner that sits on a clip line no longer flashes the level.
-- Respawn goes straight to first person.
-- The d-pad's focus is kept when you back out of a settings screen.
-- Multiplayer, from OpenH1: host controls, OpenH1 games listed first in the server browser, the Kills Score, Multi-Hill and Force Team Spawns rules, and network errors in plain words.
+- Smoother play: dynamic lights reach only what the game lights, and a closed door stops them. A pipeline that is not ready is built in the background instead of stalling the frame. A map's first frame also prepares its mirrors, fog and lens flares. Checkpoints are written on a thread of their own, and the menus open without a hitch.
+- Loading: the stock maps are kept unpacked in a cache, so no load waits for them. Crossing into a level's next section shows no loading screen. The loading screen is sharper. **MAP STORAGE** (Settings > PROFILES) sets how much room the cache takes.
+- Sound: the reverb as the Xbox ran it, the HRTF on any stereo output, and sounds muffled by walls judged from your head in VR.
+- The VR Tutorial, on the main menu in the headset.
+- Fixes in play, among them the flashlight, the needler's reload and picking up a second weapon in multiplayer.
+- Multiplayer: your hits on other players show at once, bots that drive, fly and play Capture the Flag, Oddball and King of the Hill, relays for players whose networks keep them apart, and a server browser you can search.
+- Menus: a new Campaign screen, Profiles and Mods inside Settings, a gamma setting, and VR SETUP in the CONTROLLER section of Settings > CONTROLS.
+- Crouch: upstream's crouch walk, and a CROUCH setting to hold or toggle.
+- Builds that run on kernels with 16 KB and 64 KB pages.
 
 ## Requirements
 
-- A Steam Frame with SteamOS and SteamVR, and about 4 GB free: the maps are 1.8 GB and the game builds a cache of about 800 MB.
+- A Steam Frame with SteamOS and SteamVR, and about 5 GB free: the maps are 1.8 GB, and the game keeps them unpacked in a cache of about 3 GB. MAP STORAGE set to DISK SPACE SAVER keeps the cache to 730 MB.
 - The 24 `.map` files from the `maps` folder of your own Xbox disc of Halo: Combat Evolved (about 1.8 GB). Halo PC's maps and the MCC's do not work. Every version of the Xbox game works; the game plays PAL maps as the North American ones. [openh1.com/maps](https://openh1.com/maps) explains how to make and read a disc image.
 - A terminal on the Frame for the one-time setup: SSH, or Konsole from desktop mode.
 - Steam running on the Frame while you install, so the installer can add the library entry.
@@ -58,11 +61,11 @@ OpenH1's own fixes between `build-734` and `build-769` are in this release:
    cd OpenFrame
    ```
 
-2. Download `openframe-1.0.0-linux-arm64.tar.gz` and `SHA256SUMS` from the [Releases](https://github.com/simplysanatori/OpenFrame/releases) page. Check the download and install it with your maps:
+2. Download `openframe-1.1.0-linux-arm64.tar.gz` and `SHA256SUMS` from the [Releases](https://github.com/simplysanatori/OpenFrame/releases) page. Check the download and install it with your maps:
 
    ```sh
    sha256sum -c --ignore-missing SHA256SUMS
-   steam-frame/install.sh --maps /path/to/your/maps ~/Downloads/openframe-1.0.0-linux-arm64.tar.gz
+   steam-frame/install.sh --maps /path/to/your/maps ~/Downloads/openframe-1.1.0-linux-arm64.tar.gz
    ```
 
    `--maps` takes the folder with your 24 `.map` files, or the folder that holds `maps/`. They are copied, not moved, into `~/.local/share/OpenFrame/maps`.
@@ -77,7 +80,7 @@ The installer changes nothing outside `~/Games/OpenFrame`, `~/.local/share/OpenF
 
 ## First run
 
-On the first start the game makes your profile and its cache of map data, about 800 MB, in `~/.local/share/OpenFrame/saves`.
+On the first start the game makes your profile in `~/.local/share/OpenFrame/saves`, and unpacks the maps into its cache in `saves/z`, about 3 GB in all.
 
 Sit or stand as you mean to play when the loading picture fades: the game recentres on that first frame. Hold both grips for a moment at any time to recentre again.
 
@@ -90,14 +93,15 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Right controller | Aim. It holds the weapon and the reticle shows where it points |
 | Head | Look. Crouch in the room and the game crouches |
 | Right trigger | Fire |
-| Left trigger | Second weapon in a Banshee. On foot you throw grenades by hand |
+| Left trigger | Second weapon in a Banshee. On foot you throw grenades by hand (GRENADE THROW set to BOTH: the trigger throws too; TRIGGER: only the trigger throws) |
 | Left stick | Move |
-| Left stick click | Crouch, at any speed. While sprinting, slide (PARKOUR on) |
+| Left stick click | Crouch while you hold it (CROUCH set to TOGGLE: a tap crouches until you press it again). You stay crouched at a full push of the stick (CROUCH WALK). While sprinting, slide (PARKOUR on) |
 | Right stick, left and right | Turn, in steps or smoothly |
 | Right stick, flick up | Sprint on or off (SPRINT set to TOGGLE) |
 | Right stick, flick down | Bullet time on or off (BULLET TIME on) |
 | Right stick, held down 0.8 seconds | Third person on or off. Needs no setting |
-| Right stick, pressed in | Zoom, always, in bullet time as well |
+| Right stick, pressed in | Zoom, each time you press it, in bullet time as well |
+| Right stick, while you are dead | Move the death camera round your body (the default death view) |
 | **A** | Jump |
 | **B** | Melee. A hard swing of the right controller melees too |
 | **X** | Action and reload. Hold to pick up a weapon |
@@ -110,23 +114,24 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Both grips, held | Recentre |
 | Right grip | Draw a weapon from a holster, over the shoulder or at the hip |
 | Left grip on a long gun's foregrip | Aim it with both hands |
-| Left grip at the left hip | Take a magazine. The old one drops out of the weapon by itself; push the new one in to load |
+| Left grip at the left hip | Take a magazine. The old one drops out of the weapon by itself; push the new one in to load. The shotgun takes shells one at a time; the rocket launcher's tubes are behind your left shoulder |
 | Left grip held, swung and let go | Throw a grenade where your hand threw it |
-| A raised scope at your eye | Look through it, magnified |
+| A raised scope at your eye | Look through it, magnified (SCOPES set to AT THE EYE) |
+| Right grip on a weapon on the ground | Pick it up, or swap it for the one in your hand |
 | Either hand pushed into a control | Press it |
+| Both hands low on an overturned vehicle, lifted together | Flip it. With `vr.vehicle_flip = "button"` in config.toml, X flips it instead |
+| Grip a vehicle's holds and pull | Climb in or out. X works as ever |
 | Both grips on a Ghost's handles or a Warthog's wheel | Steer it |
 
-A flick counts when the right stick goes within about 34 degrees of straight up or down; while it is inside that cone, turning pauses, so a flick never turns you, and a diagonal push only turns you. A flick down switches bullet time as you let go. There is no magazine eject on the stick: reload with **X**, or take a magazine from your left hip. Sprint, bullet time and the third person show a label on the HUD when they switch.
+A flick counts when the right stick goes within about 34 degrees of straight up or down. A diagonal push only turns you. With SPRINT set to TOGGLE or BULLET TIME on, turning pauses while the stick is inside that cone, so a flick never turns you. The gestures work on foot, aiming with the controllers, with no menu open. A flick up switches sprint at the moment of the push. A flick down switches bullet time as you let go. The press zooms once for each press. There is no magazine eject on the stick: reload with **X**, or take a magazine from your left hip. Sprint, bullet time and the third person show a label on the HUD when they switch.
 
-OpenFrame binds nothing to holding a stick click or to pressing it twice quickly (the left click crouches while it is held, the right click zooms once for each press), so those stay free for passthrough tools such as [Frame Passthrough Shortcuts](https://github.com/KominoVR/frame-passthrough-shortcuts), which use them on either stick.
-
-Sprint, bullet time, parkour, fists, weapon pull, prop throw and hand swap come from moistman42069's mod and are each off until you turn them on in VR Setup. The third person needs no setting. [docs/CONTROLS.md](docs/CONTROLS.md) explains how each one is used, and [docs/openframe-features.md](docs/openframe-features.md) has every setting.
+Sprint, bullet time, parkour, fists, weapon pull, prop throw and hand swap come from moistman42069's mod and are each off until you turn them on in VR Setup. The third person needs no setting. The GESTURES page, under MOVEMENT AND COMFORT, has other bindings for bullet time and the third person. [docs/CONTROLS.md](docs/CONTROLS.md) explains how each one is used, and [docs/openframe-features.md](docs/openframe-features.md) has every setting.
 
 ## Settings
 
-Most settings are in the headset: **Settings > Controls > VR SETUP**, under CONTROLLER. It appears while the game plays in VR, and also at the foot of the player profile menu. Its pages are **DISPLAY...**, **HUD...**, **PLAYER...**, **MOVEMENT AND COMFORT...** and **HANDS AND WEAPONS...**. The HUD page opens **HUD LAYOUT...**, with sliders to bring the corners in and to move or resize each one.
+Most settings are in the headset: **Settings > CONTROLS > VR SETUP**, in the CONTROLLER section. It appears while the game plays in VR, and also at the foot of the player profile menu. Its pages are **DISPLAY...**, **HUD...**, **PLAYER...**, **MOVEMENT AND COMFORT...** and **HANDS AND WEAPONS...**. The HUD page opens **HUD LAYOUT...**, with sliders to bring the corners in and to move or resize each one. MOVEMENT AND COMFORT opens **GESTURES...**. CROUCH and CROUCH WALK are just below VR SETUP on the CONTROLS tab.
 
-Everything is also in `~/.local/share/OpenFrame/config.toml`, with a comment on each line. A line commented out follows the default. Every setting has a `HALO_*` environment variable too, which wins over the file. The ones that matter most on the Frame:
+Everything is also in `~/.local/share/OpenFrame/config.toml`, with a comment on each line. A line commented out follows the default. A comment is written when its setting first goes into the file, and an update does not rewrite it. Every setting has a `HALO_*` environment variable too, which wins over the file. The ones that matter most on the Frame:
 
 | Key | Default | What it does |
 |---|---|---|
@@ -150,7 +155,7 @@ For one launch only, put `NAME=value` lines in `~/.local/share/OpenFrame/session
 
 ### Left-handed play
 
-VR Setup > PLAYER... > **DOMINANT HAND** = LEFT. The left controller then fires, aims and draws from the holsters on your left, and the right hand holds the foregrip, takes magazines from your right hip and throws grenades. **SWAP STICKS** follows the hand by default, so the right stick moves and the left one turns and carries the stick gestures. The third-person view sits over your left shoulder and the wrist HUD moves to your right wrist.
+VR Setup > PLAYER... > **DOMINANT HAND** = LEFT. The left controller then fires, aims and draws from the holsters on your left, and the right hand holds the foregrip, takes magazines from your right hip and throws grenades. **SWAP STICKS** follows the hand by default, so the right stick moves and crouches, and the left one turns, zooms and carries the stick gestures. A, B, X, Y, the bumpers, the d-pad, View and Menu stay where they are. The third-person view sits over your left shoulder and the wrist HUD moves to your right wrist.
 
 ### Comfort
 
@@ -162,7 +167,7 @@ Internet play is OpenH1's and is on by default. Invites and the server browser u
 
 ## Performance
 
-Measured on my Frame from the session logs, at the defaults, in the first level:
+Measured on my Frame with 1.0.0, from the session logs, at the defaults, in the first level:
 
 | | |
 |---|---|
@@ -191,6 +196,7 @@ What the build does, so you know what the numbers mean:
 | Program | `~/Games/OpenFrame/app` (`halo`, `libSDL3.so.0`, `openframe.sh`, `tools/`) |
 | Settings, maps, saves | `~/.local/share/OpenFrame` (`config.toml`, `maps/`, `saves/`, `brokers.txt`) |
 | Campaign save | `saves/u/UDATA/<profile id>/savegame.bin`. One slot per profile: **starting a new game, or any level, overwrites it**. Copy `saves/` aside first if you want to come back |
+| Map cache | `saves/z`: the maps unpacked, about 3 GB. Settings > PROFILES > MAP STORAGE sets its size |
 | Session logs | `~/.local/share/OpenFrame/sessions/<date-time>/` (`launch.log`, `stdout.log`, `debug.txt`, `vrtiming.log`); `sessions/latest` points at the newest |
 | One launch's settings | `~/.local/share/OpenFrame/session.env` |
 

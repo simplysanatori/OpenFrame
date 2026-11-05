@@ -209,7 +209,7 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/help_strings">
 		<string text=""/>
-		<string text="How the right stick turns you: in steps, or\ncontinuously."/>
+		<string text="How the turning stick turns you: in steps, or\ncontinuously."/>
 		<string text="How far each snap turn turns you."/>
 		<string text="How fast smooth turning turns you, the stick\npushed all the way: degrees a second."/>
 		<string text="The edges of your view dim as the view moves:\nin vehicles, or as the sticks move and turn you too."/>
@@ -224,6 +224,6 @@
 		<string text="How strong a jump off a wall is."/>
 		<string text="Offline: flick the turning stick down and let go to\nslow the world, again to end it (GESTURES: others)."/>
 		<string text="How fast the world runs in bullet time."/>
-		<string text="Which press or stick gesture starts bullet time and\nswitches the third person (beside a passthrough tool)."/>
+		<string text="Which press or stick gesture starts bullet time and\nswitches the third person."/>
 	</strings>
 </menus>

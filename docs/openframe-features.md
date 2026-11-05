@@ -5,10 +5,14 @@ where each came from, and how to turn it on. Each is set in `config.toml`
 (the `vr.*` keys below) or in VR Setup: MOVEMENT AND COMFORT..., HANDS AND
 WEAPONS... (and its FISTS AND GRABBING...), HUD... (WRIST HUD..., HUD
 LAYOUT...) and PLAYER....
-Every one is off, or as OpenH1 had it, until you choose it.
+Every one is off, or as OpenH1 had it, until you choose it, apart from three
+things that are on from the start: the third person's hold on the turning
+stick, the HUD's corners placed for the Frame, and no magazine eject on the
+stick.
 
-The VR Setup menu (Settings > Controls tab > VR SETUP, also at the foot of the
-player profile menu) is a tree of pages of one purpose each:
+The VR Setup menu (Settings > CONTROLS tab > VR SETUP, in the CONTROLLER
+section; also at the foot of the player profile menu) is a tree of pages of
+one purpose each:
 
 - VR SETUP: AIM, GAMEPAD VIEW, then DISPLAY..., HUD..., PLAYER..., MOVEMENT
   AND COMFORT..., HANDS AND WEAPONS...
@@ -23,7 +27,8 @@ player profile menu) is a tree of pages of one purpose each:
   view.
 - MOVEMENT AND COMFORT: turning, snap angle, smooth speed, vignette and its
   strength, sprint and its speed, vehicle view, third person and its
-  distance, parkour (slide, wall jump), bullet time and its speed.
+  distance, parkour, slide momentum, wall jump, bullet time and its speed,
+  then GESTURES... (bullet time binding, third person binding).
 - HANDS AND WEAPONS: hands, two-handed aim, aim assist, scopes, holsters,
   reload by hand, swing to melee, grenade throw, haptics, then FISTS AND
   GRABBING... (fists, punch speed and damage, weapon pull and range, hand
@@ -167,7 +172,7 @@ game's (`source/render/render_objects.c` and
   on (the stick held down)` or `off`.
 - Where: on foot, alive, not zoomed (the scopes and the smart-link are the
   first person's), not in a vehicle's seat (`vr.vehicle_view` has its own
-  third person), a cinematic or as you die; never in a multiplayer game
+  third person), not climbing into one, not in a cinematic or as you die; never in a multiplayer game
   (it would see round corners; the HUD says "Third person: not in
   multiplayer").
 - After moistman42069's VR third person (`vr_third_person.c`,
@@ -320,16 +325,17 @@ turns it off. It eases in and out over about a sixth of a second.
   toggles bullet time ("Bullet time", "Bullet time off"), on or off alike.
   Sprint and bullet time are independent: a single flick toggles sprint
   whether bullet time is on or not, and only the double flick toggles bullet
-  time (nothing else ends it but a cinematic, death, the menus' and the
-  offline-only rules, and the setting). A push held 0.8 s does nothing: its
+  time (nothing else ends it but a cinematic, death, a revert, the
+  offline-only rule and the setting). A push held 0.8 s does nothing: its
   flick (sprint) is undone at the hold, so a script's one-second hold
   neither sprints nor slows time. (With `vr.bullet_time` off the same holds still
   undo their flick.) `"hold"`: hold the stick up for 0.8 s to toggle bullet
   time, on or off alike; a flick toggles sprint, bullet time on or off (with
   bullet time enabled it waits for the stick's release). `"off"`: bullet time never
-  from the stick (flicks sprint; holds do nothing). "Up" is a wide cone (`vr_stick_gesture.h`): the push begins past 0.6
-  and more up than sideways (within 45 degrees of straight up), and is kept
-  while past 0.4 and within 54 degrees; a thumb's drift, or a dip out of the
+  from the stick (flicks sprint; holds do nothing). "Up" is the same cone as the flick down's (`vr_stick_gesture.h`): the
+  push begins past 0.6 and at least 1.5 times as far up as sideways (within
+  about 34 degrees of straight up), and is kept while past 0.4 and within 54
+  degrees; a thumb's drift, or a dip out of the
   cone shorter than 0.15 s, or a game frame or two that did not say you are
   on foot (0.3 s), does not end the push. The snap or smooth turn is off
   while the stick is in the cone. Each push is logged once when it is over
@@ -374,16 +380,19 @@ local player (`vr_sprint_speed_scale`).
 
 - Keys: `vr.sprint_mode` (`"off"`, the default; `"toggle"`;
   `"arm_swing"`), `vr.sprint_speed` (times the run, 1.1 to 2, default `1.5`).
-- `"toggle"`: flick the turning stick up (as bullet time's input, but let go
-  within 0.8 s; with bullet time off it toggles at once as you push) to
-  sprint, and again to stop, with bullet time on or off. With bullet time
+- `"toggle"`: flick the turning stick up to sprint, and again to stop, with
+  bullet time on or off. The toggle comes at once as you push; the same push
+  held 0.8 s takes it back. Only with `vr.bullet_time_binding = "hold"` and
+  bullet time on does the flick wait for the stick's release (let go within
+  0.8 s), the hold being bullet time's. With bullet time
   enabled and `vr.bullet_time_binding = "double_flick"`, two quick
   flicks up toggle bullet time instead of sprint twice (the second undoes the
   first's toggle); with the default `"flick_down"` (or `"click_hold"`, `"stick_click"` or `"double_flick_down"`)
   a flick up is sprint's alone and bullet time is on the stick's down (or, with another binding, the click). The two multiply (bullet time's entry). The sprint stays on as you stop or crouch (a crouch pauses it:
   `bipeds.c` sprints standing), and ends by itself only off foot (a vehicle,
   death; half a second of it, the menus aside). The HUD says "Sprint" and
-  "Sprint off" at every change; the right controller pulses. The gesture is
+  "Sprint off" at every change; the controller of the hand without the
+  weapon pulses. The gesture is
   `port/linux/src/vr_stick_gesture.h` (`stick_gesture_update`).
 - stdout.log: `vr: sprint on/off (why)` at each change, and from `bipeds.c`
   once for each toggle (the first tick standing after the HUD says it, not

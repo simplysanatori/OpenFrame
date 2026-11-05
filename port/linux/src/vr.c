@@ -4210,7 +4210,7 @@ static int bullet_on_click(void)
 }
 
 /* whether the click is the zoom when short and bullet time's when held
-("click_hold", the default): the game is given the zoom at the release
+("click_hold", not the default): the game is given the zoom at the release
 (click_zoom_frames), or the press itself where this is not so */
 static int bullet_on_click_hold(void)
 {

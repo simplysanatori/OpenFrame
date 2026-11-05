@@ -100,7 +100,7 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_fit_check/help_strings">
 		<string text=""/>
-		<string text="How the right stick turns you: in steps, or\ncontinuously."/>
+		<string text="How the turning stick turns you: in steps, or\ncontinuously."/>
 		<string text="How far each snap turn turns you."/>
 		<string text="How fast smooth turning turns you, the stick\npushed all the way: degrees a second."/>
 		<string text="The edges of your view dim a little as a vehicle\nturns you fast, speeds up or slows hard."/>

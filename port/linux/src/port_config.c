@@ -792,9 +792,7 @@ static const struct config_setting config_settings[] =
 		"too); both click bindings work on foot in the first person with the\n"
 		"controllers aiming: in the third person, in a vehicle, in the menus and\n"
 		"with vr.aim = \"gamepad\" the click is the game's zoom, live, and so it\n"
-		"is while bullet time cannot work, online. click_hold clashes with\n"
-		"passthrough tools (Frame Passthrough Shortcuts) that take a held stick\n"
-		"click: the hold toggles both, so it is never the default;\n"
+		"is while bullet time cannot work, online;\n"
 		"\"double_flick_down\" two quick\n"
 		"flicks DOWN, each let go within 0.45 s, the second begun within a\n"
 		"third of a second of the first's end (one flick down alone does\n"
@@ -897,7 +895,8 @@ static const struct config_setting config_settings[] =
 		"The chapters of the VR Tutorial you have finished (their numbers,\n"
 		"\"0,1,2\"), ticked on its list; the game writes it." },
 	{ "vr.turn", _config_string, "\"snap\"", "HALO_VR_TURN", _environment_value, _platform_desktop,
-		"How the right stick turns: \"snap\" in steps (vr.snap_turn_angle),\n"
+		"How the turning stick (the right, or the left with vr.swap_sticks)\n"
+		"turns: \"snap\" in steps (vr.snap_turn_angle),\n"
 		"\"smooth\" continuously (vr.smooth_turn_speed); with vr.aim = \"gamepad\",\n"
 		"vr.gamepad_view instead." },
 	{ "vr.snap_turn_angle", _config_real, "30.0", "HALO_VR_SNAP_TURN_ANGLE", _environment_value, _platform_desktop,

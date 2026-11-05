@@ -4034,7 +4034,9 @@ The Steam Frame's controllers are the halves of an Xbox controller:
 | Head | Crouch: crouch in the room, and the game crouches (`vr.physical_crouch`) |
 | Right stick, left and right | Turn: in steps (`vr.turn = "snap"`) or smoothly (`"smooth"`) |
 | Right stick click | Zoom: a window about the reticle (`vr.scope_view = "smartlink"`), or a raised scope's magnification (`"eye"`): below. Always the zoom, in bullet time as well, with the default `vr.bullet_time_binding = "flick_down"` |
-| Right stick, flick down | Bullet time on or off, if `vr.bullet_time` is on (let go before 0.8 s; held 0.8 s it is the third person's) |
+| Right stick, flick up | (OpenFrame) Sprint on or off, with `vr.sprint_mode = "toggle"` |
+| Right stick, flick down | (OpenFrame) Bullet time on or off, if `vr.bullet_time` is on (let go before 0.8 s; held 0.8 s it is the third person's) |
+| Right stick, held down 0.8 s | (OpenFrame) The third person on foot, on or off (`vr.third_person_binding = "hold"`, the default) |
 | Head | Look |
 | Right controller | Aim: it holds the weapon, and the reticle shows where it points (`vr.aim = "controller"`). With `vr.aim = "head"`, the head aims and the reticle stays in the middle of the view. |
 | Left controller | The left hand, where the controller is; the left grip closes it (`vr.hands`). The right index finger lies off the right trigger until your finger touches it, then rests on it and pulls with it ("The trigger finger", below). |
@@ -4993,7 +4995,9 @@ recentring (seated), crouches; back up within 7 cm of that, you stand. The
 game crouches as the left stick's click does, held while your head is down
 (Halo's crouch is held, not toggled), and through its input and the
 netcode as ever: your body is lower, and moves as a crouched player does
-(at a full stick too, which would stand a crouch by the stick).
+(at a full stick too, which would stand a crouch by the stick). (OpenFrame:
+`input.crouch_walk` is on by default, so a crouch by the stick's click stays
+down at a full stick as well.)
 
 - The view follows your head alone: the game lowers its eye as it crouches
   (0.82 m for the Master Chief, at `vr.world_scale` 1), which is taken back
@@ -5333,8 +5337,8 @@ It is only this computer's game: nothing is sent to another.
 
 ### Settings
 
-In the headset, Settings' VR Setup (below About; only there while the
-game plays in VR) sets most of these with the left d-pad, in pages of one
+In the headset, Settings' VR Setup (on the Controls tab, in its CONTROLLER
+section; only there while the game plays in VR) sets most of these with the left d-pad, in pages of one
 purpose each. VR SETUP holds the aim and the gamepad's view, and opens
 DISPLAY (the refresh rate, the resolution, the foveation and its size, the
 late latch, the menus' distance and width), HUD (its style, shape, size,
@@ -5343,7 +5347,8 @@ rim and shields' effects; WRIST HUD; and HUD LAYOUT, the corners' places),
 PLAYER (the dominant hand and the sticks, the play position, the eye
 height, the physical crouch, the world's scale, the recentring, the held
 lean and the view as you die), MOVEMENT AND COMFORT (turning, the vignette,
-sprinting, the vehicles' view, the third person, parkour, bullet time) and
+sprinting, the vehicles' view, the third person, parkour, bullet time; from
+it GESTURES, what starts bullet time and switches the third person) and
 HANDS AND WEAPONS (the hands, two-handed aiming, the aim assist, the
 scopes, the holsters, reloading by hand, the melee swing, the grenades, the
 haptics; from it FISTS AND GRABBING). OK writes them to
