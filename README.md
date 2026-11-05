@@ -256,6 +256,6 @@ OpenH1's own README is kept as [README.upstream.md](README.upstream.md).
 
 I wanted Halo in VR on my Frame without an emulator or a PC. OpenH1 already had a native Arm64 build with an OpenXR VR mode, so I forked it and set it up for the Frame: the install and launch, recentring, the HUD, faster loads and section changes, resolution and foveation for 90 Hz, and controls made for the Frame controllers. Then I brought in the VR features from moistman42069's mod that I wanted to play with.
 
-This is vibe coded, with manual review throughout. I wrote it with Claude Code running on the Frame itself. If you buy me a coffee, it pays for the Claude API credits these ports are built with, spent as carefully as I can.
+I made this with partial assistance from Claude. If you buy me a coffee, it pays for the Claude API credits these ports are built with, spent as carefully as I can.
 
 Developer notes are in [steam-frame/dev/DEV.md](steam-frame/dev/DEV.md).
