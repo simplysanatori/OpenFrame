@@ -2454,29 +2454,36 @@ static void sdl_gamepad_state(SDL_Gamepad *gamepad, XINPUT_GAMEPAD *pad)
 
 #ifdef HALO_VR
 /* (OpenFrame) a gamepad SDL lists that is used in the headset, said once a
-run for each (by its name): every gamepad's input is merged with the
-OpenXR controllers' there (the loop below), so on the Steam Frame this
-log shows whether Steam's own gamepads (Steam Input's "Steam Virtual
-Gamepad", or the "Steam Frame Controllers" device) bring the hands' input
-a second time */
+run for each, by its id (the host's "gamepad <id>: <name> (type, vendor:
+product)" line names it as it connects): every gamepad's input is merged
+with the OpenXR controllers' there (the loop below), so on the Steam Frame
+this log shows whether Steam's own gamepads (Steam Input's "Steam Virtual
+Gamepad", 28de:11ff, or the "Steam Frame Controllers" device, 28de:11e0)
+bring the hands' input a second time */
 static void vr_gamepad_heard(SDL_Gamepad *gamepad)
 {
-	static char heard[4][64];
-	const char *name = SDL_GetGamepadName(gamepad);
-	int slot;
+	static SDL_JoystickID heard[8];
+	static int heard_count;
+	SDL_JoystickID *ids, id = 0;
+	int count = 0, index;
 
-	if (!name || gamepad_idle(gamepad))
+	if (heard_count >= 8 || gamepad_idle(gamepad))
 		return;
-	for (slot = 0; slot < 4 && heard[slot][0]; slot++)
+	ids = SDL_GetGamepads(&count);
+	for (index = 0; ids && index < count; index++)
 	{
-		if (!strncmp(heard[slot], name, sizeof(heard[slot]) - 1))
+		if (SDL_GetGamepadFromID(ids[index]) == gamepad)
+			id = ids[index];
+	}
+	SDL_free(ids);
+	for (index = 0; index < heard_count; index++)
+	{
+		if (heard[index] == id)
 			return;
 	}
-	if (slot == 4)
-		return;
-	snprintf(heard[slot], sizeof(heard[slot]), "%s", name);
-	platform_log("vr: the gamepad \"%s\" (%04x:%04x) is used too, beside the OpenXR controllers", name,
-		(unsigned)SDL_GetGamepadVendor(gamepad), (unsigned)SDL_GetGamepadProduct(gamepad));
+	heard[heard_count++] = id;
+	platform_log("vr: gamepad %u (type %d, %s) is used too, beside the OpenXR controllers", (unsigned)id,
+		(int)SDL_GetGamepadType(gamepad), SDL_GetGamepadSteamHandle(gamepad) ? "Steam Input's" : "not Steam Input's");
 }
 #endif
 
