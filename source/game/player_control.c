@@ -1759,7 +1759,7 @@ static void get_local_player_input_blob(
 					extern int halo_vr_crouch(void);
 					extern boolean vr_parkour_slide_active(void);
 					boolean vr_physical_crouch = local_player_index == 0 &&
-						((halo_vr_crouch() & 3 /* HALO_VR_CROUCH_PHYSICAL | HALO_VR_CROUCH_BUTTON: the stick click crouches at a full push too, so a slide can start */) ||
+						((halo_vr_crouch() & 1 /* HALO_VR_CROUCH_PHYSICAL; the stick click's crouch at a full push is input.crouch_walk's (input_abstraction.c), on in OpenFrame */) ||
 							vr_parkour_slide_active() /* port: a latched slide holds the crouch with the click let go (port/linux/game/vr_parkour.c) */);
 #endif
 
@@ -2632,7 +2632,7 @@ static void player_control_substep_read(
 	extern int halo_vr_crouch(void);
 	extern boolean vr_parkour_slide_active(void);
 	boolean vr_physical_crouch = local_player_index == 0 &&
-		((halo_vr_crouch() & 3 /* HALO_VR_CROUCH_PHYSICAL | HALO_VR_CROUCH_BUTTON: the stick click crouches at a full push too, so a slide can start */) ||
+		((halo_vr_crouch() & 1 /* HALO_VR_CROUCH_PHYSICAL; the stick click's crouch at a full push is input.crouch_walk's (input_abstraction.c), on in OpenFrame */) ||
 			vr_parkour_slide_active() /* port: a latched slide holds the crouch with the click let go (port/linux/game/vr_parkour.c) */);
 #endif
 

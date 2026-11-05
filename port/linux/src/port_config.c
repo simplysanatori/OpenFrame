@@ -1112,7 +1112,10 @@ static const struct config_setting config_settings[] =
 		"as Halo did; \"toggle\" crouches at a tap until Crouch is pressed again,\n"
 		"Jump is pressed, a vehicle's seat is taken or the player dies, and still\n"
 		"crouches while held." },
-	{ "input.crouch_walk", _config_boolean, "false", "HALO_CROUCH_WALK", _environment_value, _platform_all,
+	/* OpenFrame: true (OpenH1's is false): in VR the stick's click crouches at
+	a full push of the move stick, the player crouched (and a sprint's slide, vr.parkour),
+	as OpenFrame 1.0.0 did with its own crouch at a full push */
+	{ "input.crouch_walk", _config_boolean, "true", "HALO_CROUCH_WALK", _environment_value, _platform_all,
 		"true: a crouched player stays crouched at a full push of a controller's\n"
 		"stick, walking at a crouch's speed; false: a full push stands them up,\n"
 		"as Halo did. The touch controls always stay crouched, and the keys walk\n"

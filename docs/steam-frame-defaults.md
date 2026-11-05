@@ -13,7 +13,8 @@ the wrapper's `TU_DEBUG=sysmem`.
 
 OpenH1's VR defaults were already chosen and measured on a Frame (its
 README, "Steam Frame" and "Frame rate"), so OpenFrame changes only two of
-them, the resolution scale and the foveation inset: the table says where
+them, the resolution scale and the foveation inset (and, of the controls,
+CROUCH WALK, which keeps 1.0's crouch at a full push): the table says where
 another change is worth measuring, and what to measure, before it becomes a
 default.
 
@@ -33,6 +34,7 @@ default.
 | `vr.world_scale` | `1.0` | `1.0` | 1:1 | none |
 | `vr.height` | `"seated"` | `"seated"` | The eyes are wherever you recentre (both grips held), standing or seated, with no floor or height to get right | `"standing"` needs `vr.player_height` and SteamVR's floor right |
 | `vr.physical_crouch` | `true` | `true` | Standalone, crouching in the room is natural; measured from the recentred height | none |
+| `input.crouch_walk` | `false` | `true` | The left stick's click crouches at a full push of the move stick, as OpenFrame 1.0.0's own crouch did (a sprint's slide stays crouched); Settings > Controls > CROUCH WALK | `false`: a full push of the move stick stands you up from a crouch, as Halo did |
 | `vr.melee_gesture` | `true` | `true` | The weapon swing melees; B still does | Hard swings near walls |
 | `vr.weapon_haptics` | `1.0` | `1.0` | The Frame's controllers take OpenXR haptics | Their feel on the Frame is untested |
 | `vr.hrtf` | `true` | `true` | Directional sound in the headset's speakers | Its CPU cost on the Frame's 5 usable cores is unmeasured |
