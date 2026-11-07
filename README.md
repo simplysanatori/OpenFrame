@@ -2,6 +2,9 @@
 
 Halo: Combat Evolved in VR, running natively on the Steam Frame. It is based on [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo: Combat Evolved.
 
+> [!IMPORTANT]
+> **OpenFrame 1.1.0 currently requires the SteamOS Beta.** It was built against glibc 2.43, which only the Beta has. Stable has glibc 2.39, which lacks the newer math functions that `halo` and its bundled `libSDL3.so.0` need (`acosf`, `asinf`, `atan2f`, `log10f`, `sqrtf`), so the game fails to start with `GLIBC_2.43 not found`. A hotfix is coming soon that builds against the older glibc and bundles the libraries it needs with the app, so it runs on both Stable and Beta.
+
 ## Features
 
 - No emulator, APK or PC needed
