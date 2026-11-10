@@ -23,7 +23,7 @@
 # tarball, and SHA256SUMS is written beside it. Any failure deletes the tarball again.
 set -euo pipefail
 
-VERSION=1.1.0
+VERSION=1.1.1
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$here/.." && pwd)
 build=$repo/build/linux_arm64 out=$here/release stage_only=
@@ -112,6 +112,12 @@ echo "release: packing"
 # Fixed order, owner and times, so the same inputs make the same tarball.
 (cd "$stage" && find . -mindepth 1 -printf '%P\n' | LC_ALL=C sort |
     tar --no-recursion --owner=0 --group=0 --numeric-owner --mtime='2026-01-01 00:00Z' -czf "$tarball" -T -)
+
+echo "release: portable check (libraries and glibc against every SteamOS build)"
+check=$(mktemp -d "${TMPDIR:-$HOME/.cache}/of-check.XXXXXX")
+tar -xzf "$tarball" -C "$check"
+"$here/tools/check-bundle.sh" "$check" || { rm -rf "$check"; fail "check-bundle failed (build with OPENFRAME_PORTABLE=1 steam-frame/build.sh)"; }
+rm -rf "$check"
 
 echo "release: privacy check"
 "$here/tools/privacy-check.sh" "$tarball"

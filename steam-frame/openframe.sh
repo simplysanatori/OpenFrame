@@ -159,6 +159,8 @@ fi
 
 # Not exec: the wrapper stays to stop the logger and collect the logs. A signal for the wrapper
 # (Steam stopping the app) goes on to the game.
+# (the SDL 3 that comes with the game is found first, whatever Steam puts on the library path)
+export LD_LIBRARY_PATH="$(dirname "$EXE")${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 log "starting ${CMD[*]}"
 touch "$SESSION/.start"
 "${CMD[@]}" > "$SESSION/stdout.log" 2>&1 &

@@ -1,0 +1,44 @@
+# The host libraries OpenFrame may load from SteamOS (steam-frame/tools/check-bundle.sh).
+# One soname or shell pattern per line.  Anything else halo or libSDL3.so.0 needs must sit beside halo in the
+# app folder.  Every soname taken from the system must also be named in every SteamOS build listed in
+# host-sonames/ (check-bundle.sh fails otherwise), so this list is the rule and those files are the proof.
+# Nothing here is ever bundled.  Started from Azahar for Frame's list and cut down to what the game, its SDL 3
+# and the libraries SDL 3 opens at run time (dlopen) really use.
+
+# glibc: the game is linked against 2.39, the oldest SteamOS has had
+libc.so.6
+libm.so.6
+libmvec.so.1
+ld-linux-aarch64.so.1
+libdl.so.2
+libpthread.so.0
+librt.so.1
+# graphics: the glvnd dispatch libraries with Mesa behind them, and the Vulkan loader (they match the GPU driver)
+libvulkan.so.1
+libEGL.so.1
+libGL.so.1
+libGLX.so.0
+libOpenGL.so.0
+libGLESv2.so.2
+libGLdispatch.so.0
+# the session, which SDL 3 opens at run time: Wayland, X11 and xkbcommon, libdecor's window frames, udev
+libwayland-client.so.0
+libwayland-cursor.so.0
+libwayland-egl.so.1
+libdecor-0.so.0
+libX11.so.6
+libX11-xcb.so.1
+libXcursor.so.1
+libXext.so.6
+libXfixes.so.3
+libXi.so.6
+libXrandr.so.2
+libxkbcommon.so.0
+libudev.so.1
+libdbus-1.so.3
+# audio, which SDL 3 and the game open at run time (PipeWire serves the PulseAudio one on SteamOS)
+libpulse.so.0
+libasound.so.2
+# SDL 3's system tray, opened only when a program asks for a tray icon
+libgtk-3.so.0
+libgdk-3.so.0

@@ -15,6 +15,9 @@
 #   OPENFRAME_BUILD_CONFIG   release (default; LTO and profile guided) or debug (assertions stop the game)
 #   OPENFRAME_CONFIGURE_FLAGS  extra configure.py flags (for example --profile)
 #   OPENFRAME_RECONFIGURE=1  run configure.py again even if build.ninja exists (it also runs again when the flags change)
+#   OPENFRAME_PORTABLE=1     the release build: links against a glibc 2.39 tree (OPENFRAME_GLIBC239_SYSROOT, required) so the
+#                            game starts on every SteamOS (Stable has glibc 2.39, the Beta 2.43), and gives halo a DT_RUNPATH of
+#                            $ORIGIN for the SDL beside it. steam-frame/release.sh then checks the result
 #   OPENFRAME_CONFIGURE_ONLY=1  configure, then stop
 #   JOBS                     ninja jobs (default 4; the Frame has 5 CPUs and 15 GB of RAM)
 #   CCACHE_DIR               default ~/.cache/ccache-openframe
@@ -29,6 +32,11 @@ CONFIG=${OPENFRAME_BUILD_CONFIG:-release}
 FLAGS="--vr"
 [ "$CONFIG" = release ] && FLAGS="$FLAGS --release"
 FLAGS="$FLAGS $OPENFRAME_CONFIGURE_FLAGS"
+if [ "$OPENFRAME_PORTABLE" = 1 ]; then
+    [ -d "$OPENFRAME_GLIBC239_SYSROOT/usr/lib" ] || { echo "build: OPENFRAME_PORTABLE=1 needs OPENFRAME_GLIBC239_SYSROOT (a glibc 2.39 tree)"; exit 1; }
+    export OPENFRAME_PORTABLE OPENFRAME_GLIBC239_SYSROOT
+    export PATH=$HERE/tools/portable-bin:$PATH
+fi
 export CCACHE_DIR=${CCACHE_DIR:-$HOME/.cache/ccache-openframe}
 LAUNCH=""
 command -v ccache > /dev/null && LAUNCH="--compiler-launcher ccache"

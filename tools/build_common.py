@@ -290,6 +290,11 @@ SDL_OPTIONS = [
 # the SDL the release brings is the one loaded, whatever other SDL that path
 # holds; a package without lib/openh1 gets the system's)
 SDL_RPATH_LDFLAGS = ["'-Wl,-rpath,$$ORIGIN:$$ORIGIN/../lib/openh1'", "-Wl,--disable-new-dtags"]
+# (OpenFrame's portable build, steam-frame/build.sh with OPENFRAME_PORTABLE=1: DT_RUNPATH of $ORIGIN, the
+# folder with the SDL it brings; steam-frame/openframe.sh puts that folder first on LD_LIBRARY_PATH)
+import os as _os
+if _os.environ.get("OPENFRAME_PORTABLE") == "1":
+    SDL_RPATH_LDFLAGS = ["'-Wl,-rpath,$$ORIGIN'", "-Wl,--enable-new-dtags"]
 
 
 def sdl3_desktop_check(sdl_build: Path) -> str:
