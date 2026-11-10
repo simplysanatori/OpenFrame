@@ -1,0 +1,15 @@
+#!/bin/bash
+# "clang" for the portable build (steam-frame/build.sh with OPENFRAME_PORTABLE=1 puts this folder first on PATH, where
+# the host's compiler is found; the guest's pinned LLVM has its own path): it compiles as clang does,
+# but links against a glibc 2.39 tree (OPENFRAME_GLIBC239_SYSROOT: glibc, libm and GCC 15's runtime, in the
+# layout of an Arm64 root) so the program asks for no glibc symbol newer than 2.39, the oldest SteamOS
+# (the others have 2.43, whose newer versions of atan2f, sqrtf and others would not load there).
+self=$(dirname "$(readlink -f "$0")")
+real=$(PATH=${PATH//"$self:"/} command -v clang) || { echo "clang: not found" >&2; exit 1; }
+link=1
+for a in "$@"; do case $a in -c|-S|-E|-M|-MM|--version|-v|-###|-print-*|-dumpmachine) link=0 ;; esac; done
+if [ "$link" = 1 ] && [ -n "$OPENFRAME_GLIBC239_SYSROOT" ]; then
+    gcc_dir=$(echo "$OPENFRAME_GLIBC239_SYSROOT"/usr/lib/gcc/*/*)
+    exec "$real" --sysroot="$OPENFRAME_GLIBC239_SYSROOT" --gcc-install-dir="$gcc_dir" "$@"
+fi
+exec "$real" "$@"
