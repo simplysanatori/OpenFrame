@@ -8,8 +8,8 @@ LAYOUT...) and PLAYER....
 Every one is off, or as OpenH1 had it, until you choose it, apart from four
 things that are on from the start: the third person's hold on the turning
 stick, the HUD's corners placed for the Frame, no magazine eject on the
-stick, your body's shadow, and the hands keeping their angle on a vehicle's
-controls.
+stick, your body's shadow, the hands keeping their angle on a vehicle's
+controls, and smooth turning in a vehicle's seat.
 
 The VR Setup menu (Settings > CONTROLS tab > VR SETUP, in the CONTROLLER
 section; also at the foot of the player profile menu) is a tree of pages of
@@ -477,6 +477,29 @@ to the controller, and the next grip keeps its own angle.
 - After moistman42069's HAND LOCK (`vr.vehicle_hand_lock`,
   `vr_vehicle_handles_hand_turn`). How: `port/linux/src/vr.c`,
   `held_hand_axes`.
+
+### Smooth turning in a vehicle's seat
+
+With snap turning on foot (`vr.turn = "snap"`, the default), the turning
+stick turns you smoothly while you sit in a vehicle, at
+`vr.smooth_turn_speed`, wherever it turns you there: the Scorpion (its
+driver and its riders), the Shade, a Ghost or Warthog steered by `"look"`,
+and every seat with `vr.vehicle_view = "third_person"`. In the seats whose
+view turns with the vehicle (`port/linux/game/vr_vehicle.c`: the Ghost's
+handlebars, the Warthog's wheel, its passenger's and gunner's seats, the
+Banshee) the stick turns nothing, as before. Out of the seat the stick keeps
+turning smoothly until it is back in the middle (below 0.3, where a snap's
+latch lets go), so a stick held as you get out does not snap you round; the
+next push snaps.
+
+- Key: `vr.seat_smooth_turn` (default `true`; `false`, OpenH1's behaviour:
+  the seat snaps as on foot). With `vr.turn = "smooth"` it changes nothing.
+  VR Setup > MOVEMENT AND COMFORT > GESTURES... > SMOOTH TURN IN SEATS (the
+  MOVEMENT AND COMFORT page has no room left).
+- After moistman42069's VEHICLE TURN (`vr.vehicle_smooth_turn`). How:
+  `port/linux/src/vr.c`, `turn_smoothly` (in `input_update`); the game tells
+  `halo_vr_seated` each frame the first player sits in any seat
+  (`port/linux/game/vr_render.c`).
 
 ### Wrist HUD and HUD modes
 

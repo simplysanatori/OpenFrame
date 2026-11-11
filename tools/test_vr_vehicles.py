@@ -488,6 +488,48 @@ def test_left_stick_does_not_strafe_while_it_steers():
     assert "\tstick_merge(&pad->sThumbLY, vr.input.left_stick[1]);" in gamepad
 
 
+# ---------- turning in a seat (vr.seat_smooth_turn, vr.c)
+
+SEAT_TURN_SOURCE = r"""
+#include <math.h>
+#include <stdio.h>
+static struct { int smooth_turn, seat_smooth_turn; } settings;
+static struct { int seat_smooth; } vr;
+%s
+int main(void)
+{
+    /* snap on foot, the setting on: on foot snaps, seated smooth; out with the stick held still smooth, then
+    snaps once it is back in the middle */
+    settings.seat_smooth_turn = 1;
+    printf("foot %%d\n", turn_smoothly(0, 0.9f));
+    printf("seat %%d\n", turn_smoothly(1, 0.9f));
+    printf("held %%d\n", turn_smoothly(0, 0.9f));
+    printf("easing %%d\n", turn_smoothly(0, 0.5f));
+    printf("centred %%d\n", turn_smoothly(0, 0.1f));
+    printf("again %%d\n", turn_smoothly(0, 0.9f));
+    /* the setting off: snaps seated too; smooth on foot: smooth everywhere */
+    settings.seat_smooth_turn = 0;
+    printf("off %%d\n", turn_smoothly(1, 0.9f));
+    settings.smooth_turn = 1;
+    printf("smooth %%d %%d\n", turn_smoothly(0, 0.9f), turn_smoothly(1, 0.9f));
+    return 0;
+}
+"""
+
+
+def test_a_seat_turns_smoothly_and_snaps_again_once_the_stick_is_centred(tmp_path):
+    text = VR.read_text()
+    exe = build(tmp_path, SEAT_TURN_SOURCE % function(text, "turn_smoothly"), "seat_turn")
+    lines = dict(line.split(" ", 1) for line in
+                 subprocess.run([str(exe)], check=True, capture_output=True, text=True).stdout.splitlines())
+    assert lines == {"foot": "0", "seat": "1", "held": "1", "easing": "1", "centred": "0", "again": "0",
+                     "off": "0", "smooth": "1 1"}
+    # (the turning stick asks it each frame; and the game says when the player is in any seat)
+    assert "if (turn_smoothly(seat_seated(), x))" in function(text, "input_update")
+    render = (ROOT / "port/linux/game/vr_render.c").read_text()
+    assert "if (seated_unit() != NONE)\n\t\thalo_vr_seated();" in render
+
+
 # ---------- the player's body in a seat (first_person_legs.c, tools/vr_cabin_model.py)
 
 LEGS = ROOT / "port/linux/game/first_person_legs.c"
