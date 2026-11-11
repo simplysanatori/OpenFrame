@@ -419,16 +419,18 @@ VR_SCREENS["vr_comfort"] = {
          [(f"{round(scale * 100)}%", f"{scale:g}") for scale in (0.25, 0.4, 0.5, 0.65, 0.8)],
          "How fast the world runs in bullet time.", None),
         ("GESTURES...", None, VR_GESTURES,
-         "Which press or stick gesture starts bullet time and\nswitches the third person.",
+         "Which stick gesture starts bullet time and switches\nthe third person, and turning in a vehicle's seat.",
          None),
     ],
 }
 # (OpenFrame) the stick gestures: how bullet time and the third person are
-# asked for from the turning stick (vr.c, comfort_update; vr_stick_gesture.h)
+# asked for from the turning stick (vr.c, comfort_update; vr_stick_gesture.h),
+# and the stick's turning in a vehicle's seat (vr.seat_smooth_turn; the
+# MOVEMENT AND COMFORT page has no room left)
 VR_SCREENS["vr_gestures"] = {
     "screen": "vr_gestures_screen",
     "header": ("header_vr_gestures", f"{PE}/vr_gestures/header_vr_gestures"),
-    # (two rows)
+    # (three rows)
     "spacing": 28,
     "help_top": 366,
     "rows": [
@@ -440,6 +442,8 @@ VR_SCREENS["vr_gestures"] = {
          [("HOLD", "hold"), ("DOUBLE FLICK DOWN", "double_flick_down"), ("OFF", "off")],
          "Hold: hold the turning stick down (it switches on or off, whatever THIRD PERSON says). Double flick: flick it down twice (bullet time then moves to a double flick up). Off: not from the stick.",
          None),
+        ("SMOOTH TURN IN SEATS:", "vr.seat_smooth_turn", ON_OFF,
+         "With snap turning, the turning stick turns smoothly\nin a vehicle's seat, and snaps again once you are out.", None),
     ],
 }
 # HANDS AND WEAPONS: the hands and the weapons in them
