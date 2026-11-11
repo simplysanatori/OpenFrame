@@ -8,7 +8,8 @@ very text on the CPU: float3 and float4 (their components, .xyz, .yzw, a
 component by index), their arithmetic, the few library functions, the
 constant address space, and a 3D texture sampled linear and clamped to its
 edge as a GPU samples it (of signed bytes, or of four floats a texel), and
-one read by texel.
+one read by texel (and of two signed bytes a texel: the distance-field
+scene's cascades, tools/world_trace/trace_check.cpp).
 */
 
 #ifndef METAL_SHIM_H
@@ -18,6 +19,7 @@ one read by texel.
 #include <cmath>
 
 #define constant const
+#define thread
 
 struct float3
 {
@@ -114,6 +116,11 @@ static inline float3 sign(float3 a)
 static inline int clamp(int x, int low, int high) { return x < low ? low : x > high ? high : x; }
 using std::floor;
 static inline uint ctz(uint x) { return (uint)__builtin_ctz(x); }
+/* a SIMD-group's reduction, as a lane sees it: its own bits and the other
+lanes' (simd_lanes_others, the check's: their cells' shapes) */
+static uint simd_lanes_others;
+static inline uint simd_or(uint x) { return x | simd_lanes_others; }
+static inline uint simd_broadcast_first(uint x) { return x; }
 
 namespace filter { enum value { linear }; }
 namespace address { enum value { clamp_to_edge }; }
@@ -134,10 +141,13 @@ struct level
 snorm; its table: four bytes a texel, read as RGBA8 */
 template <typename T> struct texture3d
 {
-	const signed char *voxels;
-	const unsigned char *texels;
-	/* (or four floats a texel, filtered: the vehicles' fields' atlas) */
-	const float *values;
+	const signed char *voxels = nullptr;
+	const unsigned char *texels = nullptr;
+	/* (or four floats a texel, filtered: the vehicles' fields' atlas; or
+	two signed bytes a texel, sampled as RG8 snorm: the distance-field
+	scene's cascades) */
+	const float *values = nullptr;
+	const signed char *pairs = nullptr;
 	int width, height, depth;
 	float4 read(uint3 at) const
 	{
@@ -177,11 +187,21 @@ template <typename T> struct texture3d
 					results[part] += weight * values[((at[2] * height + at[1]) * width + at[0]) * 4 + part];
 				continue;
 			}
+			if (pairs)
+			{
+				for (int part = 0; part < 2; part++)
+				{
+					float texel = (float)pairs[((at[2] * height + at[1]) * width + at[0]) * 2 + part] / 127.0f;
+
+					results[part] += weight * (texel < -1.0f ? -1.0f : texel);
+				}
+				continue;
+			}
 			float texel = (float)voxels[(at[2] * height + at[1]) * width + at[0]] / 127.0f;
 
 			result += weight * (texel < -1.0f ? -1.0f : texel);
 		}
-		if (values)
+		if (values || pairs)
 			return float4(results[0], results[1], results[2], results[3]);
 		return float4(result, 0.0f, 0.0f, 1.0f);
 	}

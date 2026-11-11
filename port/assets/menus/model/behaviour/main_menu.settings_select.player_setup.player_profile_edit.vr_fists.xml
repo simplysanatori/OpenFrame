@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The behaviour of ce/main_menu.settings_select.player_setup.player_profile_edit.vr_fists.xml's widgets, for the menu engine (docs/menu_engine.md; tools/menu_behaviour.py) -->
+<model>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/vr_fists_screen" flags="pass_unhandled_to_focused_child pause_game">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/options_menu" flags="pass_unhandled_to_focused_child up_down_tabs_children"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_bar" flags="pass_unhandled_to_focused_child left_right_tabs_items"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fists" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fists_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fist_speed" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_speed_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fist_damage" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_damage_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_weapon_pull" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_weapon_pull_range" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_range_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_hand_swap" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/hand_swap_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_prop_throw" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_prop_throw_strength" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_strength_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_grab_world" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/grab_world_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_defaults">
+		<on event="a" run="port settings defaults"/>
+		<on event="start" run="port settings defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_ok">
+		<on event="a" run="port settings save" back="true"/>
+		<on event="start" run="port settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</behaviour>
+</model>

@@ -187,14 +187,11 @@ as four light indices, -1 none: halo_dynamic_lights.h) */
 
 /* ---------- display.ambient_occlusion in the light
 
-The occlusion (found from the 3D view's depth before its opaque surfaces
-shade: d3d8_device.c's halo_screen_ambient_occlusion_begin) is the share of
+The occlusion (found in the world at the pixel: below) is the share of
 the ambient light that reaches a pixel, so it multiplies that light alone,
 in the shaders that light the surfaces, never what a light adds (the
 flashlight, a plasma bolt's glow, the enhanced dynamic lights): the pixel
-key's ambient_occlusion, the occlusion read at the pixel from the
-backend's image of it (XGPU_SPIRV_BINDING_AMBIENT_OCCLUSION,
-XGPU_MSL_TEXTURE_AMBIENT_OCCLUSION; white where none is found):
+key's ambient_occlusion, the light it multiplies:
 
 - XGPU_AMBIENT_OCCLUSION_LIGHT_MODEL: a model lit for each pixel
   (per_pixel_lighting): its ambient and distant lights (the level's light
@@ -221,7 +218,7 @@ enum
 
 The same three lights (XGPU_AMBIENT_OCCLUSION_LIGHT_*, the key's low bits:
 XGPU_AMBIENT_OCCLUSION_LIGHT_OF) multiplied by the occlusion found in the
-world at the pixel instead of GTAO's texel, where the key has
+world at the pixel, where the key has
 XGPU_AMBIENT_OCCLUSION_WORLD (docs/world-ao.md, "Shading";
 port/linux/game/world_ao.c). The pixel's world position p and normal n
 (the lighting's: a model's, or the lightmap pass's own, XGPU_LIGHTING_
@@ -260,6 +257,35 @@ line. With XGPU_AMBIENT_OCCLUSION_WORLD_VIEW too (debug.world_ao_view) the
 draw shows A in grey. */
 #define XGPU_AMBIENT_OCCLUSION_WORLD 0x10
 #define XGPU_AMBIENT_OCCLUSION_WORLD_VIEW 0x20
+/* found once a pixel (xgpu_stream.h's WORLD_AO_PREPASS): with
+XGPU_AMBIENT_OCCLUSION_WORLD, the draw reads its pixel's occlusion from the
+backend's texture of it (XGPU_SPIRV_BINDING_WORLD_AO_PIXELS,
+XGPU_MSL_TEXTURE_WORLD_AO_PIXELS) where it would find it, upsampled where it
+was found at a quarter of the pixels (the block's parameters[1].w 2: each
+2x2 block's at its nearest pixel; world_ao.h's world_ao_upsample); its twin
+in the pre-pass (_INPUTS in its place) writes its pixel's inputs to the
+occlusion instead of its colour, its alpha test as it is: four words, the
+normal octahedral, two signed 16-bit halves (x low); the owner slot plus 2
+in its low byte, the XGPU_WORLD_AO_INPUT_* bits, and in its high half the
+reference (a model's) or the static scenery's page's texel (the lightmap
+pass's: 1 where it has none) as a half float; its distance from the eye
+(the block's grid[0]), a float's bits; and a spare word. The occlusion's
+pass reads them (world_ao_shading.c's world_ao_pass_*). _CARDS: the draw
+is a two-sided model shader's cards (its uniforms' world_ao.w not 0: a
+plant's leaves), whose occlusion is found about their most open
+direction, the sky's (up) or either face's (world_ao_shading.c's
+world_ao_cards_occlusion) */
+#define XGPU_AMBIENT_OCCLUSION_WORLD_SAMPLED 0x40
+#define XGPU_AMBIENT_OCCLUSION_WORLD_INPUTS 0x80
+#define XGPU_WORLD_AO_INPUT_LIGHTMAP 0x100u
+#define XGPU_WORLD_AO_INPUT_ALL_SHAPES 0x200u
+#define XGPU_WORLD_AO_INPUT_PRESENT 0x400u
+#define XGPU_WORLD_AO_INPUT_CARDS 0x800u
+/* (the surfaces' upsampling of the occlusion found at a quarter of the
+pixels: world_ao.h's WORLD_AO_UPSAMPLE_*) */
+#define XGPU_WORLD_AO_UPSAMPLE_DEPTH 0.02f
+#define XGPU_WORLD_AO_UPSAMPLE_FACING 0.2f
+#define XGPU_WORLD_AO_UPSAMPLE_LEAST 1.0e-4f
 #define XGPU_AMBIENT_OCCLUSION_LIGHT_OF(value) ((value) & 0x0f)
 #define XGPU_WORLD_AO_K 1.6f
 #define XGPU_WORLD_AO_STEP 0.15f
@@ -305,6 +331,42 @@ it, in half diagonals) */
 objects' atlas) */
 #define XGPU_WORLD_AO_FIELD 4
 
+/* ---------- the distance-field scene (port/linux/include/world_cascades.h)
+
+The cascades about the camera, one 3D texture of two signed bytes a texel
+(RG8 snorm: the structure's distance, the objects'), each cascade
+XGPU_WORLD_CASCADE_SPAN texels a side (its side and a guard), one above the
+other along z; a cascade's block vec4 is its first voxel's centre and its
+voxel (0: not ready). world_trace, the emitters' ray step through them
+(xgpu_spirv.c's, xgpu_msl.c's), is world_cascades.c's world_trace_ray
+operation for operation; these are world_cascades.h's WORLD_CASCADE* and
+WORLD_TRACE_* */
+#define XGPU_WORLD_CASCADES 4
+#define XGPU_WORLD_CASCADE_SIDE 64
+#define XGPU_WORLD_CASCADE_SPAN 65
+#define XGPU_WORLD_CASCADE_RANGE_VOXELS 4
+#define XGPU_WORLD_TRACE_STEPS 24
+#define XGPU_WORLD_TRACE_HIT 0.25f
+#define XGPU_WORLD_TRACE_LEAST_STEP 0.5f
+#define XGPU_WORLD_TRACE_STRUCTURE 1
+#define XGPU_WORLD_TRACE_OBJECTS 2
+/* World AO's rays through it (the pass's world_ao_traced; world_ao.h's
+WORLD_AO_RAYS and so on): rays a pixel, cosine-weighted about its normal;
+their reach and their start off the surface (world units); and the share of
+a frame's occlusion blended into the history reprojected (temporal
+accumulation), and the history's tests (the distance's relative
+difference, the normals' least cosine) */
+#define XGPU_WORLD_AO_RAYS 4
+#define XGPU_WORLD_AO_RAY_REACH 2.0f
+/* (a pixel no object is within the reach of casts none: the objects'
+distance at it read first in the finest cascade whose range, 4 voxels,
+holds the reach, cascade 1's 2 wu) */
+#define XGPU_WORLD_AO_RAY_CASCADE 1
+#define XGPU_WORLD_AO_RAY_BIAS 0.1f
+#define XGPU_WORLD_AO_HISTORY_NEW 0.2f
+#define XGPU_WORLD_AO_HISTORY_DISTANCE 0.05f
+#define XGPU_WORLD_AO_HISTORY_NORMAL 0.8f
+
 /* ---------- enhanced dynamic lights
 
 display.dynamic_lights "enhanced" (d3d8_device.c, halo_dynamic_lights_set):
@@ -349,11 +411,21 @@ distance along it), then the leaves' clusters, four a texel (all bits set:
 none). A pixel finds its cluster from its point a little off its surface,
 along its normal, and its cell's lights are those its cluster's mask has; a
 world with no nodes (none uploaded, or too large) leaves the cells' lights as
-they are, as does a point the BSP puts in no cluster. */
+they are, as does a point the BSP puts in no cluster.
+That is the world the game sends; the hosts' backends give the GPU another
+made of it (xgpu_dynamic_lights_world.c and .h, which say how), in which
+every point ends in the cluster it ended in, with each node's plane beside
+it, and past the clusters' masks, at XGPU_DYNAMIC_LIGHTS_WALK in their slice,
+the mask of the lights whose walk could take them from a pixel (which the
+backend sets), a model's, and after it a structure's (which leaves out the
+lights for the models alone): a pixel walks the world only where its cell
+has one of them. */
 #define XGPU_DYNAMIC_LIGHTS_CLUSTERS 512
+#define XGPU_DYNAMIC_LIGHTS_WALK XGPU_DYNAMIC_LIGHTS_CLUSTERS
 #define XGPU_DYNAMIC_LIGHTS_WORLD_SLICES 240
 #define XGPU_DYNAMIC_LIGHTS_WORLD_TEXELS (XGPU_DYNAMIC_LIGHTS_WORLD_SLICES * 1024)
-/* the bytes uploaded each frame: the cells and the clusters' masks */
+/* the bytes of the cells and the clusters' masks, of which each frame's lights
+send those that changed (the command stream's DYNAMIC_LIGHTS_CHANGE) */
 #define XGPU_DYNAMIC_LIGHTS_CELLS_BYTES \
 	(XGPU_DYNAMIC_LIGHTS_GRID_X * XGPU_DYNAMIC_LIGHTS_GRID_Y * (XGPU_DYNAMIC_LIGHTS_GRID_Z + 1) * 16)
 /* how far off its surface a pixel's point is put, world units */
@@ -404,6 +476,7 @@ struct xgpu_texture_description
 	BOOL hires;         /* a high-res HUD texture drawn in the texture's place (hud_hires.h) */
 	BOOL hires_coverage; /* ... whose green is its coverage (a meter's) */
 	BOOL hires_point_threshold; /* ... whose red holds discrete segment data */
+	BOOL hires_msdf;    /* the high-res text's distance fields (XGPU_ADDRESS_MSDF) */
 };
 
 /* (xbox_texture_decode.c) */

@@ -65,6 +65,7 @@ union real_vector3d;
 union real_rgb_color;
 int halo_interpolation_enabled(void);
 float game_time_get_tick_fraction(void);
+float game_time_get_step_age(void);
 void render_interpolation_tick(void);
 void render_interpolation_reset(void);
 void render_interpolation_frame_begin(void);
@@ -76,6 +77,10 @@ void render_interpolation_object_point(long object_index, union real_point3d *po
 mixed of the tick's state and the frame's (render_interpolation.c) */
 void render_interpolation_object_origin(long object_index, union real_point3d *origin);
 void render_interpolation_unit_camera_position(long unit_index, union real_point3d *position);
+/* where the last frame drew a local player's view from, if it drew one */
+unsigned char render_interpolation_drawn_view_position(short local_player_index, union real_point3d *position);
+/* debug.network_test_elevator's frames (port/linux/game/network_test.c) */
+void network_test_elevator_frame(void);
 /* a widget's shape (an antenna's chain, a cloth flag's grid), stepped in the
 tick, drawn between the ticks hung from its marker as drawn */
 void render_interpolation_shape_tick(unsigned long owner, long index, struct real_matrix4x3 const *anchor,
@@ -250,6 +255,12 @@ it kept, and the range it had in previous (NULL: not wanted): a range in
 the last step before 1 draws behind everything drawn, still clipped at the
 far plane (port/linux/src/d3d8_device.c) */
 void d3d8_viewport_depth_range(float minimum, float maximum, float previous[2]);
+/* the stage samples a region of its texture as a texture of the region's
+alone, addressed by its border beyond it (D3DTADDRESS_BORDER, whatever the
+stage's address modes): region its width and height, then its left and top,
+in the texture's coordinates (0 to 1); NULL: the whole texture, as the
+stage's address modes have it (port/linux/src/d3d8_device.c) */
+void d3d8_texture_region(unsigned long stage, const float *region);
 /* takes up a new width between frames (F11); returns the width */
 long halo_screen_commit(void);
 /* the shadow maps' pixels for each of their 128 texels each way, a power of
@@ -291,17 +302,11 @@ draws (port/linux/src/d3d8_device.c, xgpu_hdr.h): the category drawing now
 (rasterizer.h's _rasterizer_profile_*, -1 none: rasterizer_profile_begin and
 _end), and what the code drawing knows of them (HALO_HDR_KIND_*, 0 none) */
 void halo_screen_tone_map(short x0, short y0, short x1, short y1);
-/* display.ambient_occlusion over a window's 3D view: its opaque surfaces'
-depth drawn first, alone (begin: FALSE where there is no occlusion), the
-occlusion found from it (the camera's near and far planes and its
-projection's x and y scales and offsets), and their light then drawn with
-it, until end (port/linux/src/d3d8_device.c) */
-int halo_screen_ambient_occlusion_begin(void);
-void halo_screen_ambient_occlusion(short x0, short y0, short x1, short y1, float z_near, float z_far,
-	const float projection[4]);
-void halo_screen_ambient_occlusion_end(void);
 void halo_hdr_category(int category);
 void halo_hdr_draw_kind(int kind);
+/* debug.render_marks: what the draws that follow belong to, for the
+inspector's replay (port/linux/game/render_marks.c) */
+#include "render_marks.h"
 /* the display's peak and SDR white, as the backend says them, as text
 (Video Setup's DISPLAY PEAK row: its value, "800 NITS"; words, its panel's
 words); 0 where no renderer draws HDR (port/linux/src/d3d8_device.c) */
@@ -324,6 +329,9 @@ int halo_frames_unseen(void);
 void unseen_frame_wait(void);
 /* network.client_timeout_seconds, in milliseconds (port/linux/src/port_config.c) */
 unsigned long network_client_timeout_milliseconds(void);
+/* the game halted on a fatal error, its report offered at the next start
+as a crash's (port/linux/src/report.c: main.c) */
+void report_session_halted(char const *reason);
 /* a dedicated server (halo --server: port/linux/src/server_mode.c,
 port/linux/game/server_director.c; docs/dedicated_server.md): whether this
 run is one; its start, before the game's (shell_xbox.c); its frames' pace
@@ -340,6 +348,9 @@ void server_console_output(const char *text);
 int halo_server_debug_echo(void);
 /* ... the level its rotation plays next, NULL if none (game_engine.c) */
 char const *server_director_first_level(void);
+/* the caches cleared at the start, where Settings' CLEAR CACHES asked for
+it (port/linux/src/game_caches.c: shell_xbox.c) */
+void game_caches_start(void);
 /* the cache slots' sources (port/linux/src/xbox_files.c): the size and
 modification time of the map file a slot was copied from, and the name,
 checksum and length of the map its whole copy holds, kept beside it once
@@ -405,7 +416,15 @@ int halo_linux_flick_stick(void);
 asked, which skips a Bink movie as a controller's button does
 (port/linux/src/sdl_platform.c; source/bink/bink_playback.c) */
 int platform_movie_skip_pressed(void);
+/* the player's move and look as the game read them, for the input trace
+(port/linux/src/input_trace.c): a frame's, or a sub-step's */
+void input_trace_player(int controller, int substep, float forward, float strafe, float yaw, float pitch);
 /* the mouse in the menus (source/interface/ui_widget.c) */
 #include "halo_ui_pointer.h"
+
+/* replaces the file at to with the one at from, at once (a rename: on POSIX
+rename(2), on Windows MoveFileEx's replace), both Xbox paths; FALSE if it
+could not (port/linux/src/xbox_files.c) */
+int platform_replace_file(const char *from, const char *to);
 
 #endif

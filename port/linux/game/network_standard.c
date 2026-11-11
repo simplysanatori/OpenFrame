@@ -53,6 +53,7 @@ host tells its OpenH1 clients which players are OpenCE's
 #include "network_standard.h"
 #include "network_distributed.h"
 #include "halo_port_limits.h"
+#include "demo.h"
 
 #include <stdlib.h>
 
@@ -60,6 +61,7 @@ host tells its OpenH1 clients which players are OpenCE's
 char const *config_string(char const *name);
 long config_integer(char const *name);
 int config_boolean(char const *name);
+unsigned long config_changes(void);
 
 /* ---------- constants */
 
@@ -119,6 +121,10 @@ static struct
 	boolean opence_players[MAXIMUM_TRACKED_PLAYERS];
 	long opence_players_time;
 	boolean opence_players_heard[MAXIMUM_TRACKED_PLAYERS];
+	/* the demo's (demo.c's G records, network_standard_port_demo_state):
+	which players are OpenCE machines', a host's as its next tick takes
+	them; and a demo's playback's, the recording's */
+	boolean demo_opence_players[MAXIMUM_TRACKED_PLAYERS];
 	/* the host: the players last told, and when */
 	byte opence_players_sent[OPENCE_PLAYER_MASK_SIZE];
 	long opence_players_sent_time;
@@ -126,6 +132,13 @@ static struct
 	join): what of OpenH1's own it heard, which must be nothing */
 	long openh1_messages_heard;
 	long record_rate_heard;
+	/* a game of this machine's own (and a Legacy game's): its players'
+	animation enhancements (game.enhanced_animations) and their way of
+	picking up a second weapon (game.auto_pickup), read as its map began, as
+	a host reads its own in the lobby: rules of the game, which do not
+	change in the middle of it */
+	boolean local_enhanced_animations;
+	boolean local_auto_pickup;
 } network_standard_globals = { FALSE, SIM_RATE_CLASSIC, FALSE, FALSE };
 
 /* ---------- private code */
@@ -150,6 +163,9 @@ sim_rate.c steps at, else 30 */
 static long network_standard_rate_setting(
 	void)
 {
+	/* (network.sim_rate, read again as the settings change: config_changes) */
+	static unsigned long read_at = (unsigned long)-1;
+	static long setting;
 	long rate;
 
 	if (halo_server_mode())
@@ -159,7 +175,12 @@ static long network_standard_rate_setting(
 		rate = network_standard_server_setting();
 		return rate ? rate : network_standard_globals.hosting_rate;
 	}
-	rate = config_integer("network.sim_rate");
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		setting = config_integer("network.sim_rate");
+	}
+	rate = setting;
 	return sim_rate_supported(rate) ? rate : SIM_RATE_CLASSIC;
 }
 
@@ -342,11 +363,11 @@ struct network_game const *network_standard_game_for_machine(
 
 /* (the host) which players are OpenCE machines', from its machines' tokens */
 static void network_standard_note_opence_players(
-	void)
+	boolean *opence_players)
 {
 	long machine_index;
 
-	csmemset(network_standard_globals.opence_players, 0, sizeof(network_standard_globals.opence_players));
+	csmemset(opence_players, 0, sizeof(network_standard_globals.opence_players));
 	for (machine_index = 0; machine_index < MAXIMUM_STANDARD_MACHINES; machine_index++)
 	{
 		long *player_list;
@@ -361,7 +382,7 @@ static void network_standard_note_opence_players(
 				DATUM_INDEX_TO_ABSOLUTE_INDEX(player_list[local_player_index]) : NONE;
 
 			if (absolute_index >= 0 && absolute_index < MAXIMUM_TRACKED_PLAYERS)
-				network_standard_globals.opence_players[absolute_index] = TRUE;
+				opence_players[absolute_index] = TRUE;
 		}
 	}
 }
@@ -383,6 +404,10 @@ boolean network_standard_player_is_opence(
 		if (!network_standard_globals.joined)
 			return FALSE;
 		break;
+	case _game_connection_local:
+		/* (a demo's playback of a mixed game: the recording's, which its
+		OpenCE players' units moved once a tick by) */
+		return demo_playing() && network_standard_globals.demo_opence_players[absolute_index];
 	default:
 		return FALSE;
 	}
@@ -390,7 +415,7 @@ boolean network_standard_player_is_opence(
 	if (network_standard_globals.opence_players_time != game_time_get())
 	{
 		if (game_connection() == _game_connection_network_server)
-			network_standard_note_opence_players();
+			network_standard_note_opence_players(network_standard_globals.opence_players);
 		else
 		{
 			csmemcpy(network_standard_globals.opence_players, network_standard_globals.opence_players_heard,
@@ -404,11 +429,31 @@ boolean network_standard_player_is_opence(
 void network_standard_new_game(
 	void)
 {
+	network_standard_globals.local_enhanced_animations = config_boolean("game.enhanced_animations") != 0;
+	network_standard_globals.local_auto_pickup = config_boolean("game.auto_pickup") != 0;
 	csmemset(network_standard_globals.opence_players, 0, sizeof(network_standard_globals.opence_players));
 	network_standard_globals.opence_players_time = NONE;
 	csmemset(network_standard_globals.opence_players_heard, 0, sizeof(network_standard_globals.opence_players_heard));
+	csmemset(network_standard_globals.demo_opence_players, 0, sizeof(network_standard_globals.demo_opence_players));
 	csmemset(network_standard_globals.opence_players_sent, 0, sizeof(network_standard_globals.opence_players_sent));
 	network_standard_globals.opence_players_sent_time = NONE;
+}
+
+void *network_standard_port_demo_state(
+	long *size)
+{
+	/* (a host recording: as the next tick takes them, from its machines,
+	which change outside the ticks; a playback's are the recording's, the
+	G record's written here) */
+	if (!demo_playing())
+	{
+		if (game_connection() == _game_connection_network_server && network_standard_hosting_mixed())
+			network_standard_note_opence_players(network_standard_globals.demo_opence_players);
+		else
+			csmemset(network_standard_globals.demo_opence_players, 0, sizeof(network_standard_globals.demo_opence_players));
+	}
+	*size = sizeof(network_standard_globals.demo_opence_players);
+	return network_standard_globals.demo_opence_players;
 }
 
 void network_standard_host_tick(
@@ -551,6 +596,7 @@ boolean network_standard_turns_with_aim(
 	long player_index)
 {
 	struct network_game *game;
+	unsigned long rules;
 
 	switch (game_connection())
 	{
@@ -568,14 +614,56 @@ boolean network_standard_turns_with_aim(
 			return TRUE;
 		return !TEST_FLAG(game->cooperative_flags, _network_game_classic_turning_bit);
 	default:
-		return config_boolean("game.enhanced_animations") != 0;
+		/* (a demo's playback: its recording's game's, demo.c) */
+		if (demo_playback_rules(&rules))
+			return TEST_FLAG(rules, _demo_rule_turns_with_aim_bit);
+		return network_standard_globals.local_enhanced_animations;
 	}
+}
+
+boolean network_standard_enhanced_animations(
+	void)
+{
+	struct network_game *game;
+	unsigned long rules;
+
+	switch (game_connection())
+	{
+	case _game_connection_network_server:
+		if (network_standard_globals.hosting)
+			return !network_standard_globals.hosting_classic_turning;
+		break;
+	case _game_connection_network_client:
+		/* (the host's word, as its record brought it) */
+		game = network_game_get_game();
+		if (network_standard_globals.joined && game)
+			return !TEST_FLAG(game->cooperative_flags, _network_game_classic_turning_bit);
+		break;
+	default:
+		/* (a demo's playback: its recording's game's, demo.c) */
+		if (demo_playback_rules(&rules))
+			return TEST_FLAG(rules, _demo_rule_enhanced_animations_bit);
+		break;
+	}
+	return network_standard_globals.local_enhanced_animations;
+}
+
+unsigned long network_standard_demo_rules(
+	void)
+{
+	unsigned long rules = 0;
+
+	SET_FLAG(rules, _demo_rule_enhanced_animations_bit, network_standard_enhanced_animations());
+	SET_FLAG(rules, _demo_rule_turns_with_aim_bit, network_standard_turns_with_aim(NONE));
+	SET_FLAG(rules, _demo_rule_walk_over_pickup_bit, network_standard_walk_over_pickup(NONE));
+	return rules;
 }
 
 boolean network_standard_walk_over_pickup(
 	long player_index)
 {
 	struct network_game *game;
+	unsigned long rules;
 
 	switch (game_connection())
 	{
@@ -593,7 +681,9 @@ boolean network_standard_walk_over_pickup(
 			return TRUE;
 		return !TEST_FLAG(game->cooperative_flags, _network_game_hold_to_pick_up_bit);
 	default:
-		return config_boolean("game.auto_pickup") != 0;
+		if (demo_playback_rules(&rules))
+			return TEST_FLAG(rules, _demo_rule_walk_over_pickup_bit);
+		return network_standard_globals.local_auto_pickup;
 	}
 }
 

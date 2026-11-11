@@ -1095,6 +1095,17 @@ static void packet_nonce(const unsigned char *packet, unsigned char *nonce)
 	memcpy(nonce + P2P_NONCE_SIZE - 8, packet + 1 + P2P_IDENTIFIER_SIZE, 8);
 }
 
+/* debug.network_relay_only: the tunnel's packets to and from peers go only
+through relays, as when hole punching cannot meet two NATs */
+static int relay_only(void)
+{
+	static int only = -1;
+
+	if (only < 0)
+		only = config_boolean("debug.network_relay_only") ? 1 : 0;
+	return only;
+}
+
 /* a tunnel packet sealed for the peer, sent to an address (to), or through
 a relay's attempt (relay: its index + 1; to is not used) */
 static void peer_send_via(struct peer *peer, const struct p2p_candidate *to, int relay, const unsigned char *inner,
@@ -1123,6 +1134,8 @@ static void peer_send_via(struct peer *peer, const struct p2p_candidate *to, int
 		p2p_relay_send(relay - 1, packet, TUNNEL_HEADER_SIZE + sealed);
 		return;
 	}
+	if (relay_only())
+		return;
 	make_address(&address, to->address, to->port);
 	posix_socket_sendto(p2p.tunnel_socket, packet, TUNNEL_HEADER_SIZE + sealed, 0, &address, sizeof(address));
 }
@@ -2835,6 +2848,8 @@ static int tunnel_received(unsigned char *packet, int size, const struct sockadd
 		return 0;
 	}
 	if (size < TUNNEL_HEADER_SIZE + P2P_TAG_SIZE + 1 || size - TUNNEL_HEADER_SIZE - P2P_TAG_SIZE > (int)sizeof(inner))
+		return 0;
+	if (!relay && relay_only())
 		return 0;
 	peer = find_peer(packet + 1);
 	if (!peer)
@@ -4983,7 +4998,14 @@ int p2p_hand_off_invite(void)
 	int socket;
 	int attempt;
 	int result = 0;
+	/* (once a process: the platform's start can run again, after SDL could
+	not start, and by then this copy's own p2p has opened the hand-off's
+	socket, which would answer this copy's invite, #861) */
+	static int tried;
 
+	if (tried)
+		return 0;
+	tried = 1;
 	if (!command_line_invite(invite, sizeof(invite)) || !handoff_key(key))
 		return 0;
 	socket = open_socket(SOCK_DGRAM, network_long(0x7F000001), 0, NULL);

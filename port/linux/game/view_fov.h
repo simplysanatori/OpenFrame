@@ -15,6 +15,18 @@ real render_fov_vertical(short local_player_index, real native_vertical_field_of
 last local view's own projection against the game's): 1 for the stock view.
 A scope's own pieces, drawn zoomed over its picture, keep to it */
 real render_fov_reticle_scale(short local_player_index);
+/* a scope's own pieces' scale: the view's (render_fov_reticle_scale), but
+the picture's own (1) with display.scale_scoped_fov, whose zoomed view is
+wider than the picture was drawn for (#731) */
+real render_fov_scope_piece_scale(short local_player_index);
+/* whether a zoomed reticle takes its scope's scale (the Xbox's zoom) rather
+than keeping its unzoomed size (display.scale_scoped_fov's: #738, #594) */
+boolean render_fov_zoomed_reticle_with_scope(short local_player_index);
+/* whether the view is still zoomed by the Xbox's zoom (display.scale_scoped_fov
+off): at a scope's zoom or along its transition, in or out. The zoom level
+is gone as a scope is let go, but the view eases back to the unzoomed one,
+and the reticle slides back with it as it slid in (#747) */
+boolean render_fov_zoom_easing(short local_player_index);
 /* the weapon's reticle's size: its scale at the unzoomed view (display.panini's
 magnification of the middle with it), kept through the zoom (the stock game
 draws its reticle one size at every zoom: display.fov sizes it, the zoom
@@ -40,6 +52,12 @@ real mouse_zoom_look_scale(short local_player_index, long unit_index, short zoom
 passes: balanced and nestable, the current local render view only */
 void viewmodel_projection_begin(void);
 void viewmodel_projection_end(void);
+/* the first-person weapon's near clip distance for the projection drawn now
+(near_clip.c's render_first_person_near_clip_distance): the game's
+(rasterizer_first_person_weapon_near_clip_distance) at the weapon's stock
+angle and place, nearer where its projection is widened or it is moved
+toward the eye; the game's in the VR mode */
+real viewmodel_near_clip_distance(void);
 
 /* where the first-person weapon and hands are drawn: moved along the view's
 right, up and forward, in world units (display.viewmodel_offset_x, _y and

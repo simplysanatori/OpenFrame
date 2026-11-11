@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
 <menus>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/vr_hud_layout_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/vr_hud_layout_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 		<on event="b" back="true"/>
 		<on event="back" back="true"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/options_menu"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help" type="text" controller="1" left="68" top="366" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help" type="text" controller="1" left="68" top="366" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help_strings" font="ui\large_ui" color="#FFFFFFFF" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 		<data input="port settings help"/>
 		<on event="created" run="port slider init"/>
 		<on event="deleted" run="port slider close"/>
@@ -30,264 +30,290 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_scale" x="54" y="337"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_bar" y="414"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_defaults" y="1"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_ok" x="380" y="1"/>
 		<child widget="common_button_cancel" x="510" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_inset" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_inset" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_x" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_x" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_y" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_y" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_scale" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_x" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_x" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_y" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_y" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_scale" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_x" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_x" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="7" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_y" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_y" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="8" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_scale" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="9" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_x" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_x" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="10" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_y" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_y" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="11" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="11" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_scale" width="512" height="20" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x20" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<on event="left" run="port slider left"/>
 		<on event="right" run="port slider right"/>
 		<on event="a" run="port slider edit"/>
 		<on event="start" run="port slider edit"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_track" x="323" y="7"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_value" x="387" y="4"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_track" x="319" y="3"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_value" x="383" y="0"/>
+		<on event="stick_left" run="port slider left"/>
+		<on event="stick_right" run="port slider right"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="12" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_label" type="text" controller="1" width="280" height="20" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" string_index="12" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="-1" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_track" controller="1" width="62" height="14" bitmap="main_menu/settings/slider_track" source="tools/port_settings.py settings_files/_setting_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_thumb"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_thumb" controller="1" width="8" height="14" bitmap="main_menu/settings/slider_thumb" source="tools/port_settings.py settings_files/_setting_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="0" text_flags="no_focus_test" font="ui\small_ui">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_value" type="text" controller="1" width="76" height="20" bitmap="main_menu/settings/slider_field" color="#FF2896FF" align="center" text_y="1" text_flags="no_focus_test" font="ui\small_ui" source="tools/port_settings.py settings_files/_setting_screen/_settings_text">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_button">
 		<on event="a" run="port settings defaults"/>
 		<on event="start" run="port settings defaults"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_button">
 		<on event="a" run="port settings save" back="true"/>
 		<on event="start" run="port settings save" back="true"/>
 		<on event="left_mouse" run="mouse emit accept event"/>

@@ -1007,7 +1007,11 @@ static void definition_shapes(struct world_proxies_source const *source, struct 
 		break;
 	case _world_proxies_source_box:
 	{
-		/* every node's collision geometry in node 0's space, one box */
+		/* every node's collision geometry in node 0's space, one box; with
+		none, the box of what it draws opaque, and nothing when it draws
+		nothing opaque (not its bounding sphere: a bound for culling, about
+		its origin on the floor, which held the floor inside it wholly
+		occluded about a grenade or a floor marker, #773) */
 		float bounds[2][3], box[2][3];
 		short node_index;
 		int any = 0;
@@ -1021,11 +1025,16 @@ static void definition_shapes(struct world_proxies_source const *source, struct 
 			bounds_add_box(source, 0, (float const (*)[3])box, 0, bounds);
 			any = 1;
 		}
+		if (!any && source->drawn)
+		{
+			memcpy(bounds, source->drawn_bounds, sizeof(bounds));
+			any = 1;
+		}
 		if (any)
+		{
 			box_shape(0, (float const (*)[3])bounds, &shape);
-		else
-			sphere_shape(source, &shape);
-		set_add(set, &shape);
+			set_add(set, &shape);
+		}
 		break;
 	}
 	case _world_proxies_source_sphere:
@@ -1276,11 +1285,8 @@ static int candidate_add(struct world_proxy const *proxies, short slots, long ow
 	return 1;
 }
 
-/* a vehicle's occlusion field placed on its node 0 as drawn (frame), in
-the GPU's layout (xgpu_stream.h's XGPU_WORLD_AO_PROXY_FIELD): the world to
-its voxels' place, g = (frame^-1 (p) - origin) / voxel, each row an axis of
-the frame over its scale squared and the voxel (a frame of one scale) */
-static void field_place(struct world_proxies_source_field const *field, struct world_proxies_frame const *frame,
+/* (world_proxies.h) */
+void world_proxies_field_place(struct world_proxies_source_field const *field, struct world_proxies_frame const *frame,
 	struct world_proxy proxies[WORLD_PROXY_FIELD_SLOTS])
 {
 	float scale = frame_scale(frame), middle[3], over;
@@ -1343,6 +1349,59 @@ long world_proxies_place(long definition, struct world_proxies_frame const *fram
 	return count;
 }
 
+int world_proxy_set_fielded(struct world_proxy_set const *set, short shape_index)
+{
+	/* (a vehicle's boxes, not its wheels' spheres; anything else's one shape,
+	a box or, with no collision geometry, a sphere of its bound) */
+	return set->shapes[shape_index].kind == _world_proxy_box || set->count == 1;
+}
+
+long world_proxies_scene(float const camera_position[3], float reach, struct world_proxy *proxies, long *owners,
+	long maximum)
+{
+	long instance_count, instance_index, count = 0;
+
+	if (maximum <= 0 || !proxies || !owners)
+		return 0;
+	instance_count = world_proxies_source_instances(world_proxies.instances, WORLD_PROXIES_MAXIMUM_INSTANCES);
+	for (instance_index = 0; instance_index < instance_count && count < maximum; instance_index++)
+	{
+		struct world_proxies_source_instance const *instance = &world_proxies.instances[instance_index];
+		struct world_proxy_set const *set = world_proxies_definition(instance->definition);
+		struct world_proxies_source_field field;
+		short node_count, shape_index;
+		int fielded = 0;
+
+		/* (a static placement the field holds is the structure's) */
+		if (!set || instance->baked)
+			continue;
+		node_count = world_proxies_source_nodes(instance->id, world_proxies.frames, WORLD_PROXIES_SOURCE_MAXIMUM_NODES);
+		if (node_count <= 0)
+			continue;
+		/* (an occlusion field, drawn or on its way, stands in for the shapes
+		it is fielded for: not a distance, so neither is here) */
+		for (shape_index = 0; shape_index < set->count; shape_index++)
+			fielded = fielded || world_proxy_set_fielded(set, shape_index);
+		fielded = fielded && (instance->field_awaited || world_proxies_source_field(instance->definition, &field));
+		for (shape_index = 0; shape_index < set->count && count < maximum; shape_index++)
+		{
+			struct world_proxy_shape const *shape = &set->shapes[shape_index];
+			float centre[3], offset[3];
+
+			if (fielded && world_proxy_set_fielded(set, shape_index))
+				continue;
+			shape_place(shape, &world_proxies.frames[shape->node_index >= 0 && shape->node_index < node_count ?
+				shape->node_index : 0], &proxies[count]);
+			world_proxy_reach_centre(&proxies[count], centre);
+			sub3(centre, camera_position, offset);
+			if (length3(offset) > reach)
+				continue;
+			owners[count++] = instance->id;
+		}
+	}
+	return count;
+}
+
 long world_proxies_window(float const camera_position[3], struct world_proxy *proxies, long *owners,
 	long maximum, long *dynamic_count)
 {
@@ -1364,10 +1423,12 @@ long world_proxies_window(float const camera_position[3], struct world_proxy *pr
 		struct world_proxy_set const *set = world_proxies_definition(instance->definition);
 		struct world_proxies_source_field field;
 		short node_count, shape_index;
-		/* (a vehicle with an occlusion field drawn: the field in place of its
-		boxes; its wheels keep their spheres, which turn and spring. One
-		whose field is on its way: neither its boxes nor a field until it
-		comes, faded in) */
+		/* (an object with an occlusion field drawn: the field in place of the
+		shapes it stands in for (world_proxy_set_fielded): a vehicle's boxes,
+		whose wheels keep their spheres, which turn and spring; a piece of
+		scenery's box or sphere, whether it moves or its placement is baked.
+		One whose field is on its way: neither those shapes nor a field until
+		it comes, faded in) */
 		int fielded = 0, boxless;
 
 		if (!set)
@@ -1376,9 +1437,9 @@ long world_proxies_window(float const camera_position[3], struct world_proxy *pr
 		if (node_count <= 0)
 			continue;
 		for (shape_index = 0; shape_index < set->count; shape_index++)
-			fielded = fielded || set->shapes[shape_index].kind == _world_proxy_box;
-		boxless = fielded && !instance->baked && instance->field_awaited;
-		fielded = fielded && !instance->baked && !boxless && world_proxies_source_field(instance->definition, &field);
+			fielded = fielded || world_proxy_set_fielded(set, shape_index);
+		boxless = fielded && instance->field_awaited;
+		fielded = fielded && !boxless && world_proxies_source_field(instance->definition, &field);
 		boxless = boxless || fielded;
 		for (shape_index = fielded ? -1 : 0; shape_index < set->count; shape_index++)
 		{
@@ -1389,14 +1450,14 @@ long world_proxies_window(float const camera_position[3], struct world_proxy *pr
 
 			if (shape_index < 0)
 			{
-				field_place(&field, &world_proxies.frames[0], placed);
+				world_proxies_field_place(&field, &world_proxies.frames[0], placed);
 				slot_count = WORLD_PROXY_FIELD_SLOTS;
 			}
 			else
 			{
 				struct world_proxy_shape const *shape = &set->shapes[shape_index];
 
-				if (boxless && shape->kind == _world_proxy_box)
+				if (boxless && world_proxy_set_fielded(set, shape_index))
 					continue;
 				shape_place(shape, &world_proxies.frames[shape->node_index >= 0 && shape->node_index < node_count ?
 					shape->node_index : 0], &placed[0]);

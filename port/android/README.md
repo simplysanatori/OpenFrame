@@ -433,6 +433,7 @@ These settings are only for Android:
 | `input.touch_controls` | (Android, iOS and the web) The touch controls in a game. `"auto"` (the default): shown on a touchscreen while no controller is connected. `"on"`: also shown with a controller. `"off"`: never shown. A device without a touchscreen never shows them. The menus take taps in any case. |
 | `debug.sample_seconds` | Refer to "Find problems". |
 | `debug.memory_watch` | `true` (the default): the app notices the game's writes to textures and vertices by page protection. `false`: it compares page contents once a frame instead, which is slower. Refer to "Limits". |
+| `display.render_scale` | (Android and iOS) The fraction of the screen's pixels the game draws, each way, from 0.25 to 1.0: the swapchain is that size and Android's compositor scales it up to the screen; the touch controls stay at the screen's pixels. `0` (the default) is the device's: 0.8 (a Pixel 11 Pro's 2410x1080 draws 1928x864), or about 1080 rows where 0.8 would draw more (0.75 on a 1440p phone). The log says which (`render scale`). Read at start (`HALO_RENDER_SCALE`). |
 | `display.astc_textures` | `"auto"` (the default): on a GPU without BC's formats (Mali, PowerVR) that samples ASTC, the maps' DXT textures are transcoded to ASTC 4x4, a quarter of the memory and bandwidth of the decoded textures; their few blocks that need encoding are encoded on worker threads the first time and kept in the app's cache folder. `"off"`: decoded, as before. Checked on a Pixel 11 Pro (PowerVR); the emulator, whose ASTC is emulated, draws those textures black. The log says which (`vulkan: DXT textures as ...`). Refer to [port/linux/README.md](../linux/README.md#settings). |
 | `display.picture_position` | Where the picture sits on a screen taller than it, such as the inner screen of a folding phone, a tablet or a window in split screen. `"center"` (the default) leaves black above and below it. `"top"` puts all the black below it, where the touch controls under the thumbs are. `"bottom"` puts all the black above it. A window taller than it is wide (portrait) has the picture under the strip along the top, lowered into the space above the touch controls when there is room. |
 | `display.orientation` | `"landscape"` (the default), `"portrait"`, or `"auto"`, whichever way the device is held (as its own rotation lock allows); a change applies at once, the game turning in place. In portrait a strip along the top holds back, pause and the touch toolbar; the picture is under it, lowered into the middle of the space above the touch controls when there is room; when there is none (a folding phone's inner screen, half a phone in split screen) it moves up, as far as the top of the screen, to clear the controls, and pause and the toolbar's hide move to the middle of the strip, off the corners of the game's HUD. |
@@ -690,7 +691,8 @@ Android build defines all of (`tools/android_build.py`):
 - `HALO_VULKAN`: the renderer's backend is the host's, Vulkan's, which the
   guest's frames reach as the command stream;
 - `HALO_ANDROID`: the app (its display, input, files and lifecycle), with
-  the anti-aliasing a phone's GPU can spare (`"ssaa2x"` gives none).
+  the anti-aliasing a phone's GPU can spare (no `display.supersampling`;
+  an older `"ssaa2x"` is read as `"off"`).
 
 `HALO_ARM64_GUEST`, the name of `HALO_GUEST` before, is still defined:
 `HALO_GUEST` on AArch64.
@@ -756,7 +758,13 @@ or 64 KB pages.
   (`host/host_arch.c`), from a stack of the signal handler's own, so a
   stack overflow is reported too.
   To find the functions, enter
-  `llvm-symbolizer --obj=build/android/halo_guest.elf <address>`.
+  `llvm-symbolizer --obj=build/android/halo_guest.debug.elf <address>`
+  (the image with its source lines), or give the crash report to
+  `tools/symbolize_crash.py` (refer to "Reports" in the Linux README). A
+  release's APK's image with its lines is the release's
+  `OpenH1-Android-symbols.zip` (`OpenH1-Android-debug-symbols.zip` for the
+  debug APK), of the release the report's Build line names:
+  `python tools/symbolize_crash.py <report's zip> OpenH1-Android-symbols.zip OpenH1-Android.apk`.
 - Set `sample_seconds = <seconds>` in `[debug]` of `config.toml`. The log
   then shows the program counter and the frame chain of each guest thread
   at this interval. This finds hangs on devices without root access.

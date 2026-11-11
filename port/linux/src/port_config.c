@@ -95,28 +95,43 @@ struct config_setting
 
 /* display.graphics = "enhanced": the values it gives the settings it
 chooses (config_graphics), which are their defaults, the same on every
-build: SMAA (on iOS MSAA 2x), 16x anisotropic filtering, 512 shadow maps,
+build: SMAA (on the phones MSAA 2x), 16x anisotropic filtering, 512 shadow maps,
 the models' detail by the display's lines and lit for each pixel, the
-enhanced dynamic lights, strong ambient occlusion */
-#ifdef HALO_IOS
+enhanced dynamic lights; ambient occlusion off (below) */
+#if defined(HALO_IOS) || defined(HALO_ANDROID)
 /* (an iPhone's tile-based GPU resolves MSAA in its tile memory, the 3D view
 drawn in one pass, port/macos/xgpu_metal.m: about the cost of SMAA's
 passes over the screen there, and smoother edges; 2x keeps a 16-player
 fight on an iPhone 15 Pro Max inside 120 Hz's 8.3 ms, 4 to 5.4 ms of GPU a
-frame where 4x took up to 10) */
+frame where 4x took up to 10. Android's phones are tile GPUs too) */
 #define GRAPHICS_ANTI_ALIASING "\"msaa2x\""
 #else
 #define GRAPHICS_ANTI_ALIASING "\"smaa\""
 #endif
 #define GRAPHICS_ANISOTROPIC_FILTERING "16"
+/* (on the phones 256, half the desktop's: the shadow atlas at 512 is two
+2048x2048 targets, and drawing them took a Pixel 11 Pro from 94 to 79 frames
+a second, its GPU's 7.6 ms a frame to 8.9; 256 is still twice the Xbox's
+128 each way) */
+#if defined(HALO_ANDROID) || defined(HALO_IOS)
+#define GRAPHICS_SHADOW_RESOLUTION "256"
+#else
 #define GRAPHICS_SHADOW_RESOLUTION "512"
+#endif
 #define GRAPHICS_PER_PIXEL_LIGHTING "true"
 #define GRAPHICS_MODEL_DETAIL "\"native\""
+/* (classic on the phones: on a Pixel 11 Pro at 120 Hz the enhanced lights
+were most of the 3D view's GPU time, and a 3-minute game with 7 bots went
+from 90 to 102 frames a second, its 1% low from 18 to 28 and its frames of
+50 ms or more from 25 to the loading's few, with them classic) */
+#if defined(HALO_ANDROID) || defined(HALO_IOS)
+#define GRAPHICS_DYNAMIC_LIGHTS "\"classic\""
+#else
 #define GRAPHICS_DYNAMIC_LIGHTS "\"enhanced\""
-/* (off in Enhanced too, for now: it is opt-in, Video Setup > Advanced
-Graphics > Ambient Occlusion, while its look is refined; and the phones'
-tile-based GPUs would store the 3D view's colour and depth and load them
-again for its passes in the middle of each frame) */
+#endif
+/* (off in Enhanced too, for now: "world" is opt-in, Video Setup > Advanced
+Graphics > Ambient Occlusion, while its cost on the slower GPUs is measured
+and brought down, #671) */
 #define GRAPHICS_AMBIENT_OCCLUSION "\"off\""
 /* display.astc_textures: "auto" everywhere (iPhones, through Metal; Android
 phones without BC, through Vulkan: seen right on a Pixel 11 Pro's PowerVR) */
@@ -169,11 +184,14 @@ static const struct config_setting config_settings[] =
 		"\"native\" draws at the window's resolution (fullscreen, the display's or\n"
 		"display.resolution); \"original\" draws the Xbox's 640x480 and scales it\n"
 		"up." },
-	{ "display.render_scale", _config_real, "0.0", "HALO_RENDER_SCALE", _environment_value, _platform_ios,
-		"iOS: the fraction of the screen's pixels the game draws, each way (0.25\n"
-		"to 1.0), which the display scales up: 0.67 draws less than half the\n"
-		"pixels, for a cooler phone and a steadier frame rate. 0: the device's,\n"
-		"0.67 on an iPhone of 3x pixels, else 1.0. Read at start." },
+	{ "display.render_scale", _config_real, "0.0", "HALO_RENDER_SCALE", _environment_value,
+		_platform_ios | _platform_android,
+		"The fraction of the screen's pixels the game draws, each way (0.25 to\n"
+		"1.0), which the display scales up: 0.67 draws less than half the\n"
+		"pixels, for a cooler phone and a steadier frame rate. 0: the device's:\n"
+		"0.67 on an iPhone of 3x pixels, 0.8 on another iPhone, 1.0 on an iPad;\n"
+		"on Android 0.8, or about 1080 rows where 0.8 would draw more. Read at\n"
+		"start." },
 	{ "display.window_size", _config_string, "\"\"", "HALO_WINDOW_SIZE", _environment_value, _platform_desktop,
 		"The window's size, \"<width>x<height>\" (\"1920x1080\"), 640x480 or more (it\n"
 		"can be resized). Empty: display.window_scale's." },
@@ -188,9 +206,26 @@ static const struct config_setting config_settings[] =
 	{ "display.low_latency", _config_string, "\"auto\"", "HALO_LOW_LATENCY", _environment_value, _platform_all,
 		"With vsync on (Vulkan: Linux, the Steam Deck, Windows, Android), start\n"
 		"each frame just in time for the refresh it is shown at, its input read\n"
-		"then, with no frames queued ahead: \"on\", \"off\", or \"auto\", on where\n"
-		"it was measured (Linux, the Steam Deck and Android). The Mac's frames\n"
-		"are paced by its display already." },
+		"then, with no frames queued ahead: \"on\" or \"auto\". \"off\" starts each\n"
+		"frame as soon as at most one waits for the display. Either way the game\n"
+		"is never more than a frame ahead of the display. The Mac's frames are\n"
+		"paced by its display already." },
+	{ "display.vrr", _config_string, "\"auto\"", "HALO_VRR", _environment_value, _platform_desktop,
+		"For a display of variable refresh (G-SYNC, FreeSync): \"on\" presents\n"
+		"with vsync and holds the frames display.vrr_cap_margin a second under\n"
+		"the refresh rate (117 at 120 Hz; display.max_fps where it is lower), so\n"
+		"the display refreshes as each frame is ready, without tearing or vsync's\n"
+		"lag.\n"
+		"\"auto\": on where the system says VRR is active (gamescope: the Steam\n"
+		"Deck, the Steam Frame; a Linux desktop whose display has it on), else\n"
+		"off (Windows says nothing of it: turn it on here). \"off\": never. Not\n"
+		"with battery saver on. Vulkan only (Linux, Windows)." },
+	{ "display.vrr_cap_margin", _config_integer, "3", "HALO_VRR_CAP_MARGIN", _environment_value, _platform_desktop,
+		"With display.vrr on, how many frames a second under the refresh rate\n"
+		"the game holds its frames (1 to 10), so that they stay inside the\n"
+		"display's VRR range and never reach the refresh rate, where vsync takes\n"
+		"over. Lower is closer to the most frames; higher is safer on a display\n"
+		"with a narrow range." },
 	{ "display.max_fps", _config_integer, "0", "HALO_MAX_FPS", _environment_value, _platform_desktop,
 		"With vsync off, the most frames a second: 0 for twice the display's\n"
 		"refresh rate, -1 for no limit (which can hang some Intel graphics). On\n"
@@ -213,9 +248,15 @@ static const struct config_setting config_settings[] =
 		_platform_all,
 		"Smoothing of jagged edges, which the Xbox did not have: \"off\"; \"fxaa\"\n"
 		"or \"smaa\" smooth the 3D view once it is drawn (the HUD and menus stay\n"
-		"sharp); \"ssaa2x\" draws at twice the resolution each way (four times\n"
-		"the work); \"msaa2x\", \"msaa4x\" or \"msaa8x\" draw with that many samples\n"
-		"a pixel. Android, macOS and iOS have no \"ssaa2x\"." GRAPHICS_CHOOSES },
+		"sharp); \"msaa2x\", \"msaa4x\" or \"msaa8x\" draw with that many samples\n"
+		"a pixel. Each combines with display.supersampling." GRAPHICS_CHOOSES },
+	{ "display.supersampling", _config_real, "1.0", "HALO_SUPERSAMPLING", _environment_value, _platform_desktop,
+		"Draw the game at this many times the display's resolution each way, 1.0\n"
+		"to 2.0, and scale it down to the display: smoother edges and finer\n"
+		"detail, for 1.56 (1.25) to 4 (2.0) times the graphics card's work. 1.0\n"
+		"draws the display's pixels. display.anti_aliasing's smoothing is drawn\n"
+		"at the larger resolution. Not with display.resolution_scaling =\n"
+		"\"original\", nor on iOS." },
 	{ "display.interpolation", _config_boolean, "true", "HALO_INTERPOLATION", _environment_value, _platform_all,
 		"Draw a frame for every display refresh, blending between the game's 30\n"
 		"ticks a second; false keeps the original 30 frames a second." },
@@ -233,15 +274,23 @@ static const struct config_setting config_settings[] =
 		"VR mode) the vehicle and the view from it are drawn as its newest\n"
 		"step left it: not a tick (33 ms) behind." },
 	{ "display.fov", _config_real, "0.0", "HALO_FOV", _environment_value, _platform_all,
-		"The view's field of view on foot, in degrees across at 16:9 (20 to\n"
-		"150, or to 160 with display.panini on); 0 keeps the stock view.\n"
-		"Vehicles take display.vehicle_fov's. Cinematics and scripted cameras\n"
-		"keep their own." },
+		"The view's field of view on foot and in a passenger's seat seen in\n"
+		"first person, in degrees across at 16:9 (20 to 150, or to 160 with\n"
+		"display.panini on); 0 keeps the stock view. The third-person seats\n"
+		"take display.vehicle_fov's. Cinematics and scripted cameras keep\n"
+		"their own." },
 	{ "display.vehicle_fov", _config_string, "\"default\"", "HALO_VEHICLE_FOV", _environment_value, _platform_all,
-		"The view's field of view in a vehicle's seat, first or third person,\n"
-		"getting in and out too: \"default\" keeps the stock view, \"match\" takes\n"
-		"display.fov's, and a number is degrees across at 16:9 (20 to 150,\n"
-		"or to 160 with display.panini on)." },
+		"The view's field of view in a vehicle's seat seen in third person (a\n"
+		"driver's, a gunner's), getting in and out too: \"default\" keeps the\n"
+		"stock view, \"match\" takes display.fov's, and a number is degrees\n"
+		"across at 16:9 (20 to 150, or to 160 with display.panini on). A seat\n"
+		"seen in first person (a passenger's) takes display.fov's." },
+	{ "display.scale_scoped_fov", _config_boolean, "false", "HALO_SCALE_SCOPED_FOV", _environment_value, _platform_all,
+		"Zoom a scope from the view's own field of view (display.fov,\n"
+		"display.vehicle_fov): each zoom level magnifies it as much as the\n"
+		"Xbox's magnifies the stock view (the tangent of half the angle\n"
+		"scaled by the player's over the stock one's). false keeps the\n"
+		"Xbox's: every zoom level is the weapon's own, whatever the view." },
 	{ "display.panini", _config_real, "0.0", "HALO_PANINI", _environment_value, _platform_all,
 		"Draw the 3D view through the Panini projection, at this strength\n"
 		"(Panini's d), 0 to 1; 0 off. At a wide field of view what is at the\n"
@@ -304,10 +353,11 @@ static const struct config_setting config_settings[] =
 		"Third-person Warthog and Scorpion passengers. Weapon zoom is disabled." },
 	{ "display.high_res_hud", _config_boolean, "true", "HALO_HIGH_RES_HUD", _environment_value, _platform_all,
 		"Draw the HUD (meters, counters, panels, motion sensor, reticles,\n"
-		"waypoints, scopes) from the high-res assets (8x the maps' bitmaps);\n"
+		"waypoints, scopes, message icons) from the high-res assets: Aerocatia's\n"
+		"and Jessie's art from Halo PC Restored, 4x the maps' bitmaps;\n"
 		"false draws the maps' own bitmaps." },
 	{ "display.hud_button_style", _config_string, "\"classic\"", "HALO_HUD_BUTTON_STYLE", _environment_value, _platform_all,
-		"High-res gameplay controller buttons: classic uses plain Xbox faces;\n"
+		"High-res gameplay controller buttons: classic uses the Xbox's stencils;\n"
 		"gems uses shaded Xbox faces; menu_gems uses the menu's button art.\n"
 		"Requires display.high_res_hud." },
 	{ "display.menu_pictures", _config_boolean, "true", "HALO_MENU_PICTURES", _environment_value, _platform_desktop,
@@ -317,9 +367,9 @@ static const struct config_setting config_settings[] =
 		"menu_pictures; false keeps the originals." },
 	{ "display.high_res_text", _config_boolean, "true", "HALO_HIGH_RES_TEXT", _environment_value, _platform_all,
 		"Draw the menus', HUD's and console's text with the fonts in\n"
-		"port/assets/fonts (Overpass, Hack) at the resolution the game draws at,\n"
-		"and the menus' titles from port/assets/titles; false draws the maps'\n"
-		"bitmap fonts and titles." },
+		"port/assets/fonts (Cyborg Interface Gothic, Hack) at the resolution\n"
+		"the game draws at, and the menus' titles from port/assets/titles;\n"
+		"false draws the maps' bitmap fonts and titles." },
 	{ "display.shadow_resolution", _config_integer, GRAPHICS_SHADOW_RESOLUTION, "HALO_SHADOW_RESOLUTION",
 		_environment_value, _platform_all,
 		"The size the objects' shadows are drawn at, in pixels each way: 128 as\n"
@@ -327,6 +377,10 @@ static const struct config_setting config_settings[] =
 	{ "display.menus", _config_string, "\"pc\"", "HALO_MENUS", _environment_value, _platform_all,
 		"The menus: \"pc\" for the PC version's main menu (port/assets/menus,\n"
 		"and a menus folder here for your own), \"xbox\" for the Xbox's." },
+	{ "display.menu_engine", _config_string, "\"classic\"", "HALO_MENU_ENGINE", _environment_value, _platform_all,
+		"What runs the PC menus' generated screens: \"classic\" the game's\n"
+		"widgets, built from the menus' files; \"new\" the port's menu engine,\n"
+		"from the menus' model (docs/menu_engine.md), drawn the same way." },
 	{ "display.menu_language", _config_string, "\"maps\"", "HALO_MENU_LANGUAGE", _environment_value, _platform_all,
 		"The PC menus' language: \"maps\" for the language of the Custom Edition\n"
 		"whose loc.map is in custom_maps (as that edition shows them; English\n"
@@ -443,9 +497,9 @@ static const struct config_setting config_settings[] =
 		"samples ASTC (to try it on a Mac); \"off\" decodes them. The few blocks\n"
 		"that cannot be transcoded exactly are encoded on a worker thread the\n"
 		"first time a texture is drawn, the texture drawn decoded meanwhile, and\n"
-		"kept in the app's caches folder. \"auto\" by default on iOS; \"off\" on\n"
-		"Android, where it is yet to be checked on a device (try \"auto\"). Read\n"
-		"by the host from the file, at the start (port/linux/astc/xgpu_astc.h)." },
+		"kept in the app's caches folder. \"auto\" by default (seen right on a\n"
+		"Pixel's PowerVR and on iPhones). Read by the host from the file, at\n"
+		"the start (port/linux/astc/xgpu_astc.h)." },
 	{ "display.picture_position", _config_string, "\"center\"", "HALO_PICTURE_POSITION", _environment_value,
 		_platform_android,
 		"Where the game's picture sits on a screen taller than it (a folding\n"
@@ -478,7 +532,8 @@ static const struct config_setting config_settings[] =
 		"Play sound. Changed while the game runs, the sound fades out or in at\n"
 		"once (a game started without sound opens its audio device then)." },
 	{ "audio.volume", _config_real, "1.0", "HALO_VOLUME", _environment_value, _platform_all,
-		"The volume of everything, 0.0 to 1.0." },
+		"The volume of everything, 0.0 to 1.0; 1.0 is the Xbox's level. Up to\n"
+		"2.0 is louder (2.0 as loud as before the Xbox's level was matched)." },
 	{ "audio.music_volume", _config_real, "1.0", "HALO_MUSIC_VOLUME", _environment_value, _platform_all,
 		"The music's volume, 0.0 to 1.0 (of audio.volume)." },
 	{ "audio.effects_volume", _config_real, "1.0", "HALO_EFFECTS_VOLUME", _environment_value, _platform_all,
@@ -508,11 +563,14 @@ static const struct config_setting config_settings[] =
 		"\"headphones\" through a model of a head (HRTF), each from its\n"
 		"direction, ahead, behind, above or below, as the Xbox's 3D audio was on\n"
 		"any stereo output, speakers or headphones; \"speakers\" panned left and\n"
-		"right. The menus, music and HUD are not placed.\n"
-		"The VR mode keeps vr.hrtf; 5.1 is always panned." },
-	{ "audio.resampler", _config_string, "\"sinc\"", "HALO_AUDIO_RESAMPLER", _environment_value, _platform_all,
-		"How sounds are converted to the output's rate: \"sinc\" with a\n"
-		"band-limited low pass; \"linear\" between neighbouring samples,\n"
+		"right. The menus, music and HUD are not placed. On 5.1 the same, on\n"
+		"the front and back pairs of speakers, as the Xbox's Dolby Digital.\n"
+		"The VR mode keeps vr.hrtf." },
+	{ "audio.resampler", _config_string, "\"xbox\"", "HALO_AUDIO_RESAMPLER", _environment_value, _platform_all,
+		"How sounds are converted to the output's rate: \"xbox\" as the\n"
+		"Xbox did, through its short low pass, which lets a little of the\n"
+		"images above a sound's own rate through; \"sinc\" with a band-limited low\n"
+		"pass, which keeps them out; \"linear\" between neighbouring samples,\n"
 		"brighter for the aliasing it lets through." },
 	{ "audio.voice_chat", _config_string, "\"push_to_talk\"", "HALO_VOICE_CHAT", _environment_value, _platform_all,
 		"Talking in network games' voice chat: \"push_to_talk\" (while\n"
@@ -1186,9 +1244,9 @@ static const struct config_setting config_settings[] =
 		"it (\"A Button\", \"Right Hand Trigger\"), or the gesture that does." },
 	{ "input.controller_p1", _config_string, "\"\"", "HALO_CONTROLLER_P1", _environment_value, _platform_all,
 		"P1 custom controller layout; empty uses the profile's preset. Edit in\n"
-		"Settings > Controls > Controller > Button Remapping. v3: 26 physical\n"
+		"Settings > Controls > Controller > Button Remapping. v4: 27 physical\n"
 		"button names (the back paddles too), unbound among them; gameplay and\n"
-		"the debug camera have separate bindings. Old ten-action and v2\n"
+		"the debug camera have separate bindings. Old ten-action, v2 and v3\n"
 		"layouts are accepted. See docs/controller_remapping.md for the full\n"
 		"order." },
 	{ "input.controller_p2", _config_string, "\"\"", "HALO_CONTROLLER_P2", _environment_value, _platform_all,
@@ -1295,6 +1353,13 @@ static const struct config_setting config_settings[] =
 		"The pause menu (the controller's Start)." },
 	{ "controls.screenshot", _config_string, "\"F10\"", "HALO_KEY_SCREENSHOT", _environment_value, _platform_all,
 		"Save a PNG screenshot in screenshots/ beside maps/ (press once per capture)." },
+	{ "controls.report", _config_string, "\"F8\"", "HALO_KEY_REPORT", _environment_value, _platform_all,
+		"Report a problem: a zip in reports/ beside maps/ (the log, the settings,\n"
+		"the GPU, the frame times and a screenshot of that moment), and a GitHub\n"
+		"issue opened in the browser, filled in, for it to be dragged into." },
+	{ "controls.clip", _config_string, "\"F9\"", "HALO_KEY_CLIP", _environment_value, _platform_all,
+		"Clip: mark the demo being recorded at this moment, its last\n"
+		"demo.clip_seconds (docs/demos.md)." },
 	{ "controls.push_to_talk", _config_string, "\"V\"", "HALO_KEY_PUSH_TO_TALK", _environment_value, _platform_all,
 		"Voice chat: talk while it is held (audio.voice_chat \"push_to_talk\")." },
 	{ "controls.chat", _config_string, "\"T\"", "HALO_KEY_CHAT", _environment_value, _platform_all,
@@ -1310,6 +1375,10 @@ static const struct config_setting config_settings[] =
 		"the vote running, whose box shows at the left." },
 	{ "controls.vote_no", _config_string, "\"F2\"", "HALO_KEY_VOTE_NO", _environment_value, _platform_all,
 		"Network games' votes: vote no in the vote running." },
+	{ "controls.ping", _config_string, "\"Mouse Middle\"", "HALO_KEY_PING", _environment_value, _platform_all,
+		"Ping: mark what you aim at (a spot, an enemy, a vehicle, a weapon) for\n"
+		"your allies, with a nav point and its distance; again on the same spot\n"
+		"takes it away (the controller's D-pad Right)." },
 
 	{ "game.console_log", _config_string, "\"important\"", "HALO_CONSOLE_LOG", _environment_value, _platform_all,
 		"What the game's console shows on screen of what it logs: \"important\"\n"
@@ -1337,8 +1406,9 @@ static const struct config_setting config_settings[] =
 		"to throw and reload, and a player turns with the aim while throwing\n"
 		"and in the air (so shots after a turn in a jump go to the crosshair);\n"
 		"false: the original animations, which freeze the legs and stand a\n"
-		"rider up, and the body, so the campaign's AI plays as on the Xbox. In\n"
-		"an OpenH1 network game the host's choice (a Legacy game's players turn)." GRAPHICS_CHOOSES },
+		"rider up, and the body, so the campaign's AI plays as on the Xbox. A\n"
+		"rule of the game, read as its map begins: in an OpenH1 network game the\n"
+		"host's, on every machine (a Legacy game's players turn)." GRAPHICS_CHOOSES },
 	{ "game.campaign_difficulty", _config_integer, "1", "HALO_CAMPAIGN_DIFFICULTY", _environment_value, _platform_all,
 		"The difficulty Choose Difficulty opens on: the one chosen last (0 Easy,\n"
 		"1 Normal, 2 Heroic, 3 Legendary). The campaign's menus write it." },
@@ -1361,9 +1431,18 @@ static const struct config_setting config_settings[] =
 	{ "game.auto_pickup", _config_boolean, "false", "HALO_AUTO_PICKUP", _environment_value, _platform_all,
 		"Multiplayer: a player with an empty weapon slot picks up a weapon by\n"
 		"walking over it, as Custom Edition does. false (the Xbox's way): they\n"
-		"hold the action button for it. The campaign always picks it up. In a\n"
-		"network game the host's decides, read in the lobby; a Legacy game, and\n"
-		"OpenCE's players, always walk over (OpenCE's way)." },
+		"hold the action button for it. The campaign always picks it up. A game\n"
+		"of this computer's reads it as its map begins; in a network game the\n"
+		"host's decides, read in the lobby; a Legacy game, and OpenCE's\n"
+		"players, always walk over (OpenCE's way)." },
+	{ "game.spectate_on_death", _config_string, "\"off\"", "HALO_SPECTATE_ON_DEATH", _environment_value,
+		_platform_all,
+		"While you are dead in co-op or a team game, waiting to respawn:\n"
+		"\"teammates\" shows a living teammate's view through their eyes (their\n"
+		"aim, their zoom, their weapon in hand), drawn from this computer's copy\n"
+		"of the game; A (or the jump key) goes to the next teammate. A\n"
+		"free-for-all game shows nobody's. \"off\": the game's death camera\n"
+		"(network co-op follows a teammate from behind, as before)." },
 	{ "game.custom_edition", _config_boolean, "true", "HALO_CUSTOM_EDITION", _environment_value, _platform_all,
 		"Load and run Halo Custom Edition maps (not those that need OpenSauce):\n"
 		"put them and Custom Edition's bitmaps.map, sounds.map and loc.map in\n"
@@ -1426,7 +1505,7 @@ static const struct config_setting config_settings[] =
 	{ "display.first_person_legs", _config_boolean, "false", "HALO_FIRST_PERSON_LEGS", _environment_value, _platform_all,
 #endif
 		"Your own legs in first person, seen looking down: your body as others\n"
-		"see it, drawn from the waist down, moving as it moves." },
+		"see it, drawn from the belly down, moving as it moves, with its shadow." },
 	{ "display.overshield_effect", _config_boolean, "true", "HALO_OVERSHIELD_EFFECT", _environment_value, _platform_all,
 		"The overshield as this machine draws it: its flare lit as it charges\n"
 		"and staying lit for as long as it lasts, its energy slower, in its own\n"
@@ -1464,13 +1543,14 @@ static const struct config_setting config_settings[] =
 		"Ambient occlusion, which the Xbox did not have: the ambient light of\n"
 		"characters, vehicles and scenery dimmed where they meet the world and\n"
 		"in their creases, and the level's dimmed under them (a marine on a\n"
-		"bench, a Warthog on the sand), worked out from the 3D view's depth\n"
-		"each frame. The levels' own corners keep their baked light, and\n"
-		"self-illuminated surfaces, lights and your weapon keep theirs: \"off\",\n"
-		"\"subtle\" or \"strong\". Not with multisampling on Metal (macOS, iOS).\n"
-		"\"world\" (docs/world-ao.md): found in the world instead, from the\n"
-		"level's distance field and the objects' shapes, with no pass over the\n"
-		"screen: in VR's eyes and with Metal's multisampling too."
+		"bench, a Warthog on the sand), found in the world from the level's\n"
+		"distance field and the objects' shapes (docs/world-ao.md). The levels'\n"
+		"own corners keep their baked light, and self-illuminated surfaces,\n"
+		"lights and your weapon keep theirs: \"off\", \"world\" or \"ray_traced\"\n"
+		"(\"world\" with the objects' shade found by the GPU's ray tracing,\n"
+		"through their own shapes, where the GPU and its Vulkan driver have ray\n"
+		"queries; \"world\" elsewhere, the Mac's and iOS's Metal included). The\n"
+		"older \"subtle\" and \"strong\" are read as \"world\"."
 		GRAPHICS_CHOOSES },
 	{ "display.shield_color", _config_string, "\"default\"", "HALO_SHIELD_COLOR", _environment_value, _platform_all,
 		"Your energy shield's color, as this machine draws it: \"default\" (the\n"
@@ -1492,6 +1572,25 @@ static const struct config_setting config_settings[] =
 		"settings or other players' games (debug.txt names what they were\n"
 		"refused)." },
 
+	{ "demo.record", _config_boolean, "false", "HALO_DEMO_RECORD", _environment_value, _platform_all,
+		"true: record every game this computer plays or hosts (the campaign,\n"
+		"split screen, games with bots, network games it hosts) as a demo in\n"
+		"paths.data's demos/ folder: its ticks' input and what reached the game\n"
+		"from elsewhere, which plays back exactly (docs/demos.md). Off by default." },
+	{ "demo.keep_count", _config_integer, "20", "HALO_DEMO_KEEP_COUNT", _environment_value, _platform_all,
+		"The most demos kept: the oldest are deleted as a new one begins. Pinned\n"
+		"demos (demos/kept/) are never deleted, nor counted." },
+	{ "demo.keep_megabytes", _config_integer, "2048", "HALO_DEMO_KEEP_MEGABYTES", _environment_value, _platform_all,
+		"The most the demos kept may take of the disk, in MB (the pinned ones\n"
+		"not counted): the oldest are deleted as a new one begins." },
+	{ "demo.snapshot_seconds", _config_real, "10.0", "HALO_DEMO_SNAPSHOT_SECONDS", _environment_value, _platform_all,
+		"How often a demo keeps the whole game state, in seconds, for its\n"
+		"playback to seek to." },
+	{ "demo.clip_seconds", _config_real, "30.0", "HALO_DEMO_CLIP_SECONDS", _environment_value, _platform_all,
+		"How much of the demo before it the clip key marks, in seconds." },
+	{ "demo.play", _config_string, "\"\"", "HALO_DEMO_PLAY", _environment_value, _platform_all,
+		"A demo to play as the game starts (its file; also halo --demo <file>);\n"
+		"empty for none." },
 	{ "paths.data", _config_string, "\"\"", "HALO_DATA_ROOT", _environment_value, _platform_desktop,
 		"The folder holding the game data's maps folder; empty looks in the\n"
 		"working directory and its assets folder. Windows paths are easiest in\n"
@@ -1594,17 +1693,21 @@ static const struct config_setting config_settings[] =
 		"LISTING changes it for each game." },
 	{ "network.game_mode", _config_string, "\"openh1\"", "HALO_NET_GAME_MODE", _environment_value, _platform_all,
 		"Hosting: \"openh1\", an OpenH1 game at the rate network.sim_rate picks,\n"
-		"which OpenCE players join too at 30 (network.allow_opence), or\n"
+		"which OpenCE players may join too at 30 (network.allow_opence), or\n"
 		"\"legacy\", OpenCE's netcode at 30 ticks a second for everyone. Read as\n"
 		"the game is hosted (\"standard\" is \"openh1\" too)." },
 	{ "network.sim_rate", _config_integer, "120", "HALO_NET_SIM_RATE", _environment_value, _platform_all,
 		"Hosting an OpenH1 game: its tick rate, 30, 60 or 120 (game.sim_rate's\n"
 		"steps), which every machine of it takes as the game starts. A Legacy game\n"
 		"plays at 30." },
+	/* OpenFrame: true (OpenH1's is false since build-2188): OpenCE players, and
+	OpenH1 builds of another protocol (as OpenCE players), join OpenFrame's
+	games, for the most players to play with */
 	{ "network.allow_opence", _config_boolean, "true", "HALO_NET_ALLOW_OPENCE", _environment_value, _platform_all,
-		"Hosting an OpenH1 game: let OpenCE players join it too. They play at 30\n"
-		"ticks a second, as on their own machine, and OpenH1 players at\n"
-		"network.sim_rate. False: OpenH1 players only. Read with\n"
+		"Hosting an OpenH1 game: true lets OpenCE players join it too. They play\n"
+		"at 30 ticks a second, as on their own machine, and OpenH1 players at\n"
+		"network.sim_rate. False: OpenH1 players only (a Legacy game,\n"
+		"network.game_mode, is the one to play with OpenCE players). Read with\n"
 		"network.game_mode." },
 	{ "network.opence_welcome", _config_boolean, "true", "HALO_NET_OPENCE_WELCOME", _environment_value,
 		_platform_all,
@@ -1632,6 +1735,10 @@ static const struct config_setting config_settings[] =
 		"Hosting: the text chat: \"on\" (links in lines are refused), \"links\"\n"
 		"(links allowed) or \"off\", in either case; listed in the server\n"
 		"browser or not." },
+	{ "network.pings", _config_boolean, "true", "HALO_NET_PINGS", _environment_value, _platform_all,
+		"Hosting: let the players ping (controls.ping, a controller's D-pad\n"
+		"Right): what they aim at marked for their allies with a nav point and\n"
+		"its distance, in co-op and in games with teams (OpenH1 games only)." },
 	{ "network.host_playlist", _config_string, "\"\"", "HALO_NET_HOST_PLAYLIST", _environment_value, _platform_all,
 		"Hosting: the games played one after another when you host, each after\n"
 		"the last one's scores (Host Controls' PLAYLIST): map[:gametype\n"
@@ -1874,7 +1981,7 @@ static const struct config_setting config_settings[] =
 	{ "server.game_mode", _config_string, "\"openh1_120\"", "HALO_SERVER_GAME_MODE", _environment_value,
 		_platform_server,
 		"The games hosted: \"openh1_120\" or \"openh1_60\" (or \"openh1_30\"), an\n"
-		"OpenH1 game at that tick rate, which OpenCE players join too at 30 while\n"
+		"OpenH1 game at that tick rate, which OpenCE players join too at 30 when\n"
 		"network.allow_opence is true; or \"legacy\", OpenCE's netcode at 30 ticks\n"
 		"a second for everyone. A change waits for the server to be empty in its\n"
 		"lobby (players in it keep the kind they joined)." },
@@ -2135,6 +2242,13 @@ static const struct config_setting config_settings[] =
 		"empty for none." },
 	{ "debug.network_test_start", _config_real, "15.0", "HALO_NETWORK_TEST_START", _environment_value, _platform_all,
 		"Seconds after hosting that an automated test game starts." },
+	{ "debug.spectate_log", _config_boolean, "false", "HALO_SPECTATE_LOG", _environment_value, _platform_all,
+		"Log each local player's camera each tick, with whether it is dead and\n"
+		"whom it watches (game.spectate_on_death's tests:\n"
+		"port/linux/game/dead_spectate.c)." },
+	{ "debug.spectate_shots", _config_string, "\"\"", "HALO_SPECTATE_SHOTS", _environment_value, _platform_all,
+		"Ticks (\"<tick>,<tick>...\") whose first frame is saved as\n"
+		"debug.screenshot_directory's tick<tick>.bmp; empty none." },
 	{ "debug.network_test_kill", _config_real, "0.0", "HALO_NETWORK_TEST_KILL", _environment_value, _platform_all,
 		"Every this many seconds an automated test host kills its last player; 0 never." },
 	{ "debug.network_test_score", _config_integer, "0", "HALO_NETWORK_TEST_SCORE", _environment_value, _platform_all,
@@ -2147,6 +2261,12 @@ static const struct config_setting config_settings[] =
 	{ "debug.network_test_vehicle", _config_real, "0.0", "HALO_NETWORK_TEST_VEHICLE", _environment_value, _platform_all,
 		"This many seconds into an automated test game the host seats its last\n"
 		"player as a vehicle's driver (and out 15 seconds on); 0 never." },
+	{ "debug.network_test_vehicle_seat", _config_string, "\"\"", "HALO_NETWORK_TEST_VEHICLE_SEAT", _environment_value,
+		_platform_all,
+		"\"<vehicle>:<seat>\": debug.network_test_vehicle seats the player in the nearest\n"
+		"vehicle whose tag name has <vehicle> in it, in its first free seat whose\n"
+		"label has <seat> in it (\"warthog:passenger\", \"warthog:gunner\"); empty the\n"
+		"nearest vehicle's driver's seat." },
 	{ "debug.network_test_hitch", _config_real, "0.0", "HALO_NETWORK_TEST_HITCH", _environment_value, _platform_all,
 		"As debug.network_test_vehicle seats the player, the frame stops for this\n"
 		"many seconds, as a stall of the renderer or the VR runtime would; 0 never." },
@@ -2161,12 +2281,34 @@ static const struct config_setting config_settings[] =
 	{ "debug.network_test_pickup", _config_real, "0.0", "HALO_NETWORK_TEST_PICKUP", _environment_value, _platform_all,
 		"This many seconds into an automated test game the host stands its last\n"
 		"player on a weapon, which a joining player then picks up; 0 never." },
+	{ "debug.network_test_camouflage", _config_real, "0.0", "HALO_NETWORK_TEST_CAMOUFLAGE", _environment_value,
+		_platform_all,
+		"This many seconds into an automated test game the host gives every\n"
+		"player active camouflage, as the powerup does, for 20 seconds; 0 never." },
+	{ "debug.network_test_place", _config_string, "\"\"", "HALO_NETWORK_TEST_PLACE", _environment_value,
+		_platform_all,
+		"\"<x> <y> <z> <yaw> <pitch>[@<seconds>]\": that many seconds (1 if not\n"
+		"given) into an automated test game the first local player is put at\n"
+		"that point, facing that way (degrees), once; \"\" never." },
+	{ "debug.network_test_elevator", _config_real, "0.0", "HALO_NETWORK_TEST_ELEVATOR", _environment_value, _platform_all,
+		"This many seconds into an automated test game each machine lists the\n"
+		"level's elevators, stands every player on the one of\n"
+		"debug.network_test_elevator_index and logs each frame where it and they\n"
+		"are drawn; the host runs it to its other end and back; 0 never." },
+	{ "debug.network_test_elevator_index", _config_integer, "0", "HALO_NETWORK_TEST_ELEVATOR_INDEX", _environment_value,
+		_platform_all,
+		"The elevator debug.network_test_elevator rides: its place in the list it logs." },
 	{ "debug.network_test_chat", _config_real, "0.0", "HALO_NETWORK_TEST_CHAT", _environment_value, _platform_all,
 		"This many seconds into an automated test game each machine's player\n"
 		"says a chat line to everyone, then to the team and to the vehicle (the\n"
 		"host seats the last two players in one first), then the host mutes and\n"
 		"unmutes a player, refuses a link and turns the chat off, and the\n"
 		"clients type on the on-screen keyboard (port/linux/NETCODE.md); 0 never." },
+	{ "debug.network_test_ping", _config_real, "0.0", "HALO_NETWORK_TEST_PING", _environment_value, _platform_all,
+		"This many seconds into an automated test game each machine's player\n"
+		"pings what it aims at, again (taking it away) and again; then a client\n"
+		"sends one as another's player (refused) and a burst (counted)\n"
+		"(port/linux/NETCODE.md); 0 never." },
 	{ "debug.network_test_party", _config_real, "0.0", "HALO_NETWORK_TEST_PARTY", _environment_value, _platform_all,
 		"This many seconds into an automated test game the host invites each\n"
 		"player it may to its party (unless debug.party leads one), a client asks\n"
@@ -2234,6 +2376,11 @@ static const struct config_setting config_settings[] =
 		"machines of twice it), to test the netcode as over the internet; 0 none." },
 	{ "debug.network_loss", _config_real, "0.0", "HALO_NETWORK_LOSS", _environment_value, _platform_all,
 		"Percent of datagrams received that are dropped, for the same; 0 none." },
+	{ "debug.network_relay_only", _config_boolean, "false", "HALO_NETWORK_RELAY_ONLY", _environment_set_is_true,
+		_platform_all,
+		"Send internet play's tunnel packets to other players only through a\n"
+		"relay and drop those that come straight from them, as two NATs that\n"
+		"hole punching cannot meet do, to test the relays (network.relays_file)." },
 	{ "debug.network_corrupt", _config_real, "0.0", "HALO_NETWORK_CORRUPT", _environment_value, _platform_all,
 		"Percent of the datagrams received that are damaged at random, to test\n"
 		"that nothing a machine sends can crash the game; 0 none." },
@@ -2260,7 +2407,11 @@ static const struct config_setting config_settings[] =
 		"wait, or click:<x>:<y>, a click of the pointer there, 0 to 1 of the\n"
 		"window, type:<letters and digits> typed, or enter, the Return key,\n"
 		"separated by spaces or commas; \"back+x\" holds Back through its\n"
-		"second and presses X half way), for testing the menus;\n"
+		"second and presses X half way, hold:<button> holds it the whole\n"
+		"second), for testing the menus; \"menu:ready ...\" counts its seconds\n"
+		"from when the screen opened is up, on the frames' clock with\n"
+		"debug.frame_time, logs where the focus is after each and quits after\n"
+		"the last (tools/menu_parity.py);\n"
 		"\"script:<second>[-<second>] <action>;...\" presses, holds and aims (\"hunt\": at the\n"
 		"nearest enemy in sight) on the\n"
 		"simulation's clock in seconds from the scenario's start (tools/scorecard),\n"
@@ -2288,6 +2439,10 @@ static const struct config_setting config_settings[] =
 	{ "debug.bot_player", _config_boolean, "false", "HALO_BOT_PLAYER", _environment_set_is_true, _platform_all,
 		"In a local game with bots (bots.count), a bot of its own plays the first\n"
 		"player too, its view drawn as the player's (for recorded footage)." },
+	{ "debug.bot_player_skill", _config_boolean, "false", "HALO_BOT_PLAYER_SKILL", _environment_set_is_true, _platform_all,
+		"With debug.bot_player, the player's bot aims and fights as the other bots\n"
+		"do at bots.skill, not with the steady hand of the trailer's footage (for\n"
+		"footage of the bots' aim)." },
 	{ "debug.bot_player_weapon", _config_string, "\"\"", "HALO_BOT_PLAYER_WEAPON", _environment_value, _platform_all,
 		"With debug.bot_player, a weapon (part of its tag's name: \"sniper\",\n"
 		"\"rocket\") the player's bot goes for wherever it lies, and keeps." },
@@ -2306,6 +2461,11 @@ static const struct config_setting config_settings[] =
 	{ "debug.update_answer", _config_string, "\"\"", "HALO_UPDATE_ANSWER", _environment_value, _platform_desktop,
 		"The answer to the new version question, for automated tests: \"yes\",\n"
 		"\"no\" or \"never\" (do not ask again, confirmed); empty asks." },
+	{ "debug.crash_answer", _config_string, "\"\"", "HALO_CRASH_ANSWER", _environment_value, _platform_all,
+		"The answer to the crash question (the last run closed unexpectedly),\n"
+		"for automated tests: \"yes\" saves its report, \"no\" lets it go, \"ask\"\n"
+		"asks even in a run nobody watches; empty asks (a run nobody watches only\n"
+		"logs what the report would say)." },
 	{ "debug.first_start_input", _config_string, "\"\"", "HALO_FIRST_START_INPUT", _environment_value, _platform_desktop,
 		"Linux: the buttons an automated test presses on the first start's screen\n"
 		"(no game data), one each half second: \"up\", \"down\", \"a\" and \"b\",\n"
@@ -2336,11 +2496,19 @@ static const struct config_setting config_settings[] =
 		"release build otherwise carries on past it, as the retail game did,\n"
 		"and a debug build halts); a warning is counted only. Either way, a\n"
 		"run in which any failed sums them up on stderr when it exits." },
+	{ "debug.crash_after", _config_real, "0.0", "HALO_CRASH_AFTER", _environment_value, _platform_all,
+		"Crash this many seconds after the window opens (without a window,\n"
+		"after the first frame), to test the crash reports; 0 never." },
 	{ "debug.exit_after", _config_real, "0.0", "HALO_EXIT_AFTER", _environment_value, _platform_all,
 		"Quit this many seconds after the window opens (without a window, after\n"
 		"the first frame); 0 never." },
 	{ "debug.hidden_window", _config_boolean, "false", "HALO_HIDDEN_WINDOW", _environment_set_is_true, _platform_desktop,
 		"Keep the window hidden (and never fullscreen)." },
+	{ "debug.input_trace", _config_boolean, "false", "HALO_INPUT_TRACE", _environment_set_is_true, _platform_all,
+		"Write the input trace (the keys, buttons and gamepads' events, and\n"
+		"what the game read of them, over the last 30 seconds; a problem\n"
+		"report has it always, input.txt) to the log each time the window\n"
+		"loses the focus." },
 	{ "debug.voice_test", _config_boolean, "false", "HALO_VOICE_TEST", _environment_set_is_true, _platform_all,
 		"Voice chat's automated tests: a tone instead of the microphone, and\n"
 		"each voice heard logged once a second." },
@@ -2358,6 +2526,17 @@ static const struct config_setting config_settings[] =
 		"A file to write a line a tick to: a hash of the game state, the random\n"
 		"seeds and every taker of a seed by its call site, to compare two runs\n"
 		"of the same input (tools/determinism_compare.py); empty for none." },
+	{ "debug.demo_seek", _config_string, "\"\"", "HALO_DEMO_SEEK", _environment_value, _platform_all,
+		"\"<at>,<by>\": the demo played seeks by seconds (negative: back) once it\n"
+		"reaches at seconds, for tests; empty none." },
+	{ "debug.demo_verify", _config_boolean, "false", "HALO_DEMO_VERIFY", _environment_set_is_true, _platform_all,
+		"The demo played compared with each of its snapshots as it reaches them,\n"
+		"the bytes apart logged, to find where a playback parts." },
+	{ "debug.demo_log", _config_boolean, "false", "HALO_DEMO_LOG", _environment_set_is_true, _platform_all,
+		"Log each whole game state the demo being recorded takes, and why." },
+	{ "debug.demo_quit", _config_boolean, "false", "HALO_DEMO_QUIT", _environment_set_is_true, _platform_all,
+		"Quit when the demo played (demo.play, --demo) ends, or cannot be\n"
+		"played, for tests." },
 	{ "debug.determinism_dump", _config_integer, "0", "HALO_DETERMINISM_DUMP", _environment_value, _platform_all,
 		"With debug.determinism_log, the tick after which to write the game\n"
 		"state too, counted as logged from 1, to <log>.<count>.bin (and its first\n"
@@ -2370,6 +2549,15 @@ static const struct config_setting config_settings[] =
 		"memory never written: two runs, one of each, compared with\n"
 		"tools/determinism_compare.py, part where one reaches the game; empty\n"
 		"as the game always has (the game's malloc fills with 0xCA)." },
+	{ "debug.frame_log", _config_string, "\"\"", "HALO_FRAME_LOG", _environment_value, _platform_all,
+		"A file to write a line to for each frame presented once the scenario's\n"
+		"simulation has started: its seconds, then microseconds of the frame,\n"
+		"the GPU's (-1 not measured), the render thread's, the game's waits for\n"
+		"the renderer and the display, and the game thread's CPU (a benchmark's:\n"
+		"tools/bench.py; port/linux/src/report.c). Empty: none." },
+	{ "debug.frame_log_seconds", _config_real, "0.0", "HALO_FRAME_LOG_SECONDS", _environment_value, _platform_all,
+		"With debug.frame_log, quit once the scenario has run this many seconds\n"
+		"of simulation; 0 never." },
 	{ "debug.frame_time", _config_real, "0.0", "HALO_FRAME_TIME", _environment_value, _platform_all,
 		"Seconds of game time each frame runs, whatever time it took, so that two\n"
 		"runs of the same input run the same frames (the determinism check),\n"
@@ -2391,6 +2579,11 @@ static const struct config_setting config_settings[] =
 	{ "debug.audio_record", _config_string, "\"\"", "HALO_AUDIO_RECORD", _environment_value, _platform_desktop,
 		"Record the game's sound, as it plays (with or without a device), to\n"
 		"this WAV file (48 kHz, 16-bit stereo), for automated tests; empty none." },
+	{ "debug.dsound_log", _config_string, "\"\"", "HALO_DSOUND_LOG", _environment_value, _platform_desktop,
+		"Log every DirectSound call the game makes, with its time, to this\n"
+		"file, and the sound data of the packets it submits to the same name\n"
+		"with .data added, for replaying the calls on an Xbox (the audio test\n"
+		"bed); empty none. The data is the maps' own sounds: keep it private." },
 
 #ifdef HALO_VR
 	{ "debug.vr_force_render", _config_boolean, "false", "HALO_VR_FORCE_RENDER", _environment_value, _platform_desktop,
@@ -2547,15 +2740,18 @@ static const struct config_setting config_settings[] =
 	{ "debug.world_ao_view", _config_boolean, "false", "HALO_WORLD_AO_VIEW", _environment_value, _platform_all,
 		"With display.ambient_occlusion \"world\", the surfaces it shades drawn as\n"
 		"its occlusion alone, in grey." },
+	{ "debug.world_ao_inline", _config_boolean, "false", "HALO_WORLD_AO_INLINE", _environment_value, _platform_all,
+		"With display.ambient_occlusion \"world\", each surface finds its own\n"
+		"occlusion as it draws (as before it was found once a pixel), to compare." },
+	{ "debug.world_ao_full_resolution", _config_boolean, "false", "HALO_WORLD_AO_FULL_RESOLUTION", _environment_value,
+		_platform_all,
+		"With display.ambient_occlusion \"world\", its occlusion found at every\n"
+		"pixel, not at a quarter of them (one a 2x2 block, upsampled), to compare." },
 	{ "debug.world_ao_test", _config_string, "\"\"", "HALO_WORLD_AO_TEST", _environment_value, _platform_all,
 		"With display.ambient_occlusion \"world\", a made-up field and shapes in\n"
 		"place of the level's and the objects' (docs/world-ao.md, \"D. Shading\"):\n"
 		"\"plane nx ny nz d; sphere x y z r; capsule ax ay az bx by bz r; box x y z\n"
 		"ex ey ez\" (\"\": none)." },
-	{ "debug.ambient_occlusion_view", _config_boolean, "false", "HALO_AMBIENT_OCCLUSION_VIEW", _environment_value,
-		_platform_all,
-		"With display.ambient_occlusion, the 3D view drawn as the occlusion\n"
-		"alone, in grey (white where it is not laid)." },
 	{ "debug.null_renderer", _config_boolean, "false", "HALO_NULL_RENDERER", _environment_set_is_true, _platform_all,
 		"Run without a window, drawing nothing: a frame a step of the game's\n"
 		"clock (game.sim_rate), not as many as it can." },
@@ -2585,11 +2781,23 @@ static const struct config_setting config_settings[] =
 		"Record the shaders and pipelines the game draws with into this file (each\n"
 		"new one added to it), for the renderer's manifest\n"
 		"(port/assets/render/README.md); empty for none." },
+	{ "debug.render_marks", _config_boolean, "false", "HALO_RENDER_MARKS", _environment_set_is_true, _platform_all,
+		"Tell the renderer's command stream what each draw belongs to (the\n"
+		"camera of each window, and each run of draws' owner: an object, the\n"
+		"structure's shader, an effect, the HUD, a menu widget, text), for the\n"
+		"inspector's replay of a recording (HALO_RENDER_RECORD; port/macos/README.md).\n"
+		"The backends draw nothing for them; off, nothing is sent." },
 	{ "debug.gpu_validation", _config_boolean, "false", "HALO_GPU_VALIDATION", _environment_set_is_true, _platform_all,
 		"Report the graphics API's errors in the log: Vulkan's validation layers\n"
 		"(which must be installed)." },
 	{ "debug.gl_debug", _config_boolean, "false", "HALO_GL_DEBUG", _environment_set_is_true, _platform_desktop,
 		"Deprecated: gpu_validation's old name, which turns it on too." },
+	{ "debug.vulkan_present_mode", _config_string, "\"\"", "HALO_VULKAN_PRESENT_MODE", _environment_value,
+		_platform_all,
+		"The Vulkan swapchain's present mode, to measure each (PresentMon): \"immediate\",\n"
+		"\"mailbox\", \"fifo\" or \"fifo_relaxed\"; empty, the game's own choice (FIFO\n"
+		"with vsync, else mailbox, else immediate). One the surface does not have\n"
+		"is the game's choice, as the log says." },
 	{ "debug.skip_cinematics", _config_boolean, "false", "HALO_SKIP_CINEMATICS", _environment_set_is_true, _platform_all,
 		"Skip each cinematic in a local game: as the skip button does where it can\n"
 		"be skipped, else run at sixteen times its speed (a test reaches play in\n"
@@ -2603,6 +2811,40 @@ static const struct config_setting config_settings[] =
 	{ "debug.menu_open", _config_string, "\"\"", "HALO_MENU_OPEN", _environment_value, _platform_all,
 		"Start on this screen of the menus (port/assets/menus) instead of the main\n"
 		"menu, a player profile being edited; empty for the main menu." },
+	{ "debug.menu_layout", _config_string, "\"\"", "HALO_MENU_LAYOUT", _environment_value, _platform_all,
+		"Write the open menu screen's geometry to this file (in the data root) as\n"
+		"JSON, every 30th frame of the menus: each widget's box, each text's box,\n"
+		"clip and drawn extent, the button glyphs drawn and the pointer's targets\n"
+		"(port/linux/game/menu_layout.c), for tools/menu_gallery.py's layout\n"
+		"checks; empty for none." },
+	{ "debug.menu_tour", _config_string, "\"\"", "HALO_MENU_TOUR", _environment_value, _platform_all,
+		"Walk the menu screens this file (in the data root) lists, one a line\n"
+		"(main_menu/settings_select/...), once the menus are up: each opened\n"
+		"alone, shown for debug.menu_tour_frames frames, its layout written to\n"
+		"tour/<n>.json in the data root and its picture to\n"
+		"debug.screenshot_directory's tour-<n>.bmp; then quit\n"
+		"(port/linux/game/menu_tour.c, tools/menu_gallery.py). Empty for none." },
+	{ "debug.menu_tour_frames", _config_integer, "12", "HALO_MENU_TOUR_FRAMES", _environment_value, _platform_all,
+		"The frames debug.menu_tour shows each screen for before it is taken." },
+	{ "debug.menu_studio", _config_string, "\"\"", "HALO_MENU_STUDIO", _environment_value, _platform_desktop,
+		"The menu studio, for working on the menus: start on this screen of them\n"
+		"(main_menu/settings_select/..., as debug.menu_open; \"main_menu/main_menu\"\n"
+		"for the main menu), reload it within a second of its files changing\n"
+		"(debug.menu_files' folder, or the menus folder), where it was, and take\n"
+		"F3 (the input: keyboard, controller, touch), F4 (the window's shape:\n"
+		"16:9, 16:10, a phone's 20:9, 4:3, 21:9), F5 (every label longer), F6\n"
+		"(each widget's box, and the layout checks' problems) and F7 (reload)\n"
+		"(port/linux/game/menu_studio.c). Empty for none." },
+	{ "debug.menu_notes", _config_string, "\"\"", "HALO_MENU_NOTES", _environment_value, _platform_desktop,
+		"The menu studio's notes file (F9: a note on a widget or a screen), a\n"
+		"JSON line a note, its pictures in a menu_notes folder beside it. Empty:\n"
+		"<tree>/build/menu_notes.jsonl where debug.menu_files is a tree's\n"
+		"port/assets/menus, else menu_notes.jsonl beside config.toml\n"
+		"(tools/menu_notes.py lists them)." },
+	{ "debug.menu_files", _config_string, "\"\"", "HALO_MENU_FILES", _environment_value, _platform_desktop,
+		"A folder of menu files read in place of the menus folder beside\n"
+		"config.toml (a source tree's port/assets/menus, for the menu studio);\n"
+		"empty for that folder." },
 	{ "debug.discord_socket", _config_string, "\"\"", "HALO_DISCORD_SOCKET", _environment_value, _platform_desktop,
 		"The Discord client's socket (on Windows its pipe) to connect to, and no\n"
 		"other: a test's stand-in for Discord. Empty: Discord's own." },
@@ -2687,6 +2929,17 @@ static const struct config_setting config_settings[] =
 	{ "debug.sample_seconds", _config_real, "0.0", "HALO_SAMPLE", _environment_value, _platform_android | _platform_guest,
 		"Log where every game thread is this often, in seconds (read by the\n"
 		"host, port/android/host/host_debug.c); 0 never." },
+	{ "debug.stall_ms", _config_real, "100.0", "HALO_STALL_MS", _environment_value, _platform_android | _platform_guest,
+		"When the game goes this many milliseconds without a frame, log where\n"
+		"its thread and the render thread were (sampled every 10 ms while it\n"
+		"lasts) and the work in progress, once the frame comes; and count such\n"
+		"frames. Read by the host (port/android/host/host_stall.c); 0 never." },
+	{ "debug.pass_times", _config_integer, "0", "HALO_PASS_TIMES", _environment_value, _platform_all,
+		"Every this many frames, time each of the frame's passes on the GPU and\n"
+		"log, every 30 timed frames, each kind of pass's milliseconds a frame and\n"
+		"share of the GPU's time (the shares hold whatever clock the GPU runs\n"
+		"at); 0 never. The Vulkan builds; read by the host from the file\n"
+		"(port/android/host/host_common.c)." },
 	{ "debug.memory_watch", _config_boolean, "true", "HALO_MEMORY_WATCH", _environment_value, _platform_android | _platform_guest,
 		"Notice the game's writes to cached textures and vertices by page\n"
 		"protection; false compares page contents once a frame instead, which is\n"
@@ -2774,6 +3027,22 @@ static int config_argument(const char *name, char *value, size_t size)
 	return 0;
 }
 #endif
+
+/* the value after a command line argument (halo --demo <file>), for the
+game's port code: whether it was there */
+int config_command_line_value(const char *name, char *value, unsigned long size)
+{
+#ifndef HALO_ANDROID
+	if (size)
+		value[0] = 0;
+	return config_argument(name, value, (size_t)size) && value[0];
+#else
+	(void)name;
+	if (size)
+		value[0] = 0;
+	return 0;
+#endif
+}
 
 /* ---------- the file */
 
@@ -2916,6 +3185,34 @@ static const struct
 	{ "vr.hands", "\"floating\"" },
 #endif
 	{ NULL, NULL },
+};
+
+/* the words a setting took in an older version that this one has no more:
+read as the word in their place (config_renamed_word: the file's and the
+environment's), and written so in the file as it is read
+(config_migrate_words) */
+static const struct
+{
+	const char *name;
+	const char *old_word, *word;
+} config_renamed_words[] =
+{
+	/* (the ambient occlusion found on the screen, gone: the world's in its
+	place) */
+	{ "display.ambient_occlusion", "subtle", "world" },
+	{ "display.ambient_occlusion", "strong", "world" },
+	{ NULL, NULL, NULL },
+};
+
+/* the settings an older version had that this one has not: read without a
+word in the log (config_report_unknown_keys), and taken out of the file as
+it is read, their line and the comment above it (config_migrate_retired) */
+static const char *const config_retired_settings[] =
+{
+	/* (the high-res text's letters rasterized or drawn from distance
+	fields: the fields draw them all) */
+	"display.text_renderer",
+	NULL,
 };
 
 struct config_text
@@ -3178,6 +3475,31 @@ static int config_line_commented_default(const char *line, const char *end)
 	return line < end && *line == '=';
 }
 
+/* the start of the comment just above a setting's line (the line itself if
+it has none): back over it to a blank line, a section, a value or another
+setting's commented default */
+static const char *config_comment_start(const char *text, const char *line)
+{
+	const char *start;
+
+	for (start = line; start > text;)
+	{
+		const char *previous_end = start - 1;
+		const char *previous = previous_end;
+		const char *first;
+
+		while (previous > text && previous[-1] != '\n')
+			previous--;
+		for (first = previous; first < previous_end && (*first == ' ' || *first == '\t'); first++)
+		{
+		}
+		if (first >= previous_end || *first != '#' || config_line_commented_default(previous, previous_end))
+			break;
+		start = previous;
+	}
+	return start;
+}
+
 /* text with the setting's block (the comment lines just above its line,
 and its line or its commented default) in place of the one it has: its
 comment as this version writes it, and value (NULL: its commented
@@ -3202,23 +3524,7 @@ static char *config_replace_setting(const char *text, const struct config_settin
 	end = line + strcspn(line, "\n");
 	if (*end)
 		end++;
-	/* (back over the comment above it, to a blank line, a section, a
-	value or another setting's commented default) */
-	for (start = line; start > text;)
-	{
-		const char *previous_end = start - 1;
-		const char *previous = previous_end;
-		const char *first;
-
-		while (previous > text && previous[-1] != '\n')
-			previous--;
-		for (first = previous; first < previous_end && (*first == ' ' || *first == '\t'); first++)
-		{
-		}
-		if (first >= previous_end || *first != '#' || config_line_commented_default(previous, previous_end))
-			break;
-		start = previous;
-	}
+	start = config_comment_start(text, line);
 	config_append_setting(&block, setting);
 	if (!block.buffer)
 		return NULL;
@@ -3310,6 +3616,176 @@ static char *config_migrate_mouse(const char *text, toml_datum_t table)
 			platform_log("settings: input.mouse_vertical_sensitivity %g is now %s, times input.mouse_sensitivity",
 				old_vertical, value);
 	}
+	return result;
+}
+
+static int config_word_is(const char *text, size_t length, const char *word);
+
+/* the word in place of the setting's value, where it is an older version's
+(config_renamed_words: in any case), or NULL */
+static const char *config_renamed_word(const char *name, const char *value)
+{
+	size_t index;
+
+	for (index = 0; value && config_renamed_words[index].name; index++)
+	{
+		if (!strcmp(config_renamed_words[index].name, name) &&
+			config_word_is(value, strlen(value), config_renamed_words[index].old_word))
+		{
+			return config_renamed_words[index].word;
+		}
+	}
+	return NULL;
+}
+
+/* a file with a setting at an older version's word (config_renamed_words):
+the word in its place, with this version's comment. Returns the new text,
+or NULL if it has none */
+static char *config_migrate_words(const char *text, toml_datum_t table)
+{
+	char *result = NULL;
+	size_t index;
+
+	for (index = 0; config_renamed_words[index].name; index++)
+	{
+		const char *name = config_renamed_words[index].name;
+		long setting = config_setting_index(name);
+		toml_datum_t datum = toml_seek(table, name);
+		const char *word;
+		char value[80];
+		char *updated;
+
+		if (setting < 0 || datum.type != TOML_STRING ||
+			!config_word_is(datum.u.s, strlen(datum.u.s), config_renamed_words[index].old_word))
+		{
+			continue;
+		}
+		word = config_renamed_words[index].word;
+		snprintf(value, sizeof(value), "\"%s\"", word);
+		updated = config_replace_setting(result ? result : text, &config_settings[setting], value);
+		if (!updated)
+			continue;
+		free(result);
+		result = updated;
+		platform_log("settings: %s = \"%s\" is an older version's: now \"%s\"", name, datum.u.s, word);
+	}
+	return result;
+}
+
+/* whether a setting is one an older version had (config_retired_settings) */
+static int config_setting_retired(const char *name)
+{
+	size_t index;
+
+	for (index = 0; config_retired_settings[index]; index++)
+	{
+		if (!strcmp(config_retired_settings[index], name))
+			return 1;
+	}
+	return 0;
+}
+
+/* a file with settings this version has not (config_retired_settings): each
+one's line, set or commented at its default, taken out with the comment
+above it and the blank line before that. Returns the new text, or NULL if
+it has none */
+static char *config_migrate_retired(const char *text)
+{
+	char *result = NULL;
+	size_t index;
+
+	for (index = 0; config_retired_settings[index]; index++)
+	{
+		const char *name = config_retired_settings[index];
+		const char *dot = strchr(name, '.');
+		char section[64];
+		int commented;
+
+		if (!dot)
+			continue;
+		snprintf(section, sizeof(section), "%.*s", (int)(dot - name), name);
+		for (commented = 0; commented < 2; commented++)
+		{
+			const char *current = result ? result : text;
+			const char *line = config_find_line(current, section, dot + 1, commented);
+			const char *start, *end;
+			struct config_text out = { NULL, 0, 0 };
+			char *before;
+
+			if (!line)
+				continue;
+			end = line + strcspn(line, "\n");
+			if (*end)
+				end++;
+			start = config_comment_start(current, line);
+			if (start - current >= 2 && start[-1] == '\n' && start[-2] == '\n')
+				start--;
+			before = config_copy(current, (size_t)(start - current));
+			if (!before)
+				continue;
+			config_append(&out, before);
+			free(before);
+			config_append(&out, end);
+			if (!out.buffer)
+				continue;
+			if (!commented)
+				platform_log("settings: %s is an older version's setting, gone from this one: taken out of the file",
+					name);
+			free(result);
+			result = out.buffer;
+		}
+	}
+	return result;
+}
+
+static char *config_add_missing(const char *text, toml_datum_t table);
+
+/* a file with display.anti_aliasing = "ssaa2x", an older version's
+supersampling (twice the pixels each way, with no pass over the 3D view):
+"off" in its place, and display.supersampling 2.0 where the build drew it
+(not on Android, nor on the Mac and iOS, whose "ssaa2x" drew none), unless
+the file has more; each with this version's comment, so that it looks as it
+did. Returns the new text, or NULL if the file has no "ssaa2x" */
+static char *config_migrate_supersampling(const char *text, toml_datum_t table)
+{
+	long anti_aliasing = config_setting_index("display.anti_aliasing");
+	toml_datum_t datum = toml_seek(table, "display.anti_aliasing");
+	char *result;
+#if !defined(HALO_ANDROID) && !defined(HALO_MACOS)
+	long supersampling = config_setting_index("display.supersampling");
+	toml_datum_t factor = toml_seek(table, "display.supersampling");
+	double asked = factor.type == TOML_FP64 ? factor.u.fp64 : factor.type == TOML_INT64 ? (double)factor.u.int64 : 0.0;
+	char *completed = NULL;
+#endif
+
+	if (anti_aliasing < 0 || datum.type != TOML_STRING || !config_word_is(datum.u.s, strlen(datum.u.s), "ssaa2x"))
+		return NULL;
+#if !defined(HALO_ANDROID) && !defined(HALO_MACOS)
+	/* (display.supersampling's block, commented out, in a file older than
+	it, as config_add_missing would add it after) */
+	if (supersampling >= 0 && factor.type == TOML_UNKNOWN)
+		completed = config_add_missing(text, table);
+	result = config_replace_setting(completed ? completed : text, &config_settings[anti_aliasing], "\"off\"");
+	free(completed);
+	if (result && supersampling >= 0 && !(asked >= 2.0))
+	{
+		char *updated = config_replace_setting(result, &config_settings[supersampling], "2.0");
+
+		if (updated)
+		{
+			free(result);
+			result = updated;
+		}
+	}
+	if (result)
+		platform_log("settings: display.anti_aliasing = \"%s\" is an older version's: now \"off\", with "
+			"display.supersampling = %s", datum.u.s, asked >= 2.0 ? "as it was" : "2.0");
+#else
+	result = config_replace_setting(text, &config_settings[anti_aliasing], "\"off\"");
+	if (result)
+		platform_log("settings: display.anti_aliasing = \"%s\" is an older version's, which drew none here: now "
+			"\"off\"", datum.u.s);
+#endif
 	return result;
 }
 
@@ -3629,7 +4105,30 @@ static int config_set_from_file(struct config_value *value, const struct config_
 keep a setting watch this, to read it again */
 static volatile unsigned long config_change_count;
 
-static long config_setting_index(const char *name)
+/* The settings by name, hashed: each config_boolean, config_integer and the
+rest finds its setting by its name, many a frame (the rasterizer's, the
+HUD's, the input's), and a walk of the 600 names was 2.7% of the game
+thread in a bot match. Open addressing, each slot the setting's index plus
+one; made once from the table, by the first thread to ask (0 not made, 1
+being made, 2 made: not pthread_once, which the Android guest's C library
+cannot link), the others walking the names meanwhile. */
+#define CONFIG_INDEX_SLOTS 2048
+
+typedef char config_index_slots_check[NUMBER_OF_CONFIG_SETTINGS * 2 <= CONFIG_INDEX_SLOTS ? 1 : -1];
+
+static unsigned short config_index_slots[CONFIG_INDEX_SLOTS];
+static int config_index_state;
+
+static unsigned long config_name_hash(const char *name)
+{
+	unsigned long hash = 2166136261UL;
+
+	for (; *name; name++)
+		hash = ((hash ^ (unsigned char)*name) * 16777619UL) & 0xffffffffUL;
+	return hash;
+}
+
+static long config_setting_walk(const char *name)
 {
 	size_t index;
 
@@ -3637,6 +4136,47 @@ static long config_setting_index(const char *name)
 	{
 		if (!strcmp(config_settings[index].name, name))
 			return (long)index;
+	}
+	return -1;
+}
+
+/* (the first of a name, as the walk finds it) */
+static void config_index_make(void)
+{
+	size_t index;
+
+	for (index = 0; index < NUMBER_OF_CONFIG_SETTINGS; index++)
+	{
+		unsigned long slot = config_name_hash(config_settings[index].name) & (CONFIG_INDEX_SLOTS - 1);
+
+		while (config_index_slots[slot] && strcmp(config_settings[config_index_slots[slot] - 1].name,
+			config_settings[index].name))
+		{
+			slot = (slot + 1) & (CONFIG_INDEX_SLOTS - 1);
+		}
+		if (!config_index_slots[slot])
+			config_index_slots[slot] = (unsigned short)(index + 1);
+	}
+}
+
+static long config_setting_index(const char *name)
+{
+	unsigned long slot;
+
+	if (__atomic_load_n(&config_index_state, __ATOMIC_ACQUIRE) != 2)
+	{
+		int unmade = 0;
+
+		if (!__atomic_compare_exchange_n(&config_index_state, &unmade, 1, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+			return config_setting_walk(name);
+		config_index_make();
+		__atomic_store_n(&config_index_state, 2, __ATOMIC_RELEASE);
+	}
+	for (slot = config_name_hash(name) & (CONFIG_INDEX_SLOTS - 1); config_index_slots[slot];
+		slot = (slot + 1) & (CONFIG_INDEX_SLOTS - 1))
+	{
+		if (!strcmp(config_settings[config_index_slots[slot] - 1].name, name))
+			return config_index_slots[slot] - 1;
 	}
 	return -1;
 }
@@ -3847,7 +4387,7 @@ static void config_report_unknown_keys(toml_datum_t table)
 			in them) */
 			if (!strcmp(name, CONFIG_WEAPON_TABLE))
 				continue;
-			if (config_setting_index(name) < 0)
+			if (config_setting_index(name) < 0 && !config_setting_retired(name))
 				config_report_unknown_key(section.u.tab.value[key_index].lineno, name);
 		}
 	}
@@ -3996,6 +4536,7 @@ static const struct
 	{ "display.mode", { "", "fullscreen", "borderless", "windowed", NULL }, "display.fullscreen's" },
 	{ "display.resolution_scaling", { "native", "original", NULL }, NULL },
 	{ "display.anti_aliasing", { "off", "fxaa", "smaa", "ssaa2x", "msaa2x", "msaa4x", "msaa8x", NULL }, NULL },
+	{ "display.ambient_occlusion", { "off", "world", "ray_traced", NULL }, "off" },
 	{ "display.astc_textures", { "auto", "always", "off", NULL }, NULL },
 	{ "display.picture_position", { "center", "top", "bottom", NULL }, NULL },
 	{ "display.orientation", { "landscape", "portrait", "auto", NULL }, NULL },
@@ -4003,6 +4544,7 @@ static const struct
 	{ "display.frame_style", { "plain", "halo", "xbox", NULL }, NULL },
 	{ "display.hud_button_style", { "classic", "gems", "menu_gems", NULL }, NULL },
 	{ "display.menus", { "pc", "xbox", NULL }, NULL },
+	{ "display.menu_engine", { "classic", "new", NULL }, NULL },
 	{ "display.menu_cursor", { "off", "small", "medium", "large", "extra_large", NULL }, "medium" },
 	{ "display.player_names", { "all", "allies", "enemies", "none", NULL }, NULL },
 	{ "display.scoreboard_team_layout", { "teams", "score", NULL }, NULL },
@@ -4010,7 +4552,7 @@ static const struct
 	{ "display.shield_glow_intensity", { "default", "light_show", NULL }, NULL },
 	{ "display.shield_color", { "default", "white", "black", "red", "blue", "gray", "yellow", "green", "pink",
 		"purple", "cyan", "cobalt", "orange", "teal", "sage", "brown", "tan", "maroon", "salmon", NULL }, NULL },
-	{ "audio.resampler", { "sinc", "linear", NULL }, NULL },
+	{ "audio.resampler", { "xbox", "sinc", "linear", NULL }, NULL },
 	{ "audio.spatial", { "auto", "headphones", "speakers", NULL }, "auto" },
 	{ "audio.voice_chat", { "push_to_talk", "open_mic", "off", NULL }, NULL },
 	{ "input.touch_controls", { "auto", "on", "off", NULL }, NULL },
@@ -4023,6 +4565,7 @@ static const struct
 	{ "input.button_prompts", { "auto", "controller", "keyboard", NULL }, NULL },
 	{ "input.zoom_sensitivity", { "cs2", "halo", NULL }, "cs2" },
 	{ "game.console_log", { "important", "all", "none", NULL }, NULL },
+	{ "game.spectate_on_death", { "teammates", "off", NULL }, NULL },
 	{ "game.language", { "", "ja", "de", "fr", "es", "it", NULL }, NULL },
 	{ "network.game_mode", { "openh1", "legacy", "standard", NULL }, NULL },
 	{ "server.game_mode", { "openh1_120", "openh1_60", "openh1_30", "legacy", NULL }, NULL },
@@ -4067,6 +4610,17 @@ static void config_check_words(void)
 		if (index < 0 || !(config_settings[index].platforms & CONFIG_PLATFORM))
 			continue;
 		value = &config_values[index];
+		/* (an older version's word, as this version names it: from the
+		environment, or a file that could not be written) */
+		{
+			const char *renamed = config_renamed_word(config_words[word_index].name, value->string);
+
+			if (renamed)
+			{
+				free(value->string);
+				value->string = strdup(renamed);
+			}
+		}
 		for (word = 0; words[word] && !config_word_is(value->string, strlen(value->string), words[word]); word++)
 		{
 		}
@@ -4202,6 +4756,9 @@ static void config_apply_probe_mode(void)
 		{ "server.enabled", "false" },
 		{ "debug.test_input", "" },
 		{ "debug.menu_open", "" },
+		{ "debug.menu_layout", "" },
+		{ "debug.menu_tour", "" },
+		{ "debug.menu_studio", "" },
 		{ "debug.exit_after", "45" },
 	};
 	size_t index;
@@ -4237,6 +4794,9 @@ static void config_apply_server_mode(void)
 		{ "debug.network_test", "" },
 		{ "debug.test_input", "" },
 		{ "debug.menu_open", "" },
+		{ "debug.menu_layout", "" },
+		{ "debug.menu_tour", "" },
+		{ "debug.menu_studio", "" },
 	};
 	const char *tunnel_port = getenv("HALO_NET_TUNNEL_PORT");
 	size_t index;
@@ -4354,6 +4914,48 @@ static void config_load(void)
 				migrated = text;
 			}
 		}
+		/* (an older version's words, as this version names them) */
+		if (result.ok && !skipped)
+		{
+			char *words = config_migrate_words(text, result.toptab);
+
+			if (words)
+			{
+				toml_free(result);
+				free(text);
+				text = words;
+				result = toml_parse(text, (int)strlen(text));
+				migrated = text;
+			}
+		}
+		/* (an older version's "ssaa2x", display.supersampling's now) */
+		if (result.ok && !skipped)
+		{
+			char *supersampling = config_migrate_supersampling(text, result.toptab);
+
+			if (supersampling)
+			{
+				toml_free(result);
+				free(text);
+				text = supersampling;
+				result = toml_parse(text, (int)strlen(text));
+				migrated = text;
+			}
+		}
+		/* (the settings an older version had) */
+		if (result.ok && !skipped)
+		{
+			char *retired = config_migrate_retired(text);
+
+			if (retired)
+			{
+				toml_free(result);
+				free(text);
+				text = retired;
+				result = toml_parse(text, (int)strlen(text));
+				migrated = text;
+			}
+		}
 		if (result.ok)
 		{
 			char *completed;
@@ -4448,14 +5050,17 @@ static void config_load(void)
 	config_check_words();
 }
 
-/* the file read, the first time a setting is asked for */
+/* the file read, the first time a setting is asked for (once read, a
+setting is read without the lock: what is read every frame) */
 static void config_ensure_loaded(void)
 {
+	if (__atomic_load_n(&config_loaded, __ATOMIC_ACQUIRE))
+		return;
 	pthread_mutex_lock(&config_lock);
 	if (!config_loaded)
 	{
 		config_load();
-		config_loaded = 1;
+		__atomic_store_n(&config_loaded, 1, __ATOMIC_RELEASE);
 	}
 	pthread_mutex_unlock(&config_lock);
 }
@@ -4815,6 +5420,22 @@ int config_write(const char *name, const char *value)
 	free(text);
 	free(line_text);
 	return succeeded;
+}
+
+int config_set_for_run(const char *name, const char *value)
+{
+	long index = config_setting_index(name);
+
+	if (index < 0 || strlen(value) > CONFIG_MAXIMUM_WRITTEN_STRING)
+		return 0;
+	/* (the file read first, as the other settings are, so that it does
+	not take the value back) */
+	config_value(name, config_settings[index].type);
+	pthread_mutex_lock(&config_lock);
+	config_set_from_text(&config_values[index], config_settings[index].type, value);
+	config_change_count++;
+	pthread_mutex_unlock(&config_lock);
+	return 1;
 }
 
 int config_write_boolean(const char *name, int value)

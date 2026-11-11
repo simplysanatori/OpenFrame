@@ -383,6 +383,7 @@ symbols in this file:
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "network_voice.h" /* port: port/linux/game/network_voice.c */
 #include "network_chat.h" /* port: port/linux/game/network_chat.c */
+#include "network_markers.h" /* port: port/linux/game/network_markers.c */
 #include "network_party.h" /* port: port/linux/game/network_party.c */
 #include "network_host_controls.h" /* port: port/linux/game/network_host_controls.c */
 #include "party.h" /* port: port/linux/game/party_menu.inc */
@@ -698,6 +699,7 @@ typedef char screenshot_and_framerate_globals_size_assert[
 	sizeof(struct _screenshot_and_framerate_globals) == 0x38B ? 1 : -1];
 
 void network_test_update(boolean main_menu_loaded, real seconds);
+#include "demo.h" /* port: port/linux/game/demo.c */
 /* port: port/linux/game/basic_training.c */
 void basic_training_update(boolean main_menu_loaded, real seconds);
 /* port: the menus' pictures drawn again from the player's maps, rendered
@@ -1531,6 +1533,8 @@ boolean main_menu_is_loaded(
 	return main_globals.main_menu_scenario_loaded;
 }
 
+static void main_map_change_failed(char const *map_name); /* port: (below) */
+
 static void main_new_map(
 	struct game_options *options)
 {
@@ -1539,6 +1543,28 @@ static void main_new_map(
 	if (game_load(options))
 	{
 		game_initialize_for_new_map();
+	}
+	/* port: a map that does not load (its tags damaged: tag_validate.c)
+	leaves the game at the main menu, with its error, where the Xbox's
+	stopped for good (_error_immediate: halt_and_catch_fire); a failure of
+	the main menu's own map is as it was */
+	else if (!main_globals.main_menu_scenario_loaded)
+	{
+		error(_error_silent, "game_load() failed.");
+		errors_handle();
+		main_map_change_failed(options->map_name);
+		main_globals.want_to_be_at_main_menu = TRUE;
+		main_globals.reset_map = FALSE;
+		main_globals.revert_map = FALSE;
+		main_globals.skip_cinematic = FALSE;
+		main_globals.saving_map = FALSE;
+		main_globals.won_map = FALSE;
+		main_globals.lost_map = FALSE;
+		main_globals.respawn = FALSE;
+		main_globals.save_core = FALSE;
+		main_globals.load_core = FALSE;
+		main_globals.switch_to_structure_bsp_index = NONE;
+		return;
 	}
 	else
 	{
@@ -1584,9 +1610,61 @@ static void main_new_map(
 /* port: the platform layer's (port/linux/src/port_config.c) */
 int config_boolean(const char *name);
 
+/* port: the solo map's name before map_name changed it (main_set_map_name),
+for a change refused (main_map_change_refused) */
+static char main_map_name_before_change[256];
+
+/* port: a map that cannot be loaded (a name typed wrong at the console or in
+init.txt, a map file missing or damaged) refused once, before the game it
+would end is left: the reason logged (cache_files_map_loadable) and shown (a
+line of the console; at the main menu its error dialog too), and the game as
+it was. The Xbox's precache took a missing map for a damaged disc, whose
+error stopped the game for good (display_error_damaged_media,
+main_loop_of_death): a map's name typed at a computer's console is no disc */
+static void main_map_change_failed(
+	char const *map_name)
+{
+	static wchar_t text[320];
+	char message[320];
+	short index;
+
+	error(_error_silent, "can't load map '%s'", map_name);
+	console_warning("can't load map '%s' (debug.txt says why)", map_name);
+	snprintf(message, sizeof(message),
+		"The map \"%s\" could not be loaded: it is not in the maps folder, or it is damaged.", map_name);
+	for (index = 0; message[index] && index < NUMBEROF(text) - 1; index++)
+		text[index] = (wchar_t)(unsigned char)message[index];
+	text[index] = 0;
+	if (main_globals.main_menu_scenario_loaded)
+		display_error_text_deferred(text, NONE);
+	else if (!game_in_progress())
+		display_error_text_when_main_menu_loaded(text);
+	csstrncpy(main_globals.soloplayer_map_name, main_map_name_before_change,
+		NUMBEROF(main_globals.soloplayer_map_name) - 1);
+	main_globals.soloplayer_map_name[NUMBEROF(main_globals.soloplayer_map_name) - 1] = 0;
+	main_globals.defer_map_change = FALSE;
+	main_globals.map_change_load_timer = 0;
+
+	return;
+}
+
+static boolean main_map_change_refused(
+	char const *map_name)
+{
+	if (cache_files_map_loadable(map_name))
+		return FALSE;
+	main_map_change_failed(map_name);
+
+	return TRUE;
+}
+
 static void main_change_map_name(
 	void)
 {
+	/* port: (a map that cannot be loaded refused, the game as it was) */
+	if (!main_globals.map_change_load_timer && main_map_change_refused(main_globals.soloplayer_map_name))
+		return;
+
 	/* port: (none for the menus' pictures: menu_pictures_render.c) */
 	if (main_globals.main_menu_scenario_loaded == TRUE && !menu_pictures_preparing())
 	{
@@ -1621,6 +1699,21 @@ static void main_change_map_name(
 
 	if (main_globals.frame_start_milliseconds >= main_globals.map_change_load_timer)
 	{
+		/* port: the map copied into the cache before anything of this game
+		is left, as the main menu's map is (main_load_ui_scenario): a map
+		whose copy fails (its file damaged) is refused, and the game stays,
+		where the Xbox's took it for a damaged disc and stopped for good. The
+		menus the copy's loading screen closed are opened again. */
+		if (game_in_progress() && main_globals.connection == _game_connection_local &&
+			!game_precache_new_map_refusable(main_globals.soloplayer_map_name))
+		{
+			ui_widgets_set_fade_value(-1.0f);
+			ui_widgets_inhibit_processing(FALSE);
+			if (main_globals.main_menu_scenario_loaded)
+				main_screen_shell_load();
+			main_map_change_failed(main_globals.soloplayer_map_name);
+			return;
+		}
 		ui_widgets_set_fade_value(-1.0f);
 		ui_stop_main_menu_music();
 		main_menu_active(FALSE);
@@ -1647,7 +1740,7 @@ static void main_change_map_name(
 			/* port: (not a map of the menus' pictures: the player's last level
 			is as it was) */
 			for (local_player_index = 0;
-				local_player_index < player_spawn_count && !menu_pictures_preparing();
+				local_player_index < player_spawn_count && !menu_pictures_preparing() && !demo_playing();
 				local_player_index++)
 			{
 				player_profile_save_last_level_played(local_player_index);
@@ -2522,6 +2615,12 @@ void main_set_map_name(
 	char const *map_name)
 {
 	main_globals.want_to_be_at_main_menu = FALSE;
+	/* port: (the name a change refused goes back to: main_map_change_refused) */
+	if (!main_globals.defer_map_change)
+	{
+		csstrncpy(main_map_name_before_change, main_globals.soloplayer_map_name, NUMBEROF(main_map_name_before_change) - 1);
+		main_map_name_before_change[NUMBEROF(main_map_name_before_change) - 1] = 0;
+	}
 	csstrncpy(main_globals.soloplayer_map_name, map_name, NUMBEROF(main_globals.soloplayer_map_name) - 1);
 	main_globals.soloplayer_map_name[NUMBEROF(main_globals.soloplayer_map_name) - 1] = 0;
 	main_globals.allow_persistent_storage = TRUE;
@@ -3107,9 +3206,15 @@ static void main_setup_connection(
 		main_globals.want_to_be_at_main_menu = TRUE;
 		main_menu_load();
 	}
+	/* port: a map of init.txt's map_name that cannot be loaded refused, and
+	the main menu loaded in its place (main_map_change_refused) */
+	else if (main_map_change_refused(main_globals.soloplayer_map_name))
+	{
+		main_globals.want_to_be_at_main_menu = TRUE;
+		main_menu_load();
+	}
 	else
 	{
-		main_globals.connection = _game_connection_local;
 		game_options_new(&options);
 		csstrncpy(
 			options.map_name,
@@ -3117,7 +3222,15 @@ static void main_setup_connection(
 			NUMBEROF(options.map_name) - 1);
 		options.map_name[NUMBEROF(options.map_name) - 1] = 0;
 		options.difficulty = global_difficulty_level;
-		game_precache_new_map(options.map_name, TRUE);
+		/* port: (and one whose copy fails: game_precache_new_map_refusable) */
+		if (!game_precache_new_map_refusable(options.map_name))
+		{
+			main_map_change_failed(options.map_name);
+			main_globals.want_to_be_at_main_menu = TRUE;
+			main_menu_load();
+			return;
+		}
+		main_globals.connection = _game_connection_local;
 		game_dispose_from_old_map();
 		main_new_map(&options);
 	}
@@ -3416,6 +3529,9 @@ void halt_and_catch_fire(
 	it ends with exit code 1 (port/linux/game/server_director.c) */
 	if (halo_server_mode())
 		server_fatal(error_get());
+	/* port: the halt offered as a crash's report at the next start
+	(port/linux/src/report.c) */
+	report_session_halted(error_get());
 	if (!global_screenshot_count.halt_recursion_lock)
 	{
 		scenario = global_scenario_try_and_get();
@@ -3843,6 +3959,9 @@ void main_loop(
 
 			/* automated system link tests (port/linux/game/network_test.c) */
 			network_test_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
+			/* port: a demo asked for played, and the end of one
+			(port/linux/game/demo.c) */
+			demo_frame(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
 			/* port: Basic Training's game started, its skip buttons
 			(port/linux/game/basic_training.c) */
 			basic_training_update(main_globals.main_menu_scenario_loaded, main_globals.seconds_elapsed);
@@ -3873,6 +3992,8 @@ void main_loop(
 			map_share_update();
 			/* port: network games' text chat (port/linux/game/network_chat.c) */
 			network_chat_update();
+			/* port: the players' pings (port/linux/game/network_markers.c) */
+			network_markers_update();
 			/* port: the party, which follows its leader into its games
 			(port/linux/game/party_menu.inc) */
 			party_update();
@@ -4011,10 +4132,15 @@ void main_loop(
 				if (!console_update() || main_globals.connection!=_game_connection_local)
 				{
 					/* port: not while a chat line is typed (its K plays an animation) */
-					if (!network_chat_typing())
-						debug_keys_update();
-					cheats_update();
-					player_control_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);
+					/* port: nor any of the machine's input in a demo's playback,
+					whose players play the recording's (port/linux/game/demo.c) */
+					if (!demo_playing())
+					{
+						if (!network_chat_typing())
+							debug_keys_update();
+						cheats_update();
+						player_control_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);
+					}
 
 					connection = main_globals.connection;
 					profile_scope_enter(main_network_end_frame_section)
@@ -4054,6 +4180,13 @@ void main_loop(
 					observer_update((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);
 					collision_log_end_period();
 					game_engine_update_non_deterministic((real)main_globals.halt_time_scale*main_globals.seconds_elapsed);
+					/* port: the frames a multiplayer game's start leaves undrawn
+					place the sound's listeners at the cameras just placed, as a
+					drawn frame does: a sound of the first ticks (the first
+					weapon's ready sound) was judged from where they were before
+					the game, and dropped. The original's bug, fixed (#740) */
+					if (!render_frame && game_engine_running() && game_time_get()<3)
+						sound_render_listeners();
 					profile_scope_exit(main_non_deterministic_update_section)
 				}
 

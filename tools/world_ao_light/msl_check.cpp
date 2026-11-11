@@ -7,7 +7,9 @@ world_msl.inc, which tools/test_world_ao_light.py writes from the emitter's
 shader) run on the CPU (metal_shim.h) and compared with their reference,
 world_proxies.c's world_proxy_occlusion and world_proxy_reach and
 world_ao_shading.c's, over the made-up scene's points (scene.c): each
-shape's occlusion and reach, the proxies' product and the field's cone.
+shape's occlusion and reach, the proxies' product (walked by a pixel
+alone, and as one lane of a SIMD-group: metal_shim.h's simd_or) and the
+field's cone.
 
   msl_check <count> <tolerance>   prints the largest difference of each;
                                   exits 1 if one is past the tolerance
@@ -98,7 +100,9 @@ int main(int argc, char **argv)
 		/* (a vehicle's field, and its slots: its own, below) */
 		if (v0.w < 1.0f || v0.w > 3.0f)
 			continue;
-		float difference = std::fabs(world_proxy_reach(v0, v1, v2) - world_proxy_reach(&scene_proxies[shape]));
+		float found = v0.w == 1.0f ? world_proxy_sphere_reach(v2) : v0.w == 2.0f ? world_proxy_capsule_reach(v0, v1, v2) :
+			world_proxy_box_reach(v1, v2);
+		float difference = std::fabs(found - world_proxy_reach(&scene_proxies[shape]));
 
 		worst_reach = difference > worst_reach ? difference : worst_reach;
 	}
@@ -148,10 +152,14 @@ int main(int argc, char **argv)
 						world_proxy_occlusion(&scene_proxies[shape], point, normal));
 			}
 		}
-		/* (every shape, or the dynamic objects' alone: the first three) */
+		/* (every shape, or the dynamic objects' alone: the first three; a
+		third of the points walked as one lane of a SIMD-group whose other
+		lanes' cells hold other shapes, which it must leave out) */
 		int limit = index % 2 ? 64 : 3;
 
-		difference = std::fabs(world_proxies_occlusion(block, objects, p, n, owner, limit) -
+		block.parameters[1].z = index % 3 == 1 ? 1.0f : 0.0f;
+		simd_lanes_others = index % 3 == 1 ? (unsigned int)(index * 2654435761u) : 0u;
+		difference = std::fabs(world_proxies_occlusion(block, objects, p, n, owner, limit, 0) -
 			world_ao_proxies_occlusion(scene_proxies, limit < scene_proxy_count ? limit : scene_proxy_count, point, normal,
 			owner));
 		worst_product = difference > worst_product ? difference : worst_product;
@@ -161,6 +169,18 @@ int main(int argc, char **argv)
 		difference = std::fabs(world_sdf_occlusion(block, field, table, p, n, own) -
 			world_ao_field_occlusion_from(&scene_volume, point, normal, own));
 		worst_field = difference > worst_field ? difference : worst_field;
+		/* (and as a two-sided shader's cards: their most open direction, and
+		which it is) */
+		{
+			float3 found = n;
+			float direction[3] = { normal[0], normal[1], normal[2] };
+
+			difference = std::fabs(world_sdf_cards_occlusion(block, field, table, p, found, own, true) -
+				world_ao_cards_occlusion(&scene_volume, point, direction, own));
+			difference = std::fmax(difference, std::fabs(found.x - direction[0]) + std::fabs(found.y - direction[1]) +
+				std::fabs(found.z - direction[2]));
+			worst_field = difference > worst_field ? difference : worst_field;
+		}
 	}
 	printf("shapes %.3g reach %.3g proxies %.3g field %.3g; a vehicle's field %.3g at %ld points it shades\n", worst_shape,
 		worst_reach, worst_product, worst_field, worst_field_shape, shaded);

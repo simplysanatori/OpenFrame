@@ -84,6 +84,9 @@ struct xgpu_metal_stream_shaders
 	uint32_t (*uniforms)(void *context, const struct xgpu_metal_stream_uniform_inputs *inputs, void *bytes,
 		uint32_t size);
 	int (*halo)(void *context, uint32_t *vertex_shader, uint32_t *pixel_shader);
+	/* display.ambient_occlusion "world" found once a pixel: its pass's
+	functions (xgpu_msl.h's xgpu_msl_world_ao_pass) */
+	int (*world_ao_pass)(void *context, uint32_t *vertex_shader, uint32_t *pixel_shader);
 };
 
 void xgpu_metal_stream_set_shaders(const struct xgpu_metal_stream_shaders *shaders);
@@ -91,6 +94,12 @@ void xgpu_metal_stream_set_shaders(const struct xgpu_metal_stream_shaders *shade
 /* a target's picture written to path as a PNG; nonzero if written (the
 render thread: host_render_record.h's shooter) */
 int xgpu_metal_stream_shot(uint32_t target, const char *path);
+/* (the render thread) a colour target's pixels as xgpu_metal_stream_shot
+reads them: BGRA rows from the top, malloc'd; NULL if it has none */
+unsigned char *xgpu_metal_stream_read(uint32_t target, uint32_t *width, uint32_t *height);
+/* a target's texture handle (0: none: the tests', the replay's ID buffer;
+the render thread) */
+uint32_t xgpu_metal_stream_target_texture(uint32_t target);
 
 /* the MSL emitter's provider (xgpu_metal_shaders.c) */
 const struct xgpu_metal_stream_shaders *xgpu_metal_shaders(void);

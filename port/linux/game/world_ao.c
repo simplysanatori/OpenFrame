@@ -12,12 +12,19 @@ is named to the front end with its owner slot among the window's proxies'
 owners (its own do not shade it) and its reference (the field's occlusion
 where its ambient light was sampled, which that light already holds).
 
-Nothing here runs unless the setting is "world": every other value (and
-the Classic preset's "off") draws exactly as before.
+With "ray_traced", the same, and the dynamic objects' occlusion traced by
+the GPU's ray queries through the ray-traced scene (world_rt.c: its meshes
+and each frame's instances) where the backend has them; "world" where it has
+not (said once, with why).
+
+Nothing here runs unless the setting is "world" or "ray_traced": every
+other value (and the Classic preset's "off") draws exactly as before.
 */
 
 #include "world_ao.h"
+#include "world_cascades.h"
 #include "world_proxies.h"
+#include "world_rt.h"
 #include "world_scene.h"
 #include "world_sdf.h"
 
@@ -27,7 +34,10 @@ the Classic preset's "off") draws exactly as before.
 #include <string.h>
 
 const char *config_string(const char *name);
-unsigned long config_changes(void);
+int config_boolean(const char *name);
+unsigned long halo_gpu_settings_taken(void);
+unsigned long long SDL_GetTicksNS(void);
+void platform_log(const char *format, ...);
 /* (render_enumerate.c's: the window drawn is a map's first frame's, unseen,
 which prepares its pipelines) */
 extern unsigned char render_enumerating;
@@ -37,10 +47,16 @@ static struct
 	int initialized;
 	unsigned long read_at;
 	int mode;
+	/* "ray_traced" asked for, and whether why it is drawn as "world" was
+	said */
+	int rays, rays_missing_said;
 	/* a window's occlusion handed to the front end (world_ao_window_end
 	takes it away): its proxies and their objects (datum handles), the
 	field's volume (for the objects' references; NULL none) and its fade */
 	int window;
+	/* the window's span (WORLD_AO_SPAN_OPEN, _FOUND, or _NONE outside one),
+	whatever the setting: the first-person weapon's drawn in it */
+	int span;
 	struct world_proxy proxies[WORLD_PROXY_MAXIMUM_PER_WINDOW];
 	long owners[WORLD_PROXY_MAXIMUM_PER_WINDOW];
 	/* (the dynamic objects' first, dynamic_count of them; the static
@@ -51,11 +67,19 @@ static struct
 	/* the proxies' grid (world_ao_grid; its cells allocated once) */
 	float grid[2][4];
 	unsigned int (*cells)[4];
+	/* the distance-field scene's cascades as the window has them (each the
+	first voxel's centre and the voxel, 0 not ready) */
+	float cascades[WORLD_CASCADES][4];
 } world_ao;
 
+/* (read again as the front end takes the settings up between frames,
+d3d8_device.c's halo_gpu_settings_taken, not as they are written: the map
+is prepared again under the change at the same frame, render_enumerate.c's
+enumerated_derivation_check, so that no frame draws the world's pipelines
+before they are made) */
 int world_ao_mode(void)
 {
-	unsigned long changes = config_changes();
+	unsigned long changes = halo_gpu_settings_taken();
 
 	if (!world_ao.initialized || world_ao.read_at != changes)
 	{
@@ -63,7 +87,18 @@ int world_ao_mode(void)
 
 		world_ao.initialized = 1;
 		world_ao.read_at = changes;
-		world_ao.mode = setting && !strcmp(setting, "world") ? WORLD_AO_PROXIES | WORLD_AO_FIELD : 0;
+		world_ao.rays = setting && !strcmp(setting, "ray_traced");
+		world_ao.mode = setting && (!strcmp(setting, "world") || world_ao.rays) ? WORLD_AO_PROXIES | WORLD_AO_FIELD : 0;
+	}
+	/* (the backend's ray queries, once it has said: until then, and
+	without them, "world") */
+	if (world_ao.rays && halo_world_ao_ray_queries())
+		return world_ao.mode | WORLD_AO_RAYS;
+	if (world_ao.rays && !world_ao.rays_missing_said && halo_world_ao_ray_queries_missing())
+	{
+		platform_log("world ao: display.ambient_occlusion \"ray_traced\" is drawn as \"world\" here: %s",
+			halo_world_ao_ray_queries_missing());
+		world_ao.rays_missing_said = 1;
 	}
 	return world_ao.mode;
 }
@@ -84,17 +119,196 @@ void world_ao_bsp_switched(short bsp_index)
 	world_sdf_bsp_switched(bsp_index);
 }
 
+static void world_ao_scene_release(void);
+
 void world_ao_map_unloaded(void)
 {
+	world_rt_map_unloaded();
+	world_ao_scene_release();
 	world_sdf_map_unloaded();
 	world_proxies_map_unloaded();
 	world_scene_map_unloaded();
+}
+
+/* ---------- the distance-field scene (world_cascades.h, docs/world-ao.md
+"The distance-field scene")
+
+Its cascades about the first window's camera, updated once a frame: the
+structure's field sampled where they move or it changes, the objects'
+shapes (world_proxies_scene) stamped where they moved, and the boxes
+written handed to the renderer. HALO_WORLD_AO_COUNTS logs, every 600
+frames, its mean time and voxels a frame. */
+
+enum
+{
+	/* (the farthest a shape is taken from the camera: the outermost
+	cascade's half side and its range) */
+	WORLD_AO_SCENE_SHAPES = WORLD_CASCADES_MAXIMUM_SHAPES,
+};
+
+static struct
+{
+	struct world_cascades cascades;
+	int made, failed;
+	/* the frame (world_ao_frame_begin's count) it was last updated in, and
+	the structure's field it holds (NULL none) */
+	unsigned long frame, updated;
+	struct world_sdf_volume const *structure;
+	/* the frame's shapes and their objects */
+	struct world_proxy shapes[WORLD_AO_SCENE_SHAPES];
+	long owners[WORLD_AO_SCENE_SHAPES];
+	struct world_cascades_object objects[WORLD_CASCADES_MAXIMUM_OBJECTS];
+	/* a box's bytes on their way */
+	signed char *box;
+	/* the windows drawn this frame (windows_frame) and the frame before
+	(last_windows, last_frame) */
+	unsigned long windows_frame, last_frame;
+	long windows, last_windows;
+	/* (measuring) */
+	double seconds, most_seconds, shapes_seconds, cascades_seconds;
+	long frames, voxels, moved, boxes;
+	unsigned long bytes;
+} world_ao_scene;
+
+static float world_ao_scene_structure(void *context, float const point[3])
+{
+	return world_sdf_sample((struct world_sdf_volume const *)context, point);
+}
+
+static void world_ao_scene_release(void)
+{
+	if (world_ao_scene.made)
+	{
+		world_cascades_free(&world_ao_scene.cascades);
+		halo_world_ao_cascades(0, 0, 0, 0, 0, 0, NULL);
+	}
+	free(world_ao_scene.box);
+	world_ao_scene.box = NULL;
+	world_ao_scene.made = world_ao_scene.failed = 0;
+	world_ao_scene.structure = NULL;
+}
+
+/* the cascades about the camera, once a frame; their block (each [k] the
+first voxel's centre and the voxel, 0 not ready) */
+static void world_ao_scene_update(float const camera[3], float block[WORLD_CASCADES][4])
+{
+	struct world_sdf_volume const *structure = (struct world_sdf_volume const *)world_sdf_current();
+	unsigned long long start = SDL_GetTicksNS();
+	float reach = WORLD_CASCADE_FINEST * (float)(1 << (WORLD_CASCADES - 1)) *
+		(float)(WORLD_CASCADE_SIDE / 2 + WORLD_CASCADE_RANGE_VOXELS + 1);
+	long count, index, object_count = 0, box_index;
+
+	memset(block, 0, sizeof(float) * 4 * WORLD_CASCADES);
+	if (world_ao_scene.failed)
+		return;
+	if (!world_ao_scene.made)
+	{
+		world_ao_scene.box = malloc(WORLD_CASCADES_BYTES);
+		if (!world_ao_scene.box || !world_cascades_create(&world_ao_scene.cascades))
+		{
+			free(world_ao_scene.box);
+			world_ao_scene.box = NULL;
+			world_ao_scene.failed = 1;
+			return;
+		}
+		world_ao_scene.made = 1;
+		world_ao_scene.structure = NULL;
+		world_ao_scene.updated = world_ao_scene.frame - 1;
+	}
+	if (world_ao_scene.updated != world_ao_scene.frame)
+	{
+		struct world_cascades *cascades = &world_ao_scene.cascades;
+
+		world_ao_scene.updated = world_ao_scene.frame;
+		count = world_proxies_scene(camera, reach, world_ao_scene.shapes, world_ao_scene.owners, WORLD_AO_SCENE_SHAPES);
+		for (index = 0; index < count; index++)
+		{
+			if (index && world_ao_scene.owners[index] == world_ao_scene.owners[index - 1])
+			{
+				world_ao_scene.objects[object_count - 1].count++;
+				continue;
+			}
+			if (object_count >= WORLD_CASCADES_MAXIMUM_OBJECTS)
+				break;
+			world_ao_scene.objects[object_count].id = world_ao_scene.owners[index];
+			world_ao_scene.objects[object_count].first = index;
+			world_ao_scene.objects[object_count].count = 1;
+			object_count++;
+		}
+		world_ao_scene.shapes_seconds += (double)(SDL_GetTicksNS() - start) * 1.0e-9;
+		world_cascades_update(cascades, camera, structure != world_ao_scene.structure,
+			structure ? world_ao_scene_structure : NULL, (void *)structure, world_ao_scene.objects, object_count,
+			world_ao_scene.shapes);
+		world_ao_scene.structure = structure;
+		world_ao_scene.cascades_seconds += (double)(SDL_GetTicksNS() - start) * 1.0e-9;
+		/* (the boxes written: each its texels, x fastest; or the whole) */
+		if (cascades->whole)
+		{
+			halo_world_ao_cascades(0, 0, 0, WORLD_CASCADE_SPAN, WORLD_CASCADE_SPAN, WORLD_CASCADE_SPAN * WORLD_CASCADES,
+				cascades->texels);
+			world_ao_scene.bytes += WORLD_CASCADES_BYTES;
+		}
+		for (box_index = 0; !cascades->whole && box_index < cascades->box_count; box_index++)
+		{
+			struct world_cascades_box const *box = &cascades->boxes[box_index];
+			signed char *at = world_ao_scene.box;
+			long y, z;
+
+			for (z = 0; z < box->size[2]; z++)
+			{
+				for (y = 0; y < box->size[1]; y++)
+				{
+					size_t row = (((size_t)(box->place[2] + z) * WORLD_CASCADE_SPAN + (size_t)(box->place[1] + y)) *
+						WORLD_CASCADE_SPAN + (size_t)box->place[0]) * WORLD_CASCADE_TEXEL;
+
+					memcpy(at, cascades->texels + row, (size_t)box->size[0] * WORLD_CASCADE_TEXEL);
+					at += box->size[0] * WORLD_CASCADE_TEXEL;
+				}
+			}
+			halo_world_ao_cascades((unsigned long)box->place[0], (unsigned long)box->place[1],
+				(unsigned long)box->place[2], (unsigned long)box->size[0], (unsigned long)box->size[1],
+				(unsigned long)box->size[2], world_ao_scene.box);
+			world_ao_scene.bytes += (unsigned long)(at - world_ao_scene.box);
+		}
+		/* (measuring) */
+		{
+			double seconds = (double)(SDL_GetTicksNS() - start) * 1.0e-9;
+
+			world_ao_scene.seconds += seconds;
+			world_ao_scene.most_seconds = seconds > world_ao_scene.most_seconds ? seconds : world_ao_scene.most_seconds;
+			world_ao_scene.voxels += cascades->structure_voxels + cascades->object_voxels;
+			world_ao_scene.moved += cascades->moved;
+			world_ao_scene.boxes += cascades->box_count;
+			if (++world_ao_scene.frames >= 600)
+			{
+				if (getenv("HALO_WORLD_AO_COUNTS"))
+				{
+					printf("world ao: the distance-field scene's update %.3f ms a frame (at most %.3f; its shapes found "
+						"%.3f, the cascades %.3f), %.0f voxels, %.1f objects moved, %.1f boxes, %.1f KB uploaded a frame; "
+						"%ld objects, %ld shapes\n",
+						world_ao_scene.seconds * 1000.0 / 600.0, world_ao_scene.most_seconds * 1000.0,
+						world_ao_scene.shapes_seconds * 1000.0 / 600.0,
+						(world_ao_scene.cascades_seconds - world_ao_scene.shapes_seconds) * 1000.0 / 600.0,
+						(double)world_ao_scene.voxels / 600.0, (double)world_ao_scene.moved / 600.0,
+						(double)world_ao_scene.boxes / 600.0, (double)world_ao_scene.bytes / 600.0 / 1024.0,
+						cascades->object_count, cascades->shape_count);
+					fflush(stdout);
+				}
+				world_ao_scene.seconds = world_ao_scene.most_seconds = 0.0;
+				world_ao_scene.shapes_seconds = world_ao_scene.cascades_seconds = 0.0;
+				world_ao_scene.frames = world_ao_scene.voxels = world_ao_scene.moved = world_ao_scene.boxes = 0;
+				world_ao_scene.bytes = 0;
+			}
+		}
+	}
+	world_cascades_block(&world_ao_scene.cascades, block);
 }
 
 void world_ao_frame_begin(void)
 {
 	const char *test;
 
+	world_ao_scene.frame++;
 	if (!world_ao_mode())
 		return;
 	world_scene_frame_begin();
@@ -302,7 +516,10 @@ static void world_ao_counts_window(void)
 			(double)world_ao_counts.kinds[_world_proxy_field] / 600.0,
 			(double)world_ao_counts.paged / 600.0, (double)world_ao_counts.unpaged / 600.0);
 		fflush(stdout);
-		memset(&world_ao_counts.windows, 0, sizeof(world_ao_counts) - sizeof(world_ao_counts.wanted));
+		/* (the counts zeroed, whatever the padding after wanted) */
+		memset(world_ao_counts.kinds, 0, sizeof(world_ao_counts.kinds));
+		world_ao_counts.windows = world_ao_counts.shapes = world_ao_counts.dynamic = 0;
+		world_ao_counts.paged = world_ao_counts.unpaged = 0;
 	}
 }
 
@@ -339,12 +556,12 @@ void world_ao_window_begin(short local_player_index, short rasterizer_target, fl
 	(void)local_player_index;
 	(void)rasterizer_target;
 	/* (its span, whatever the setting: halo_world_ao_span) */
+	world_ao.span = WORLD_AO_SPAN_OPEN;
 	halo_world_ao_span(WORLD_AO_SPAN_OPEN);
-	/* (none while a map's pipelines are prepared: its draws then are the
-	ones without the world, exactly as with it off, so that the world never
-	lengthens a load. The world's pipelines are made after it, their
-	stand-ins, these, drawing until they are: d3d8_device.c's
-	world_ao_stand_in) */
+	/* (none while a map's pipelines are prepared, nothing being seen then:
+	the front end gives its draws the keys they have in play from their span
+	alone, and makes the pre-pass's twins of them, d3d8_device.c's
+	world_ao_key) */
 	if (!mode)
 		return;
 	if (render_enumerating)
@@ -365,6 +582,19 @@ void world_ao_window_begin(short local_player_index, short rasterizer_target, fl
 		if (mode & WORLD_AO_FIELD)
 			world_ao.volume = (struct world_sdf_volume const *)world_sdf_current();
 		world_ao.fade = world_ao.volume ? world_sdf_fade() : 0.0f;
+		/* (the distance-field scene about the camera, once a frame; the
+		ray-traced scene's instances too, with "ray_traced") */
+		world_ao_scene_update(camera_position, world_ao.cascades);
+		if (mode & WORLD_AO_RAYS)
+			world_rt_frame(world_ao_scene.frame);
+		if (world_ao_scene.windows_frame != world_ao_scene.frame)
+		{
+			world_ao_scene.last_windows = world_ao_scene.windows;
+			world_ao_scene.last_frame = world_ao_scene.windows_frame;
+			world_ao_scene.windows_frame = world_ao_scene.frame;
+			world_ao_scene.windows = 0;
+		}
+		world_ao_scene.windows++;
 	}
 	if (world_ao.count < 0)
 		world_ao.count = 0;
@@ -393,8 +623,35 @@ void world_ao_window_begin(short local_player_index, short rasterizer_target, fl
 	world_ao_counts_window();
 }
 
+int world_ao_prepass_begin(void)
+{
+	/* (its span, whatever the setting and while a map's pipelines are
+	prepared: the surfaces found once a pixel where it is on, which a map's
+	preparation makes the pipelines and twins of: d3d8_device.c's
+	world_ao_key) */
+	if (halo_world_ao_prepass_found())
+	{
+		world_ao.span = WORLD_AO_SPAN_FOUND;
+		halo_world_ao_span(WORLD_AO_SPAN_FOUND);
+	}
+	if (!world_ao.window || config_boolean("debug.world_ao_inline"))
+		return 0;
+	return halo_world_ao_prepass_begin();
+}
+
+void world_ao_prepass_end(short x0, short y0, short x1, short y1, float const camera[4][4])
+{
+	/* (the previous frame's occlusion reprojected only where one window
+	draws a frame, this one and the last: split screen's share the
+	backend's texture) */
+	halo_world_ao_prepass_end(x0, y0, x1, y1, camera, (float const (*)[4])world_ao.cascades, world_ao_scene.frame,
+		world_ao_scene.windows == 1 && world_ao_scene.last_windows == 1 &&
+		world_ao_scene.windows_frame == world_ao_scene.last_frame + 1);
+}
+
 void world_ao_window_end(void)
 {
+	world_ao.span = WORLD_AO_SPAN_NONE;
 	halo_world_ao_span(WORLD_AO_SPAN_NONE);
 	if (!world_ao.window)
 		return;
@@ -407,6 +664,7 @@ void world_ao_object_begin(long object_index)
 	struct world_scene_instance const *instance;
 	int owner = WORLD_AO_OWNER_NONE, baked;
 	float reference = 1.0f;
+	unsigned long rays_owner = 0;
 	long index;
 
 	if (!world_ao.window)
@@ -425,15 +683,30 @@ void world_ao_object_begin(long object_index)
 		}
 		/* (a static scenery placement the field holds: its own geometry is in
 		the field, which a negative reference says: the shaders take its taps
-		from the pixel's own depth in it) */
-		baked = world_ao.volume && world_ao.fade > 0.0f && world_proxies_source_baked(object_index);
+		from the pixel's own depth in it. One without collision geometry (a
+		shrub, a fern) is not in the field: its reference is taken as a moving
+		object's, since the lightmap its ambient light is sampled from already
+		holds what the field finds about it (#781: a shrub by a cliff went
+		black)) */
+		baked = world_ao.volume && world_ao.fade > 0.0f && world_proxies_source_baked(object_index) &&
+			world_proxies_source_solid(object_index);
 		instance = world_ao.volume && world_ao.fade > 0.0f && !baked ? world_scene_instance_find(object_index) : NULL;
 		if (instance)
 			reference = world_ao_reference(world_ao.volume, instance->lighting_point);
 		if (baked)
 			reference = WORLD_AO_REFERENCE_NO_FIELD;
+		/* (its own instances, which its pixels' rays leave out) */
+		if (world_ao_mode() & WORLD_AO_RAYS)
+			rays_owner = world_rt_owner(object_index);
 	}
-	halo_world_ao_object(owner, reference);
+	halo_world_ao_object(owner, reference, rays_owner);
+}
+
+void world_ao_cards(int cards)
+{
+	if (!world_ao.window)
+		return;
+	halo_world_ao_cards(cards);
 }
 
 void world_ao_lightmap_begin(void const *lightmap_bitmap)
@@ -449,13 +722,15 @@ void world_ao_lightmap_begin(void const *lightmap_bitmap)
 		world_ao_counts.paged++;
 	else
 		world_ao_counts.unpaged++;
-	halo_world_ao_object(WORLD_AO_OWNER_NONE, (float)layer);
+	halo_world_ao_object(WORLD_AO_OWNER_NONE, (float)layer, 0);
 }
 
 void world_ao_first_person(int drawing)
 {
-	halo_world_ao_span(drawing ? WORLD_AO_SPAN_FIRST_PERSON : WORLD_AO_SPAN_OPEN);
+	/* (the window's own span again after it) */
+	halo_world_ao_span(!drawing ? world_ao.span : world_ao.span == WORLD_AO_SPAN_FOUND ?
+		WORLD_AO_SPAN_FOUND_FIRST_PERSON : WORLD_AO_SPAN_FIRST_PERSON);
 	if (!world_ao.window)
 		return;
-	halo_world_ao_object(drawing ? WORLD_AO_OWNER_UNLIT : WORLD_AO_OWNER_NONE, 1.0f);
+	halo_world_ao_object(drawing ? WORLD_AO_OWNER_UNLIT : WORLD_AO_OWNER_NONE, 1.0f, 0);
 }

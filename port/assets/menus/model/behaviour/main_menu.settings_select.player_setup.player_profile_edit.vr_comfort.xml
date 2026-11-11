@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The behaviour of ce/main_menu.settings_select.player_setup.player_profile_edit.vr_comfort.xml's widgets, for the menu engine (docs/menu_engine.md; tools/menu_behaviour.py) -->
+<model>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vr_comfort_screen" flags="pass_unhandled_to_focused_child pause_game">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/options_menu" flags="pass_unhandled_to_focused_child up_down_tabs_children"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_bar" flags="pass_unhandled_to_focused_child left_right_tabs_items"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_turn" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/turn_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_snap_turn_angle" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/snap_turn_angle_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_smooth_turn_speed" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/smooth_turn_speed_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vignette" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vignette_strength" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_strength_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_sprint_mode" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_mode_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_sprint_speed" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_speed_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vehicle_view" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vehicle_view_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_third_person" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_third_person_distance" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_distance_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_parkour" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/parkour_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_slide_momentum" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/slide_momentum_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_walljump_scale" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/walljump_scale_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time_scale" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vr_gestures_screen" flags="pass_unhandled_to_focused_child">
+		<on event="a" run="port settings save" open="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/vr_gestures_screen"/>
+		<on event="start" run="port settings save" open="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/vr_gestures_screen"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_defaults">
+		<on event="a" run="port settings defaults"/>
+		<on event="start" run="port settings defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_ok">
+		<on event="a" run="port settings save" back="true"/>
+		<on event="start" run="port settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</behaviour>
+</model>

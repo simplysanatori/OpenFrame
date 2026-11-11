@@ -1,0 +1,247 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The look of ce/main_menu.settings_select.player_setup.player_profile_edit.vr_hud_layout.xml's widgets, for the menu engine (docs/menu_engine.md; tools/menu_look.py) -->
+<model>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/vr_hud_layout_screen" picture="bitmaps/gradient">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/options_menu" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout" box="35 11 640 70" picture="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/header_vr_hud_layout"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help" type="text" box="68 366 550 426">
+		<text font="ui\large_ui" color="#FFFFFFFF" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/help_strings"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/options_menu" type="column_list">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_inset" x="54" y="73"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_x" x="54" y="95"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_y" x="54" y="117"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_scale" x="54" y="139"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_x" x="54" y="161"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_y" x="54" y="183"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_scale" x="54" y="205"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_x" x="54" y="227"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_y" x="54" y="249"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_scale" x="54" y="271"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_x" x="54" y="293"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_y" x="54" y="315"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_scale" x="54" y="337"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_bar" x="0" y="414"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_bar" role="buttons" type="column_list" box="0 0 640 28">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_defaults" x="0" y="1"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_ok" x="380" y="1"/>
+		<at widget="common_button_cancel" x="510" y="1"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_inset" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_inset_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_x" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="1"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_x_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_offset_y" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="2"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_offset_y_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_scale" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="3"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_scale_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_x" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="4"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_x_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_y" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="5"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_y_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_weapon_scale" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="6"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_weapon_scale_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_x" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="7"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_x_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_y" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="8"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_y_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_status_scale" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="9"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_status_scale_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_x" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="10"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_x_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_y" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="11"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_y_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/op_hud_tracker_scale" box="0 0 512 20" picture="main_menu/parts/option_row_512x20">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_track" x="319" y="3"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_value" x="383" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_label" type="text" box="0 0 280 20">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -1" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/labels" index="12"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_track" box="0 0 62 14" picture="main_menu/settings/slider_track">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_thumb" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_thumb" box="0 0 8 14" picture="main_menu/settings/slider_thumb"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/hud_tracker_scale_value" type="text" box="0 0 76 20" picture="main_menu/settings/slider_field">
+		<text font="ui\small_ui" color="#FF2896FF" align="center" at="0 1" flags="no_focus_test"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_defaults" type="text" box="0 0 128 24" picture="bitmaps/text_button_background">
+		<text font="ui\small_ui" color="#FFFFFFFF" align="center" at="0 2" string_list="strings/common_button_captions" index="3"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_hud_layout/button_ok" type="text" box="0 0 128 24" picture="bitmaps/text_button_background">
+		<text font="ui\small_ui" color="#FFFFFFFF" align="center" at="0 2" string_list="strings/common_button_captions" index="1"/>
+	</look>
+</model>

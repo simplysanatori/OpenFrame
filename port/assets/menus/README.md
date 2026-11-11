@@ -12,6 +12,7 @@ controller, the keyboard and the mouse, on every port.
 | `ce/shell/...png` | The pictures, drawn from the high-res redraws in `svg/` (up to 4x), else a placeholder |
 | `NON_HANDDRAWN.md` | The pictures that are not redraws: those drawn from the Xbox's map (the player's own), and the placeholders, to be redrawn |
 | `UNWIRED.md` | The menus' functions that do nothing yet: the lists they fill are empty, and the settings they change do not change |
+| `model/` | The menu engine's model of the generated screens (`docs/menu_engine.md`): `settings.xml`, the settings screens' rows (`tools/port_settings.py`), `look/`, every widget's look (`tools/menu_look.py`), `behaviour/`, every widget's behaviour (`tools/menu_behaviour.py`), and `nodes.xml`, the setup screens' nodes and their rows' conditions (`tools/menu_nodes.py`) |
 | `menus.json` | The files the game embeds |
 
 `tools/ce_menus.py` writes all of them from the PC version's tags and the
@@ -37,35 +38,55 @@ one screen (by its name, `main_menu/settings_select/...`), for looking at it.
 ## Writing them again
 
 `tools/ce_menus.py` writes every file in `ce/` and `menus.json` again,
-the settings screens too (it runs `tools/port_settings.py`'s):
+the settings screens too (it runs `tools/port_settings.py`'s).
+`tools/menus_regen.sh` runs it with its inputs, kept in a folder outside the
+repository (`$MENU_INPUTS`, else `~/dev/menu-inputs`; the tags are the
+game's data, never committed):
 
 ```sh
-python3 tools/ce_menus.py \
-    --tags <halopc-restored>/tags \
-    --definitions <invader>/src/tag/hek/definition \
-    --redraws <ui-svg-handmade> \
-    --placeholder <placeholder.png> \
-    --pictures <extracted-ui-assets-fixed>
+tools/menus_regen.sh --fetch   # gets the inputs, once
+tools/menus_regen.sh           # writes the menus again
+git status                     # only the screens meant to change
 ```
 
-- `--tags`: the PC version's tags (its `ui\shell` widgets, strings and
-  bitmaps).
-- `--definitions`: Invader's tag definitions, which say how the tags are
-  laid out.
-- `--redraws`: the hand-made SVG redraws, copied to `svg/`.
-- `--placeholder`: the picture drawn where a picture has no redraw and the
-  Xbox's map has not got it.
-- `--pictures` (optional): the PC version's pictures, of which only where
-  each sits in its frame is read.
+`--fetch` needs `git` and `python3`; the run needs `rsvg-convert`
+(`librsvg2-bin`, Homebrew's `librsvg`). The inputs, as ce_menus.py's
+options:
 
-It needs `rsvg-convert`, Pillow, NumPy and SciPy. It writes every file, so
-`git status` should show only the screens meant to change; then
-`ninja linux_x86_64` (or `ninja linux_arm64`, `ninja android`) embeds them
-in the game.
+- `--tags`: the PC version's tags (its `ui\shell` widgets, strings and
+  bitmaps): `tags/` of [halopc-restored](https://github.com/Aerocatia/halopc-restored)
+  at the commit `HALOPC_RESTORED_COMMIT` in `menus_regen.sh`.
+- `--definitions`: Invader's tag definitions, which say how the tags are
+  laid out: `src/tag/hek/definition` of
+  [Invader](https://github.com/SnowyMouse/invader) at `INVADER_COMMIT`.
+- `--redraws`: the hand-made SVG redraws (ui-svg-handmade), copied to
+  `svg/`. `svg/` has every redraw the menus draw, so `menus_regen.sh` copies
+  it into the inputs' `redraws/` before each run; a new redraw goes there.
+- `--placeholder`: the picture drawn where a picture has no redraw and the
+  Xbox's map has not got it: `--fetch` cuts it from the largest of those
+  frames (`NON_HANDDRAWN.md`).
+- `--pictures` (optional): the PC version's pictures, of which only where
+  each sits in its frame is read: `--fetch` decodes those of the
+  placeholders' frames from the tags (`tools/ce_menu_pictures.py`).
+
+ce_menus.py needs Pillow, NumPy, SciPy and fontTools (`--fetch` puts them in
+the inputs' `venv/`). Its output does not depend on the computer: the titles
+are laid out by FreeType alone (not Raqm, which some Pillows have), and a
+picture drawn the same as before keeps its file (zlib's builds compress it
+differently). It writes every file; then `ninja linux_x86_64` (or
+`ninja linux_arm64`, `ninja android`) embeds them in the game.
 
 A settings screen (Controls Setup, Gamepads, Mouse, Audio, Video or Network
 Setup) is changed in `tools/port_settings.py`, not in its XML, and written
 with the command above.
+
+`python3 tools/ce_menus.py --port-pictures` writes the port's own screens and
+the pictures `tools/port_settings.py` draws (Settings', the shared parts,
+the campaign's) without the PC version's tags: their entries in
+`ce/bitmaps.xml`, each frame drawn again only where its SVG changed, the
+files of those no screen names any more removed, and `menus.json`. The
+rest of `ce/bitmaps.xml` stays as it is. It needs `rsvg-convert`, Pillow and
+NumPy.
 
 ## Elements
 
@@ -132,7 +153,7 @@ be a child of many).
 | `font` | `large`, `small`, `terminal`, `heading` (the port's: `large`'s measures, drawn in OpenCE by the high-res text; `large` where the map has no `large_ui`), or a font tag of the map |
 | `color` | The text's colour, `#RRGGBB` or `#AARRGGBB`. Focused text is white. |
 | `align`, `text_x`, `text_y` | `left`, `right` or `center`, and where the text starts in it |
-| `text_flags` | `editable`, `password`, `flashing`, `no_focus_test` |
+| `text_flags` | `editable`, `password`, `flashing`, `no_focus_test`, or the port's `wrap`: its text wrapped to its width less `text_x` each side (its written line breaks kept; with the port's `unbreak` too, made spaces, a word broken with a hyphen whole again), in the smaller font or drawn smaller where it would be taller than its height less `text_y` above and below |
 | `list_flags` | `items_in_code`, `items_from_strings` (a spinner showing its strings), `one_tooltip`, `single_preview` |
 | `strings`, `setting`, `values` | A spinner's values as shown, separated by `\|`; its `config.toml` setting and the values written for each (`port setting load` and `port setting save`) |
 | `header_bitmap`, `footer_bitmap`, `header_bounds`, `footer_bounds` | A list's header and footer: a `<bitmap>` and "top left bottom right" |
@@ -140,6 +161,7 @@ be a child of many).
 | `controller` | `1` to `4`, or `any` (the default); a `<child>`'s or `child_controller`: the one it is for |
 | `auto_close`, `auto_close_fade` | It closes itself after this many milliseconds, fading for this many |
 | `wide` | "dx dw": on a 16:9 screen the widget (and what is in it) moves dx and is dw wider, and on a narrower one by its part of that (none at 4:3); a wider one has 16:9's. Below |
+| `radius` | Its picture's corners cut round by this many units (1 to 64), drawn at the display's resolution: nothing of the picture past them (the campaign's mission pictures) |
 | `platform` | `desktop`, `android` or `web`, or several separated by spaces: it is only there; `vr`: only in the VR build while it plays in the headset; `touch`: the touchscreen's builds (Android, iOS, or `debug.touch_menus`), `pointer`: the others; `computer`: the desktop's builds but iOS's. Every element takes this. |
 
 Widget flags: `pass_unhandled_to_focused_child` (an event it does not handle

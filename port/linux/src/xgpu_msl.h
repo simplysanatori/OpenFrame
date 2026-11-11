@@ -51,10 +51,6 @@ draw reads the frame's, wherever its ring put them) */
 the buffer's t), a buffer of its own: the cells' clusters' masks are the
 cells' (their texture's slice past them, in its order) */
 #define XGPU_MSL_BUFFER_DYNAMIC_LIGHT_WORLD 24
-/* display.ambient_occlusion: the occlusion of the 3D view, read at the pixel
-by the draws whose pixel key has it (xgpu.h's XGPU_AMBIENT_OCCLUSION_LIGHT_*;
-white where the backend found none) */
-#define XGPU_MSL_TEXTURE_AMBIENT_OCCLUSION 4
 /* display.ambient_occlusion "world" (xgpu_stream.h): the structure's
 distance field, its atlas of bricks (texture3d<float>, read through a
 constexpr linear sampler clamped to its edge) and its table of cells
@@ -66,7 +62,13 @@ constexpr linear sampler clamped to its edge) and its table of cells
 /* (the vehicles' occlusion fields' atlas: a 3D texture of four halves;
 past the combiner's places, 8 to 19) */
 #define XGPU_MSL_TEXTURE_WORLD_AO_OBJECTS 20
+/* (the distance-field scene's cascades: xgpu.h's XGPU_WORLD_CASCADE*) */
+#define XGPU_MSL_TEXTURE_WORLD_CASCADES 22
 #define XGPU_MSL_BUFFER_WORLD_AO 23
+/* (display.ambient_occlusion "world" found once a pixel: its texture, a
+float a pixel, which the draws with XGPU_AMBIENT_OCCLUSION_WORLD_SAMPLED
+read; past the combiner's places and the objects' atlas) */
+#define XGPU_MSL_TEXTURE_WORLD_AO_PIXELS 21
 
 /* the draw's values both stages read, laid out alike in C and in Metal
 (float4s, and floats in fours): d3d8_gl.c's draw uniforms, the per-pixel
@@ -99,9 +101,14 @@ struct xgpu_msl_uniforms
 	float model_lights[XGPU_MODEL_LIGHT_COUNT][4];
 	/* display.ambient_occlusion "world" (xgpu.h): the draw's object, its
 	owner slot among the window's proxies (-1 none) and its reference, then
-	two spare; declared in the pixel shaders that read it alone, the last
-	member, so that the others' text is as it was */
+	two spare; declared in the pixel shaders that read it alone, past the
+	others, so that their text is as it was */
 	float world_ao[4];
+	/* display.dynamic_lights "enhanced": the lights' tint in the
+	structure's lightmap pass, ps_final_c0's color in linear light (to the
+	2.2), which the backend works out; declared (past world_ao) in those
+	pixel shaders alone */
+	float dynamic_light_tint[4];
 };
 
 /* what the Metal Shading Language is written for (xgpu_msl.c):
@@ -120,6 +127,23 @@ struct xgpu_msl_options
 	const char *debug_expression;
 	BOOL debug_texture0, debug_flat;
 };
+
+/* display.ambient_occlusion "world" found once a pixel (xgpu_stream.h's
+WORLD_AO_PREPASS): its pass's functions, one source. xgpu_world_ao_vertex
+covers the viewport with one triangle; xgpu_world_ao_pass draws the
+occlusion into an RGBA32Float target, at each 2x2 block's nearest pixel at a
+quarter of the pixels (the pass's camera[3].w 2) or at each pixel (1): the
+occlusion, the pixel's distance from the eye, its normal octahedral (what
+the surfaces upsample it by). Its textures: the pre-pass's inputs (0,
+RGBA32Uint); the field's and the objects' atlas and the window's block where
+the surfaces have them; the pass's struct xgpu_world_ao_pass at buffer
+XGPU_MSL_BUFFER_UNIFORMS. The vertex function's source, or (pixel) the
+pass's. Returns a malloc'd string. */
+/* (the pass's history, the previous frame's occlusion of the window, and
+the distance-field scene's cascades: its textures past the inputs') */
+#define XGPU_MSL_WORLD_AO_PASS_HISTORY 1
+#define XGPU_MSL_WORLD_AO_PASS_CASCADES 2
+char *xgpu_msl_world_ao_pass(BOOL pixel);
 
 /* the vertex program (xgpu_shader.h) as a Metal vertex function,
 xgpu_vertex: packed_attribute_mask's attributes are NORMPACKED3,
@@ -164,5 +188,16 @@ struct xgpu_msl_halo_uniforms
 };
 
 char *xgpu_msl_halo_shader(BOOL pixel);
+
+/* the distance-field scene's ray step (port/linux/include/world_cascades.h's
+world_trace_ray: struct world_trace_hit and world_trace(world_cascades,
+cascades, origin, direction, t_max, mask), the cascades' texture and their
+four vec4s as xgpu.h's XGPU_WORLD_CASCADE* describes them) appended to a
+shader's text; and a fragment function of it alone,
+xgpu_world_trace_test (its ray from its inputs, the hit, t and kind
+written), for tools/test_world_trace.py. A malloc'd string */
+struct xgpu_text;
+void xgpu_msl_world_trace(struct xgpu_text *text);
+char *xgpu_msl_world_trace_test(void);
 
 #endif

@@ -10994,9 +10994,9 @@ void game_engine_postspawn_player_update(
 
 
 
-/* port: port/linux/game/hud_key_prompts.c's: a button's word in a message
-as its icon's name, which the HUD draws as the prompts draw the button */
-void hud_key_prompt_button_word(wchar_t *text, long length, wchar_t const *word, wchar_t const *icon);
+/* port: port/linux/game/hud_key_prompts.c's: the score hint's BACK as the
+Back button's icon where the HUD draws something for it */
+void hud_key_prompt_score_hint(short local_player_index, wchar_t *text, long length);
 
 boolean game_engine_get_state_message(
 	long player_index,
@@ -11059,10 +11059,12 @@ boolean game_engine_get_state_message(
 				message_character_count);
 			/* port: its BACK the Back button's icon, which the HUD draws as
 			the prompts draw a button: the scoreboard's key while the
-			keyboard and mouse play, else the controller's Back (the string
-			is the map's, which names the button in words) */
+			keyboard and mouse play; with a controller the word stays where
+			the map's message icons have no picture of Back, as the Xbox's
+			have not (the string is the map's, which names the button in
+			words) */
 			if (result)
-				hud_key_prompt_button_word(message, message_character_count, L"BACK", L"%back-button");
+				hud_key_prompt_score_hint(player->local_player_index, message, message_character_count);
 		}
 		else if (player->state_message != NONE)
 		{
@@ -11423,4 +11425,51 @@ void game_engine_read_network_state(
 	shows it) */
 	if (postgame_state != 0 && game_engine_globals.postgame_state == 0)
 		game_engine_end_game();
+}
+
+/* port: what the game engine keeps outside the game state that the ticks
+read (its flags, the goals, the vehicles' homes, the friendly fire
+penalties, then each game type's), part by part (NULL past the last), for a
+demo (port/linux/game/demo.c): its playback has the recording's */
+void *game_engine_ctf_port_demo_state(short part, long *size);
+void *game_engine_oddball_port_demo_state(short part, long *size);
+void *game_engine_king_port_demo_state(short part, long *size);
+void *game_engine_race_port_demo_state(short part, long *size);
+void *game_engine_slayer_port_demo_state(short part, long *size);
+
+void *game_engine_port_demo_state(
+	short part,
+	long *size)
+{
+	static void *(*const types[])(short part, long *size) = {
+		game_engine_ctf_port_demo_state, game_engine_oddball_port_demo_state, game_engine_king_port_demo_state,
+		game_engine_race_port_demo_state, game_engine_slayer_port_demo_state,
+	};
+	short type_index;
+
+	switch (part)
+	{
+	case 0: *size = (long)sizeof(game_engine_globals); return &game_engine_globals;
+	case 1: *size = (long)sizeof(global_goal); return global_goal;
+	case 2: *size = (long)sizeof(game_engine_vehicle_homes); return game_engine_vehicle_homes;
+	case 3: *size = (long)sizeof(game_engine_vehicle_home_count); return &game_engine_vehicle_home_count;
+	case 4: *size = (long)sizeof(game_engine_vehicle_homes_waiting); return game_engine_vehicle_homes_waiting;
+	case 5: *size = (long)sizeof(game_engine_vehicles_leaving); return game_engine_vehicles_leaving;
+	case 6: *size = (long)sizeof(game_engine_vehicles_leaving_count); return &game_engine_vehicles_leaving_count;
+	case 7: *size = (long)sizeof(game_engine_betrayal_penalty); return game_engine_betrayal_penalty;
+	case 8: *size = (long)sizeof(game_engine_vehicles_placed); return game_engine_vehicles_placed;
+	}
+	part -= 9;
+	for (type_index = 0; type_index < (short)NUMBEROF(types); type_index++)
+	{
+		short count = 0;
+		long part_size;
+
+		while (types[type_index](count, &part_size))
+			count++;
+		if (part < count)
+			return types[type_index](part, size);
+		part -= count;
+	}
+	return NULL;
 }

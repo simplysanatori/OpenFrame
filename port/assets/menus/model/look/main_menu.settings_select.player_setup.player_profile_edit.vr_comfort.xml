@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The look of ce/main_menu.settings_select.player_setup.player_profile_edit.vr_comfort.xml's widgets, for the menu engine (docs/menu_engine.md; tools/menu_look.py) -->
+<model>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vr_comfort_screen" picture="bitmaps/gradient">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/header_vr_comfort" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/options_menu" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/header_vr_comfort" box="35 11 640 70" picture="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/header_vr_comfort"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/help" type="text" box="68 366 550 426">
+		<text font="ui\large_ui" color="#FFFFFFFF" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/help_strings"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/options_menu" type="column_list">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_turn" x="54" y="73"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_snap_turn_angle" x="54" y="91"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_smooth_turn_speed" x="54" y="109"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vignette" x="54" y="127"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vignette_strength" x="54" y="145"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_sprint_mode" x="54" y="163"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_sprint_speed" x="54" y="181"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vehicle_view" x="54" y="199"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_third_person" x="54" y="217"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_third_person_distance" x="54" y="235"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_parkour" x="54" y="253"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_slide_momentum" x="54" y="271"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_walljump_scale" x="54" y="289"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time" x="54" y="307"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time_scale" x="54" y="325"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vr_gestures_screen" x="54" y="343"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_bar" x="0" y="414"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_bar" role="buttons" type="column_list" box="0 0 640 28">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_defaults" x="0" y="1"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_ok" x="380" y="1"/>
+		<at widget="common_button_cancel" x="510" y="1"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_turn" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/turn_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/turn_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/turn_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/turn_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="SNAP|SMOOTH"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_snap_turn_angle" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/snap_turn_angle_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/snap_turn_angle_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/snap_turn_angle_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="1"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/snap_turn_angle_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="15 DEGREES|22.5 DEGREES|30 DEGREES|45 DEGREES|60 DEGREES|90 DEGREES"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_smooth_turn_speed" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/smooth_turn_speed_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/smooth_turn_speed_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/smooth_turn_speed_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="2"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/smooth_turn_speed_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="60 DEG/S|90 DEG/S|120 DEG/S|150 DEG/S|180 DEG/S|240 DEG/S|300 DEG/S|360 DEG/S"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vignette" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="3"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="VEHICLES|ALWAYS|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vignette_strength" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_strength_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_strength_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_strength_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="4"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vignette_strength_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="25%|50%|75%|100%|125%|150%"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_sprint_mode" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_mode_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_mode_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_mode_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="5"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_mode_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="OFF|TOGGLE|ARM SWING"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_sprint_speed" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_speed_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_speed_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_speed_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="6"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/sprint_speed_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="1.25X|1.5X|1.75X|2X"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vehicle_view" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vehicle_view_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vehicle_view_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vehicle_view_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="7"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vehicle_view_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="FIRST PERSON|THIRD PERSON"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_third_person" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="8"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="ON|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_third_person_distance" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_distance_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_distance_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_distance_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="9"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/third_person_distance_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="1 M|1.5 M|1.7 M|2 M|2.5 M|3 M|4 M"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_parkour" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/parkour_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/parkour_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/parkour_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="10"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/parkour_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="ON|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_slide_momentum" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/slide_momentum_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/slide_momentum_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/slide_momentum_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="11"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/slide_momentum_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="0.5X|0.75X|1X|1.5X|2X"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_walljump_scale" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/walljump_scale_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/walljump_scale_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/walljump_scale_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="12"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/walljump_scale_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="0.5X|0.75X|1X|1.25X|1.5X"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="13"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="ON|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_bullet_time_scale" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_label" type="text" box="0 0 280 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="14"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/bullet_time_scale_spinner" type="spinner" box="0 -3 206 19" header="bitmaps/arrow_sm_left" header_box="-13 2 -7 14" footer="bitmaps/arrow_sm_right" footer_box="213 2 219 14">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="25%|40%|50%|65%|80%"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/op_vr_gestures_screen" box="0 0 512 16" picture="main_menu/parts/option_row_512x16">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vr_gestures_screen_label" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/vr_gestures_screen_label" type="text" box="0 0 480 16">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 -3" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/labels" index="15"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_defaults" type="text" box="0 0 128 24" picture="bitmaps/text_button_background">
+		<text font="ui\small_ui" color="#FFFFFFFF" align="center" at="0 2" string_list="strings/common_button_captions" index="3"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_comfort/button_ok" type="text" box="0 0 128 24" picture="bitmaps/text_button_background">
+		<text font="ui\small_ui" color="#FFFFFFFF" align="center" at="0 2" string_list="strings/common_button_captions" index="1"/>
+	</look>
+</model>

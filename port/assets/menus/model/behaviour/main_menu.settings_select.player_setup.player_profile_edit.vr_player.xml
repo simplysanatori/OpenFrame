@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The behaviour of ce/main_menu.settings_select.player_setup.player_profile_edit.vr_player.xml's widgets, for the menu engine (docs/menu_engine.md; tools/menu_behaviour.py) -->
+<model>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/vr_player_screen" flags="pass_unhandled_to_focused_child pause_game">
+		<on event="b" back="true"/>
+		<on event="back" back="true"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/options_menu" flags="pass_unhandled_to_focused_child up_down_tabs_children"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/button_bar" flags="pass_unhandled_to_focused_child left_right_tabs_items"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_dominant_hand" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/dominant_hand_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_swap_sticks" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/swap_sticks_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_height" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/height_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_player_height" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/player_height_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_physical_crouch" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/physical_crouch_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_world_scale" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/world_scale_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_auto_recentre" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/auto_recentre_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_held_lean" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/held_lean_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/op_death_view" flags="pass_unhandled_to_focused_child"/>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/death_view_spinner" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+		<on event="created" run="port setting load"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/button_defaults">
+		<on event="a" run="port settings defaults"/>
+		<on event="start" run="port settings defaults"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</behaviour>
+	<behaviour name="main_menu/settings_select/player_setup/player_profile_edit/vr_player/button_ok">
+		<on event="a" run="port settings save" back="true"/>
+		<on event="start" run="port settings save" back="true"/>
+		<on event="left_mouse" run="mouse emit accept event"/>
+	</behaviour>
+</model>

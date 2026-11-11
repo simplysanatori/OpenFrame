@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The look of ce/main_menu.settings_select.player_setup.player_profile_edit.vr_wrist.xml's widgets, for the menu engine (docs/menu_engine.md; tools/menu_look.py) -->
+<model>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/vr_wrist_screen" picture="bitmaps/gradient">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/header_vr_wrist" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/options_menu" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/header_vr_wrist" box="35 11 640 70" picture="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/header_vr_wrist"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/help" type="text" box="68 366 550 426">
+		<text font="ui\large_ui" color="#FFFFFFFF" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/help_strings"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/options_menu" type="column_list">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/op_wrist_hud_scale" x="54" y="73"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/op_wrist_hud_offset_along" x="54" y="101"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/op_wrist_hud_offset_across" x="54" y="129"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/op_wrist_hud_offset_out" x="54" y="157"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/button_bar" x="0" y="414"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/button_bar" role="buttons" type="column_list" box="0 0 640 28">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/button_defaults" x="0" y="1"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/button_ok" x="380" y="1"/>
+		<at widget="common_button_cancel" x="510" y="1"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/op_wrist_hud_scale" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_scale_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_scale_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_scale_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/labels" index="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_scale_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="50%|75%|100%|125%|150%|200%"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/op_wrist_hud_offset_along" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_along_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_along_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_along_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/labels" index="1"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_along_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="-10 CM|-5 CM|-2 CM|0 CM|+2 CM|+5 CM|+10 CM"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/op_wrist_hud_offset_across" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_across_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_across_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_across_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/labels" index="2"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_across_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="-10 CM|-5 CM|-2 CM|0 CM|+2 CM|+5 CM|+10 CM"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/op_wrist_hud_offset_out" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_out_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_out_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_out_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/labels" index="3"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/wrist_hud_offset_out_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="-10 CM|-5 CM|-2 CM|0 CM|+2 CM|+5 CM|+10 CM"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/button_defaults" type="text" box="0 0 128 24" picture="bitmaps/text_button_background">
+		<text font="ui\small_ui" color="#FFFFFFFF" align="center" at="0 2" string_list="strings/common_button_captions" index="3"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_wrist/button_ok" type="text" box="0 0 128 24" picture="bitmaps/text_button_background">
+		<text font="ui\small_ui" color="#FFFFFFFF" align="center" at="0 2" string_list="strings/common_button_captions" index="1"/>
+	</look>
+</model>

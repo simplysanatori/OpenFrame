@@ -60,6 +60,18 @@ record carries to its OpenH1 machines (_network_game_classic_turning_bit);
 a Legacy game's players, and an OpenCE machine's, always turn, as OpenCE's
 machines turn them */
 boolean network_standard_turns_with_aim(long player_index);
+/* whether the players' bipeds have the animation enhancements in this game
+(units.c's unit_animation_enhanced: a seat's reload borrowed, the hands
+off a vehicle's grips in a throw, the throw's pose), which move their nodes
+and with them where their shots go and what they are hit by: a rule of the
+game, as the host's game.enhanced_animations (the record's
+_network_game_classic_turning_bit) in an OpenH1 game, both on the host
+and its clients; this machine's setting as the map began in a game of its
+own and a Legacy game; a demo's recording's in its playback */
+boolean network_standard_enhanced_animations(void);
+/* the rules above as the game has them, for a demo's header (demo.h's
+_demo_rule_*) */
+unsigned long network_standard_demo_rules(void);
 
 /* joining: whether the game joined is Standard (its advertisement's), set
 as the join begins, and its join token made a Standard game's */
@@ -110,6 +122,10 @@ plays on an OpenCE machine, and so at 30 (objects.c's lanes): the host's
 from its machines, a client's from its host
 (_distributed_message_opence_players) */
 boolean network_standard_player_is_opence(long player_index);
+/* ... for a demo (demo.c's G records): the players' as a host's next tick
+takes them, and in a demo's playback the recording's, which
+network_standard_player_is_opence then answers with */
+void *network_standard_port_demo_state(long *size);
 /* a new game (network_distributed.c), each tick of the host (it tells its
 OpenH1 clients which players are OpenCE's) and the message it sends them */
 void network_standard_new_game(void);

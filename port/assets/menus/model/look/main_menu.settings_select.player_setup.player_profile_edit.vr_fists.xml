@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- The look of ce/main_menu.settings_select.player_setup.player_profile_edit.vr_fists.xml's widgets, for the menu engine (docs/menu_engine.md; tools/menu_look.py) -->
+<model>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/vr_fists_screen" picture="bitmaps/gradient">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/header_vr_fists" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/options_menu" x="0" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/header_vr_fists" box="35 11 640 70" picture="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/header_vr_fists"/>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/help" type="text" box="68 366 550 426">
+		<text font="ui\large_ui" color="#FFFFFFFF" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/help_strings"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/options_menu" type="column_list">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fists" x="54" y="73"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fist_speed" x="54" y="101"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fist_damage" x="54" y="129"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_weapon_pull" x="54" y="157"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_weapon_pull_range" x="54" y="185"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_hand_swap" x="54" y="213"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_prop_throw" x="54" y="241"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_prop_throw_strength" x="54" y="269"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_grab_world" x="54" y="297"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_bar" x="0" y="414"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_bar" role="buttons" type="column_list" box="0 0 640 28">
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_defaults" x="0" y="1"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_ok" x="380" y="1"/>
+		<at widget="common_button_cancel" x="510" y="1"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fists" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fists_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fists_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fists_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fists_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="ON|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fist_speed" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_speed_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_speed_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_speed_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="1"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_speed_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="1.5 M/S|2 M/S|2.5 M/S|3 M/S|3.5 M/S|4 M/S"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_fist_damage" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_damage_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_damage_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_damage_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="2"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/fist_damage_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="15%|25%|33%|50%|75%|100%"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_weapon_pull" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="3"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="ON|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_weapon_pull_range" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_range_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_range_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_range_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="4"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/weapon_pull_range_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="1 M|2 M|3 M|4 M|5 M"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_hand_swap" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/hand_swap_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/hand_swap_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/hand_swap_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="5"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/hand_swap_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="ON|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_prop_throw" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="6"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="ON|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_prop_throw_strength" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_strength_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_strength_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_strength_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="7"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/prop_throw_strength_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="0.5X|1X|1.5X|2X|2.5X|3X"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/op_grab_world" box="0 0 512 26" picture="main_menu/parts/option_row_512x26">
+		<text color="#FF2896FF"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/grab_world_label" x="0" y="0"/>
+		<at widget="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/grab_world_spinner" x="286" y="0"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/grab_world_label" type="text" box="0 0 280 26">
+		<text font="ui\large_ui" color="#FF2896FF" at="13 2" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/labels" index="8"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/grab_world_spinner" type="spinner" box="0 2 206 24" header="bitmaps/arrow_sm_left" header_box="-13 7 -7 19" footer="bitmaps/arrow_sm_right" footer_box="213 7 219 19">
+		<text font="ui\large_ui" color="#FF2896FF" align="center" at="0 0" items="ON|OFF"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_defaults" type="text" box="0 0 128 24" picture="bitmaps/text_button_background">
+		<text font="ui\small_ui" color="#FFFFFFFF" align="center" at="0 2" string_list="strings/common_button_captions" index="3"/>
+	</look>
+	<look name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/button_ok" type="text" box="0 0 128 24" picture="bitmaps/text_button_background">
+		<text font="ui\small_ui" color="#FFFFFFFF" align="center" at="0 2" string_list="strings/common_button_captions" index="1"/>
+	</look>
+</model>

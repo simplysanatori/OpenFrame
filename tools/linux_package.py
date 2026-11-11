@@ -15,7 +15,7 @@ anywhere and starts with bin/openh1:
     share/openh1/masters.txt                   the master servers (network.masters_file)
     share/openh1/prepared.records              the stock maps' preparations' records (prepared_shipped.h)
     share/openh1/openh1.assets                 the textures', fonts' and menus' bytes (embedded_assets.h)
-    share/openh1/relays.txt                    the relays offered (network.relays_file: none in it)
+    share/openh1/relays.txt                    the relays offered (network.relays_file)
     share/openh1/vr                            only in the VR build's (--vr): install.sh's sign of it
     share/openh1/steam/<kind>.png              Steam's library artwork, which install.sh gives its shortcut
                                                (port/assets/steam, tools/steam_art.py; the VR build's OpenH1 VR's)
@@ -72,8 +72,10 @@ def notices(platform: str) -> List[Tuple[Path, str]]:
         # internet play's UPnP (port/third_party/miniupnpc), in every build,
         # whose BSD license asks binaries to carry its notice
         (ROOT / "port/third_party/miniupnpc/LICENSE", "miniupnpc-LICENSE.txt"),
-        # the text's fonts (port/assets/fonts), embedded in every build, whose
-        # SIL Open Font License asks each copy to carry it
+        # the text's font, Cyborg Interface Gothic, by fizzy, and the font of
+        # what it lacks, Overpass (port/assets/fonts), embedded in every
+        # build, whose SIL Open Font License asks each copy to carry it
+        (ROOT / "port/assets/fonts/CyborgInterfaceGothic-OFL.txt", "CyborgInterfaceGothic-OFL.txt"),
         (ROOT / "port/assets/fonts/Overpass-OFL.txt", "Overpass-OFL.txt"),
         # the console's font (port/assets/fonts), embedded in every build,
         # whose MIT and Bitstream Vera licenses ask copies to carry them
@@ -81,6 +83,13 @@ def notices(platform: str) -> List[Tuple[Path, str]]:
         # the menus' headings' font (port/assets/fonts), embedded in every
         # build, whose SIL Open Font License asks each copy to carry it
         (ROOT / "port/assets/fonts/OpenCE-OFL.txt", "OpenCE-OFL.txt"),
+        # the font OpenCE is made from, Newtown, in the public domain, whose
+        # statement OpenCE-OFL.txt names
+        (ROOT / "port/assets/fonts/Newtown-LICENSE.txt", "Newtown-LICENSE.txt"),
+        # the high-res text's distance fields (port/third_party/msdfgen/msdf_gen.h,
+        # msdfgen translated to C), in every build, whose MIT license asks
+        # copies to carry its notice
+        (ROOT / "port/third_party/msdfgen/LICENSE.txt", "msdfgen-LICENSE.txt"),
         # the menus' XML parser (port/third_party/expat), in every build,
         # whose MIT license asks copies to carry its notice
         (ROOT / "port/third_party/expat/COPYING", "expat-COPYING.txt"),

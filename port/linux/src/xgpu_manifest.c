@@ -87,17 +87,18 @@ static const struct field pixel_fields[] = {
 
 /* a d record's context (xgpu_manifest_context): cl the vertex program's
 lighting (lights, world's transform found), ct the targets (multisampled,
-screen colour), co the occlusion (pre-pass, ready), cd the dynamic lights
+screen colour), cd the dynamic lights
 (present, the lightmap pass), ch the HDR tag's (category, 3D view, kind),
-cw the world's occlusion's light (a recording without it: none) */
+cw the world's occlusion's light (a recording without it: none), cf its
+window found once a pixel by the pre-pass (none) */
 static const struct field context_fields[] = {
 	CONTEXT_FIELD("cl", lights, 1, 2),
 	CONTEXT_FIELD("ct", multisampled, 1, 2),
-	CONTEXT_FIELD("co", occlusion_prepass, 1, 2),
 	CONTEXT_FIELD("cd", lights_present, 1, 2),
 	CONTEXT_FIELD("ch", hdr_category, 1, 2),
 	CONTEXT_FIELD("ck", hdr_kind, 2, 1),
 	CONTEXT_FIELD("cw", world, 1, 1),
+	CONTEXT_FIELD("cf", found, 1, 1),
 };
 
 #define FIELD_COUNT(fields) (sizeof(fields) / sizeof((fields)[0]))
@@ -753,11 +754,8 @@ int xgpu_draw_derive(const struct xgpu_draw_facts *facts, int unlit, struct xgpu
 	if (facts->sample_mask && facts->samples > 1 && facts->alpha_test && !facts->blend)
 		derived->alpha_test_samples = (uint8_t)facts->samples;
 	derived->hdr = facts->hdr_target ? facts->hdr : 0;
-	/* display.ambient_occlusion's pre-pass: the depth (and the marks) alone,
-	its draws unlit */
-	derived->no_color = facts->occlusion_prepass ? 1 : 0;
 	derived->lighting = XGPU_LIGHTING_NONE;
-	if (!unlit && facts->lights && !facts->lighting_failed && !facts->occlusion_prepass && facts->per_pixel)
+	if (!unlit && facts->lights && !facts->lighting_failed && facts->per_pixel)
 	{
 		/* a model lighting program's draw lit for each pixel: the enhanced
 		dynamic lights in its two point lights' place, its ambient light by
@@ -766,27 +764,24 @@ int xgpu_draw_derive(const struct xgpu_draw_facts *facts, int unlit, struct xgpu
 		derived->per_pixel_lighting = (uint8_t)facts->lights;
 		if (facts->lights_active && facts->world_found)
 			derived->dynamic_lights = XGPU_DYNAMIC_LIGHTS_MODEL;
-		if (facts->occlusion_ready)
-			derived->ambient_occlusion = XGPU_AMBIENT_OCCLUSION_LIGHT_MODEL;
-		else if (facts->world && (facts->lights == 2 || facts->world_found))
+		if (facts->world && (facts->lights == 2 || facts->world_found))
 			derived->ambient_occlusion = (uint8_t)(facts->world | XGPU_AMBIENT_OCCLUSION_LIGHT_MODEL);
 		derived->lighting = facts->lights == 2 ? XGPU_LIGHTING_MODEL_POINT : XGPU_LIGHTING_MODEL;
 		return 1;
 	}
-	if (!unlit && facts->lights && !facts->lighting_failed && !facts->split_failed && (facts->occlusion_ready ||
-		(facts->world && (facts->lights == 2 || facts->world_found))))
+	if (!unlit && facts->lights && !facts->lighting_failed && !facts->split_failed && facts->world &&
+		(facts->lights == 2 || facts->world_found))
 	{
-		/* the occlusion over a model lit for each vertex: its ambient light
-		handed on apart, by the occlusion at each pixel (the program's own
-		sum clamps each vertex's light: xgpu.h); the world's where its
-		lighting has its world position */
-		derived->ambient_occlusion = (uint8_t)(facts->occlusion_ready ? XGPU_AMBIENT_OCCLUSION_LIGHT_VERTEX :
-			facts->world | XGPU_AMBIENT_OCCLUSION_LIGHT_VERTEX);
+		/* the world's occlusion over a model lit for each vertex, where its
+		lighting has its world position: its ambient light handed on apart,
+		by the occlusion at each pixel (the program's own sum clamps each
+		vertex's light: xgpu.h) */
+		derived->ambient_occlusion = (uint8_t)(facts->world | XGPU_AMBIENT_OCCLUSION_LIGHT_VERTEX);
 		derived->lighting = XGPU_LIGHTING_MODEL_SPLIT;
 		return 1;
 	}
 	if (!unlit && facts->environment && facts->lights_active && !facts->immediate && !facts->lighting_failed &&
-		!facts->occlusion_prepass && (facts->packed_attributes & 0xe) == 0xe)
+		(facts->packed_attributes & 0xe) == 0xe)
 	{
 		/* a structure's lightmap pass lit by the dynamic lights (its normal,
 		binormal and tangent packed: rasterizer_xbox_vertex_shaders_initialize.c's
@@ -795,15 +790,13 @@ int xgpu_draw_derive(const struct xgpu_draw_facts *facts, int unlit, struct xgpu
 		derived->dynamic_lights = XGPU_DYNAMIC_LIGHTS_ENVIRONMENT;
 		if (facts->hdr_target)
 			derived->hdr |= XGPU_HDR_LIGHTS;
-		if (facts->occlusion_ready && !facts->blend)
-			derived->ambient_occlusion = XGPU_AMBIENT_OCCLUSION_LIGHT_LIGHTMAP;
-		else if (facts->world && !facts->blend)
+		if (facts->world && !facts->blend)
 			derived->ambient_occlusion = (uint8_t)(facts->world | XGPU_AMBIENT_OCCLUSION_LIGHT_LIGHTMAP);
 		derived->lighting = XGPU_LIGHTING_ENVIRONMENT;
 		return 1;
 	}
 	if (!unlit && facts->world && facts->environment && !facts->immediate && !facts->lighting_failed &&
-		!facts->occlusion_prepass && !facts->blend && (facts->packed_attributes & 0xe) == 0xe)
+		!facts->blend && (facts->packed_attributes & 0xe) == 0xe)
 	{
 		/* the world's occlusion over a structure's lightmap pass without the
 		enhanced dynamic lights: lit as its program lights it, its vertex
@@ -813,10 +806,6 @@ int xgpu_draw_derive(const struct xgpu_draw_facts *facts, int unlit, struct xgpu
 		derived->lighting = XGPU_LIGHTING_ENVIRONMENT;
 		return 1;
 	}
-	/* (unlit by these shaders: a lightmap pass's light, drawn opaque, by the
-	occlusion; nothing else) */
-	if (facts->occlusion_ready && facts->environment && !facts->immediate && !facts->blend)
-		derived->ambient_occlusion = XGPU_AMBIENT_OCCLUSION_LIGHT_LIGHTMAP;
 	return 0;
 }
 
@@ -876,11 +865,8 @@ int xgpu_manifest_derive(const struct xgpu_manifest_draw *draw, const struct xgp
 		tagged.kind = context->hdr_kind;
 		facts.hdr = xgpu_hdr_classify(&tagged);
 	}
-	/* (as the journal's draws played with the occlusion on or off:
-	d3d8_device.c's journal_occlusion; "world" has no pre-pass, and its
-	light where its window is given: d3d8_device.c's world_ao_key) */
-	facts.occlusion_prepass = settings->ambient_occlusion == XGPU_MANIFEST_OCCLUSION_SCREEN && context->occlusion_prepass;
-	facts.occlusion_ready = settings->ambient_occlusion == XGPU_MANIFEST_OCCLUSION_SCREEN && context->occlusion_ready;
+	/* ("world"'s light where its window is given: d3d8_device.c's
+	world_ao_key) */
 	facts.world = settings->ambient_occlusion == XGPU_MANIFEST_OCCLUSION_WORLD && context->world ?
 		XGPU_AMBIENT_OCCLUSION_WORLD : 0;
 	/* (d3d8_device.c's per_pixel_lighting, dynamic_lights_active: the
@@ -896,14 +882,41 @@ int xgpu_manifest_derive(const struct xgpu_manifest_draw *draw, const struct xgp
 	derived->key.color_format = parts.color_format;
 	derived->key.samples = parts.samples;
 	derived->key.lighting = parts.lighting;
-	if (parts.no_color)
-		derived->key.color_mask = 0;
 	derived->key.pixel.alpha_test_samples = parts.alpha_test_samples;
 	derived->key.pixel.hdr = parts.hdr;
 	derived->key.pixel.per_pixel_lighting = parts.per_pixel_lighting;
 	derived->key.pixel.dynamic_lights = parts.dynamic_lights;
 	derived->key.pixel.ambient_occlusion = parts.ambient_occlusion;
 	return lit;
+}
+
+int xgpu_manifest_world_ao_forms(const struct xgpu_manifest_draw *derived, const struct xgpu_manifest_context *context,
+	const struct xgpu_manifest_settings *settings, struct xgpu_manifest_draw forms[XGPU_MANIFEST_WORLD_AO_FORMS])
+{
+	struct xgpu_stream_pipeline_define twin;
+	uint8_t occlusion = derived->key.pixel.ambient_occlusion;
+	int count = 0;
+
+	forms[count++] = *derived;
+	/* (the pre-pass draws only a found window, with "world" on:
+	d3d8_device.c's world_ao_twins) */
+	if (!context->found || settings->ambient_occlusion != XGPU_MANIFEST_OCCLUSION_WORLD)
+		return count;
+	memset(&twin, 0, sizeof(twin));
+	twin.key = derived->key;
+	if ((occlusion & 0x30u) == XGPU_AMBIENT_OCCLUSION_WORLD)
+	{
+		forms[count] = *derived;
+		forms[count].key.pixel.ambient_occlusion = (uint8_t)(occlusion | XGPU_AMBIENT_OCCLUSION_WORLD_SAMPLED);
+		twin.key = forms[count++].key;
+	}
+	twin.pixel_program.ambient_occlusion = twin.key.pixel.ambient_occlusion;
+	if (xgpu_stream_world_ao_twin(&twin))
+	{
+		forms[count] = *derived;
+		forms[count++].key = twin.key;
+	}
+	return count;
 }
 
 /* ---------- the recorder */
@@ -1075,10 +1088,12 @@ void xgpu_manifest_note_textures(const struct xgpu_texture_source *stages)
 		memcpy(to->address, from->sampler.address, sizeof(to->address));
 		/* (w addresses a 3D texture alone: in another, what earlier draws
 		left) */
-		if (to->sampler_type != _xgpu_sampler_3d)
+		/* (but the high-res text's distance fields') */
+		if (to->sampler_type != _xgpu_sampler_3d && to->address[2] != XGPU_ADDRESS_MSDF)
 			to->address[2] = 0;
 		if (from->source != XGPU_SOURCE_NONE && (to->address[0] == XGPU_ADDRESS_BORDER ||
-			to->address[1] == XGPU_ADDRESS_BORDER || to->address[2] == XGPU_ADDRESS_BORDER))
+			to->address[1] == XGPU_ADDRESS_BORDER || to->address[2] == XGPU_ADDRESS_BORDER ||
+			to->address[0] == XGPU_ADDRESS_REGION))
 		{
 			to->border_color = (uint32_t)from->sampler.border_color;
 		}

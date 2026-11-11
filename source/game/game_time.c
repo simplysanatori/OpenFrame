@@ -87,6 +87,7 @@ real network_clock_frame_seconds(real time_delta_sec);
 void determinism_log_tick_begin(void);
 void determinism_log_tick_end(long tick);
 void determinism_log_tick_pause(void);
+#include "demo.h" /* port: port/linux/game/demo.c */
 
 /* port: the tick loop's steps, timed in the profiling build */
 PROFILE_SECTION(game_time_network_distributed_tick_section, "network_distributed_tick")
@@ -357,6 +358,26 @@ real game_time_get_tick_fraction(
 			(real)sim_substep_count();
 	}
 	return PIN(fraction, 0.0f, 1.0f);
+}
+
+/* port: how long ago, in ticks, the clock's newest step (a tick at
+game.sim_rate 30, a sub-step at 60 and 120) fell due: the time it has run
+past it, which may be more than a step while a step waits (the frame's work
+waiting for a tick's end: game_time_tick_open_wait), less the steps run
+before their time (game_time_finish_tick), when it is less than none. 0
+while the clock does not run. What is drawn from the newest step is carried
+on by this much (port/linux/game/render_interpolation.c) */
+real game_time_get_step_age(
+	void)
+{
+	real age;
+
+	if (!game_time_globals || !game_time_globals->active || game_time_globals->paused)
+		return 0.0f;
+	age = game_time_globals->leftover_dt * game_time_globals->speed * TICKS_PER_SECOND;
+	if (game_time_substeps.substeps_ahead)
+		age -= (real)game_time_substeps.substeps_ahead / (real)sim_substep_count();
+	return age;
 }
 
 /* port: the seconds of the frames' time until the clock's next step (a
@@ -633,15 +654,19 @@ void game_time_update(
 			(game_time_tick_open_wait) */
 			if (!sim_substep_next())
 				game_time_substeps.boundary_wanted = FALSE;
-			/* port: else it waits for the boundary: the steps run only to the
-			open tick's end, and the time of the rest is the next frame's. So
+			/* port: else, while it waits for the boundary, the steps run only
+			to the open tick's end, and the time of the rest is the next
+			frame's (only then: a frame whose steps crossed every tick's end
+			left the next tick's first sub-step a frame late, its time kept
+			over, and at 120 and 60 fps the frames ran 1 and 3 sub-steps in
+			turn: OpenH1 #706). So
 			no tick is begun here, nor its update built (update_client_local_ticks,
 			network_game_server_update_ticks, below): a tick's update built and
 			its tick not begun stayed queued, and every tick after took the
 			update one older, its input with it, until the map was loaded again:
 			a frame's wait at each checkpoint, structure switch and death added
 			a tick to the delay of every press (OpenH1 #590) */
-			else if (steps_elapsed > substep_count - sim_substep_next())
+			else if (game_time_substeps.boundary_wanted && steps_elapsed > substep_count - sim_substep_next())
 			{
 				long open_steps = substep_count - sim_substep_next();
 
@@ -736,6 +761,7 @@ void game_time_update(
 		the fraction, so what they hang off is drawn where they put it. */
 		render_interpolation_frame_begin();
 		profile_scope(game_time_game_frame_section, game_frame(game_time_get_speed()*time_delta_sec);)
+		network_test_elevator_frame(); /* port: debug.network_test_elevator (port/linux/game/network_test.c) */
 		render_interpolation_frame_end();
 	}
 	else
@@ -758,11 +784,23 @@ static boolean game_time_run_substep(
 
 	/* port: (debug.determinism_log), and the local seed's takers in the
 	tick take the ticks' (random_math.c) */
+	/* port: a tick begun: the demo being recorded or played (port/linux/
+	game/demo.c), as nothing of the tick has run */
+	if (sim_substep_next() == 0 && !game_time_menu_scene())
+		demo_tick_begin(game_time_globals->server_time);
+	/* port: (or a later sub-step: what the frames put in while the tick
+	was open) */
+	else if (!game_time_menu_scene())
+		demo_substep_resume(sim_substep_next());
 	determinism_log_tick_begin();
 	random_math_port_set_ticking(TRUE);
 	LATENCY_LOG(latency_log_substep_begin()); /* port: debug.latency_log */
 	tick_ended = game_tick_substep(sim_substep_next());
 	LATENCY_LOG(latency_log_substep_end()); /* port: debug.latency_log */
+	/* port: (and ended, before the netcode's work of the tick, which a
+	demo has as what reached the game state from outside the ticks) */
+	if (tick_ended && !game_time_menu_scene())
+		demo_tick_end(game_time_globals->server_time + 1);
 	if (tick_ended)
 	{
 		sim_trace_step(game_time_globals->server_time, sim_substep_count() - 1, sim_substep_count()); /* port: debug.trace */
@@ -784,6 +822,9 @@ static boolean game_time_run_substep(
 		and are not logged as the tick's) */
 		random_math_port_set_ticking(FALSE);
 		determinism_log_tick_pause();
+		/* port: (and the demo's, port/linux/game/demo.c) */
+		if (!game_time_menu_scene())
+			demo_tick_pause();
 	}
 
 	return tick_ended;

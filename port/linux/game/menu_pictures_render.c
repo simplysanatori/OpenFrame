@@ -38,8 +38,9 @@ the camera put at the pose (debug_camera_set, camera_pose.c); and one
 frame drawn, each texture it draws with waited for (xbox_texture_cache.c),
 with only the pipelines it draws with made (render_enumerate.c's map's
 enumeration left out), at the window's size, and kept as it is presented
-instead of shown (d3d8_device.c; menu_pictures_render_kept cuts and scales
-it). The phase has the game to itself (menu_pictures_exclusive): the map
+instead of shown (d3d8_device.c; menu_pictures_render_kept reads it back,
+and the pictures' own thread cuts, scales and writes it while the pass goes
+on to the next map; the main menu waits for the last). The phase has the game to itself (menu_pictures_exclusive): the map
 loader, the copy of a map's file into the cache and the texture cache's
 spare memory it takes are the pass's alone, no movie starts (bink_playback.c),
 and the main menu's menus are not loaded yet, so a frame kept is the scene
@@ -77,11 +78,13 @@ shown, not the loading screen.
 #include "cutscene/cinematics.h"
 #include "effects/player_effects.h"
 #include "game/game.h"
+#include "game/players.h"
 #include "hs/hs.h"
 #include "input/input.h"
 #include "interface/interface.h"
 #include "interface/ui_widget.h"
 #include "main/main.h"
+#include "objects/objects.h"
 #include "rasterizer/rasterizer.h"
 #include "render/render.h"
 #include "scenario/scenario.h"
@@ -314,6 +317,24 @@ static void prepare_command(
 	hs_compile_and_evaluate((char *)line);
 }
 
+/* the player's body (and what it holds) gone from the world: the player
+given no unit first, for the scripts' object_destroy refuses a player's
+(hs_object_destroy: a10's picture had the Master Chief standing in it,
+issue 881) */
+static void prepare_player_body_remove(
+	void)
+{
+	long unit_index;
+
+	if (!local_player_exists(0))
+		return;
+	unit_index = player_get(local_player_get_player_index(0))->unit_index;
+	if (unit_index == NONE)
+		return;
+	players_set_local_player_unit(0, NONE);
+	object_delete(unit_index);
+}
+
 /* the world's ticks run now (its time stood still, game_speed 0, else) */
 static void prepare_ticks(
 	long ticks)
@@ -391,6 +412,8 @@ static void prepare_next(
 	prepare.captured = FALSE;
 	if (prepare.index >= prepare.count)
 	{
+		/* (the kept frames' pictures made, on their own thread meanwhile) */
+		menu_pictures_render_finished();
 		/* (every stock map's preparation recorded, or tried) */
 		if (!prepare.overdue)
 			render_prepared_stock_done();
@@ -776,7 +799,7 @@ static void prepare_update(
 		/* (the player's body gone after the pose's own lines, which may
 		need it: cheat_teleport_to_camera, for where the camera's view is
 		drawn from) */
-		prepare_command("object_destroy (unit (list_get (players) 0))");
+		prepare_player_body_remove();
 		prepare_quiet();
 		snprintf(line, sizeof(line), "debug_camera_set \"%s\"", picture->camera);
 		prepare_command(line);
@@ -940,6 +963,7 @@ void menu_pictures_abandon(
 	if (prepare.state != _prepare_menu && prepare.index < prepare.count)
 		menu_pictures_render_given_up(prepare.poses[prepare.index], why);
 	platform_log("menu pictures: the pass stopped (%s)", why);
+	menu_pictures_render_finished();
 	main_queue_map_name(NULL);
 	prepare.capture_wanted = FALSE;
 	prepare.state = _prepare_off;

@@ -31,7 +31,7 @@ NEGATIVE_CONTROLS = {
                               ""), "record"),
     "openh1-messages-to-opence": (("return type < FIRST_OPENH1_DISTRIBUTED_MESSAGE || "
                                    "!network_standard_machine_is_opence(machine_index);", "return TRUE;"), "messages"),
-    "opence-players-unknown": (("network_standard_globals.opence_players[absolute_index] = TRUE;", ";"), "players"),
+    "opence-players-unknown": (("opence_players[absolute_index] = TRUE;", ";"), "players"),
     "players-told-to-opence": (("if (network_standard_machine_is_openh1(machine_indices[index]))", "if (1)"),
                                "players"),
     "players-never-told-again": (("game_time_get() - network_standard_globals.opence_players_sent_time < "
@@ -66,6 +66,7 @@ def generated(fault=None):
     config += f"#define FIRST_OPENH1_DISTRIBUTED_MESSAGE {first}\n"
     header = read("port/linux/game/network_standard.h")
     config += enum_with(header, "_network_standard_join_legacy") + "\n"
+    config += enum_with(read("port/linux/game/demo.h"), "_demo_rule_enhanced_animations_bit") + "\n"
     # (the prototypes, which the code relies on: its functions call each other in any order)
     prototypes = header[header.index("/* ---------- prototypes */"):header.rindex("#endif")]
     source = read("port/linux/game/network_standard.c")
