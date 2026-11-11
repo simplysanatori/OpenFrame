@@ -32,7 +32,9 @@ lights' cells' upload put aside before a draw that reads them).
 #include "../xgpu_vulkan.c"
 #include "../xgpu_vulkan_post.c"
 #include "../xgpu_vulkan_post_shaders.c"
+#include "../xgpu_vulkan_inspect_shader.c"
 #include "../xgpu_vulkan_world_ao.c"
+#include "../xgpu_vulkan_rt.c"
 #include <assert.h>
 #include <stdarg.h>
 #include <unistd.h>
@@ -45,6 +47,11 @@ device has neither present wait nor display timing) */
 void host_render_stream_display_paced(int paced)
 {
 	(void)paced;
+}
+
+void host_render_stream_frames_ahead(int frames)
+{
+	(void)frames;
 }
 
 void host_render_stream_frames_taken_reset(void)
@@ -100,7 +107,9 @@ the calls that set state (a draw's state is set only where it changed) */
 static VkBuffer vertex_state[3];
 static VkDeviceSize vertex_state_offsets[3];
 static unsigned int state_calls;
-static unsigned int allocated_sets, set_updates, pool_resets;
+static unsigned int allocated_sets, set_updates, pool_resets, pools_made;
+/* the pool each set was allocated from, by its handle (50 on) */
+static VkDescriptorPool allocated_from[64];
 static VkMemoryBarrier last_memory;
 static VkPipelineStageFlags last_source, last_destination;
 
@@ -109,6 +118,9 @@ static void VKAPI_CALL fake_end_query(VkCommandBuffer command, VkQueryPool pool,
 	(void)command; (void)pool; (void)query;
 	ended_queries++;
 }
+
+/* (debug.pass_times: never) */
+int host_pass_times;
 
 void host_logf(int priority, const char *format, ...)
 {
@@ -175,8 +187,18 @@ static VkResult VKAPI_CALL fake_view(VkDevice device, const VkImageViewCreateInf
 
 static VkResult VKAPI_CALL fake_allocate(VkDevice device, const VkDescriptorSetAllocateInfo *info, VkDescriptorSet *set)
 {
-	(void)device; (void)info;
+	(void)device;
+	if (allocated_sets < 64)
+		allocated_from[allocated_sets] = info->descriptorPool;
 	*set = (VkDescriptorSet)(uintptr_t)(50 + allocated_sets++);
+	return VK_SUCCESS;
+}
+
+static VkResult VKAPI_CALL fake_make_pool(VkDevice device, const VkDescriptorPoolCreateInfo *info,
+	const VkAllocationCallbacks *allocator, VkDescriptorPool *pool)
+{
+	(void)device; (void)info; (void)allocator;
+	*pool = (VkDescriptorPool)(uintptr_t)(90 + pools_made++);
 	return VK_SUCCESS;
 }
 
@@ -265,9 +287,8 @@ static void reset(void)
 	free(color_target.attachments);
 	free(depth_target.attachments);
 	free(vk.garbage);
-	for (index = 0; index < SLOTS; index++)
-		free(vk.slots[index].texture_sets);
-	free(recording.texture_sets);
+	(void)index;
+	free(vk.texture_sets);
 	memset(&vk, 0, sizeof(vk));
 	memset(&color_target, 0, sizeof(color_target));
 	memset(&depth_target, 0, sizeof(depth_target));
@@ -301,6 +322,7 @@ static void reset(void)
 	vkCreateImageView = fake_view;
 	vkAllocateDescriptorSets = fake_allocate;
 	vkUpdateDescriptorSets = fake_update;
+	vkCreateDescriptorPool = fake_make_pool;
 }
 
 static VkResult VKAPI_CALL fake_pipeline(VkDevice device, VkPipelineCache cache, uint32_t count,
@@ -501,6 +523,9 @@ static void vertex_input_test(void)
 		bound_vertices = 0;
 		xgpu_vulkan_draw(&draw);
 		assert(begins == before + 1 && vk.pass_reads_depth);
+		/* (without discards the pass is the main command buffer's, which
+		keeps the state bound before it) */
+		assert(!vk.deferred && bound_vertices == 0);
 		assert(began_depth.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD && began_depth.storeOp == VK_ATTACHMENT_STORE_OP_NONE);
 		assert(began_stencil.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD && began_stencil.storeOp == VK_ATTACHMENT_STORE_OP_NONE);
 		assert(began_color.loadOp == VK_ATTACHMENT_LOAD_OP_LOAD && began_color.storeOp == VK_ATTACHMENT_STORE_OP_STORE);
@@ -544,15 +569,16 @@ static void VKAPI_CALL fake_copy_lights(VkCommandBuffer command, VkBuffer source
 
 /* (the cells and the clusters' masks, 17 slices from 0; or the world, its
 whole slices from 17) */
-static uint32_t light_image_z, light_image_depth;
+static uint32_t light_image_z, light_image_depth, light_image_y = 0, light_image_height = 32;
 
 static void VKAPI_CALL fake_copy_cells(VkCommandBuffer command, VkBuffer source, VkImage destination,
 	VkImageLayout layout, uint32_t count, const VkBufferImageCopy *regions)
 {
 	(void)source; (void)destination;
 	assert(layout == VK_IMAGE_LAYOUT_GENERAL && count == 1);
-	assert(regions[0].imageExtent.width == 32 && regions[0].imageExtent.height == 32 &&
-		regions[0].imageOffset.z == (int32_t)light_image_z && regions[0].imageExtent.depth == light_image_depth);
+	assert(regions[0].imageExtent.width == 32 && regions[0].imageExtent.height == light_image_height &&
+		regions[0].imageOffset.y == (int32_t)light_image_y && regions[0].imageOffset.z == (int32_t)light_image_z &&
+		regions[0].imageExtent.depth == light_image_depth);
 	assert(regions[0].imageSubresource.baseArrayLayer == 0 && regions[0].imageSubresource.layerCount == 1);
 	assert(command == light_commands);
 	light_image_copies++;
@@ -590,22 +616,44 @@ static void dynamic_lights_test(void)
 	vkCmdCopyBuffer = fake_copy_lights;
 	vkCmdCopyBufferToImage = fake_copy_cells;
 	light_copies = light_image_copies = 0;
-	xgpu_vulkan_dynamic_lights_upload(data, sizeof(data), grid);
+	/* (the first upload: all of the cells, whatever changed) */
+	vk.lights_cells_uploaded = 0;
+	xgpu_vulkan_dynamic_lights_upload(data, sizeof(data), grid, 0, 0);
 	assert(light_copies == 1 && light_image_copies == 1 && light_commands == vk.slot->early);
 	assert(vk.statistics.uploads_early == 2 && vk.statistics.uploads_ordered == 0);
 	assert(ring[0] == 7 && ring[6192 + sizeof(grid) - 1] == 9);
 	block.used = cells.used = vk.serial;
 	vk.ring_head = 0;
-	xgpu_vulkan_dynamic_lights_upload(data, sizeof(data), grid);
+	xgpu_vulkan_dynamic_lights_upload(data, sizeof(data), grid, 0, sizeof(grid));
 	assert(light_copies == 2 && light_image_copies == 2 && light_commands == vk.slot->main);
 	assert(vk.statistics.uploads_ordered == 2);
+	/* (none changed: the block alone; some of a slice's rows: those rows;
+	more than one slice: those slices) */
+	vk.ring_head = 0;
+	xgpu_vulkan_dynamic_lights_upload(data, sizeof(data), grid, 4096, 4096);
+	assert(light_copies == 3 && light_image_copies == 2);
+	vk.ring_head = 0;
+	grid[3 * 16384 + 5 * 512 + 16] = 21;
+	light_image_z = 3;
+	light_image_depth = 1;
+	light_image_y = 5;
+	light_image_height = 3;
+	xgpu_vulkan_dynamic_lights_upload(data, sizeof(data), grid, 3 * 16384 + 5 * 512 + 16, 3 * 16384 + 7 * 512 + 32);
+	assert(light_copies == 4 && light_image_copies == 3 && ring[6192 + 16] == 21);
+	vk.ring_head = 0;
+	light_image_z = 2;
+	light_image_depth = 2;
+	light_image_y = 0;
+	light_image_height = 32;
+	xgpu_vulkan_dynamic_lights_upload(data, sizeof(data), grid, 2 * 16384 + 31 * 512, 3 * 16384 + 16);
+	assert(light_copies == 5 && light_image_copies == 4 && ring[6192 + 16384 + 5 * 512 + 16] == 21);
 	/* the world: its 1500 texels in two whole slices past the clusters' */
 	world[1499][3] = 11;
 	light_image_z = 17;
 	light_image_depth = 2;
 	vk.ring_head = 0;
 	xgpu_vulkan_dynamic_lights_world(world, 1500);
-	assert(light_image_copies == 3 && ring[1499 * 16 + 12] == 11 && ring[1500 * 16] == 0);
+	assert(light_image_copies == 5 && ring[1499 * 16 + 12] == 11 && ring[1500 * 16] == 0);
 }
 
 static void VKAPI_CALL fake_copy_buffer(VkCommandBuffer command, VkBuffer source, VkBuffer destination,
@@ -676,9 +724,12 @@ static VkResult VKAPI_CALL fake_reset_descriptors(VkDevice device, VkDescriptorP
 static VkResult VKAPI_CALL fake_counter(VkDevice device, VkSemaphore semaphore, uint64_t *value)
 { (void)device; (void)semaphore; *value = vk.serial; return VK_SUCCESS; }
 
-/* Draws that come back to earlier textures reuse their submission's sets.
-Another sampler, an image made where a destroyed one was, or the slot's
-pools reset never give back a set written before. */
+/* Draws that come back to earlier textures reuse the sets kept for them,
+in this submission and the ones after. Another sampler or an image made
+where a destroyed one was never gives back a set written before. Once as
+many are kept as there can be, the one the GPU finished with that is found
+first is written again; while every one is read by work not done, a set of
+the slot's pools is written, kept for nothing. */
 static void texture_sets_test(void)
 {
 	static struct xgpu_vulkan_image first, second;
@@ -686,6 +737,7 @@ static void texture_sets_test(void)
 	VkDescriptorPool pools[2] = { (VkDescriptorPool)(uintptr_t)7, (VkDescriptorPool)(uintptr_t)8 };
 	VkDescriptorSet set_a, set_b, set;
 	struct slot *slot;
+	uint32_t index;
 
 	reset();
 	vk.recording = 0;
@@ -696,7 +748,7 @@ static void texture_sets_test(void)
 	slot = &vk.slots[vk.serial % SLOTS];
 	slot->descriptor_pools = pools;
 	slot->descriptor_pool_count = 2;
-	pool_resets = 0;
+	pool_resets = pools_made = 0;
 	recording_begin();
 	assert(vk.slot == slot && !pool_resets);
 	memset(&first, 0, sizeof(first));
@@ -715,10 +767,12 @@ static void texture_sets_test(void)
 	set_a = texture_set(a);
 	set_b = texture_set(b);
 	assert(set_a && set_b && set_a != set_b && set_updates == 2);
+	assert(pools_made == 1 && allocated_from[0] == vk.texture_set_pool && allocated_from[1] == vk.texture_set_pool);
 	assert(texture_set(a) == set_a && texture_set(b) == set_b);
 	assert(texture_set(a) == set_a && set_updates == 2 && allocated_sets == 2);
 	assert(vk.statistics.texture_sets_written == 2 && vk.statistics.texture_sets_reused == 3);
 	assert(written_images[0].imageView == second.sampled);
+	assert(first.used == vk.serial && second.used == vk.serial);
 
 	a[0].sampler = (VkSampler)(uintptr_t)6;
 	set = texture_set(a);
@@ -738,15 +792,45 @@ static void texture_sets_test(void)
 	assert(written_images[0].imageView == (VkImageView)(uintptr_t)33);
 	assert(texture_set(b) == set_b && texture_set(a) == set && set_updates == 4);
 
-	/* The slot's next submission: only the pool allocated from is reset,
-	and its sets are forgotten with it. */
+	/* The slot's next submission: the kept sets are found again (none
+	was allocated from the slot's pools, which are not reset), their images
+	used by it. */
 	vk.recording = 0;
 	vk.serial += SLOTS;
 	recording_begin();
-	assert(vk.slot == slot && pool_resets == 1 && !slot->texture_set_count && !slot->descriptor_pool_dirty);
-	assert(texture_set(b) && set_updates == 5 && allocated_sets == 5);
-	assert(texture_set(a) && set_updates == 6);
-	assert(texture_set(b) && set_updates == 6);
+	assert(vk.slot == slot && !pool_resets && !slot->descriptor_pool_dirty);
+	assert(texture_set(b) == set_b && texture_set(a) == set && set_updates == 4 && allocated_sets == 4);
+	assert(second.used == vk.serial && first.used == vk.serial);
+
+	/* As many kept as there can be: each one used by this submission, a
+	set of the slot's pools; one the GPU has done with, written again */
+	vk.texture_set_count = TEXTURE_SETS_KEPT;
+	for (index = 0; index < TEXTURE_SETS_KEPT; index++)
+	{
+		if (!vk.texture_sets[index].set)
+			vk.texture_sets[index].set = (VkDescriptorSet)(uintptr_t)(1000 + index);
+		vk.texture_sets[index].used = vk.serial;
+	}
+	b[0].sampler = (VkSampler)(uintptr_t)7;
+	set = texture_set(b);
+	assert(set && set_updates == 5 && allocated_sets == 5 && allocated_from[4] == pools[0]);
+	b[0].sampler = (VkSampler)(uintptr_t)8;
+	vk.texture_sets[TEXTURE_SETS_KEPT - 2].used = vk.serial - 1;
+	set = texture_set(b);
+	assert(set == vk.texture_sets[TEXTURE_SETS_KEPT - 2].set && set_updates == 6 && allocated_sets == 5);
+	assert(texture_set(a) && texture_set(b) == set && set_updates == 6);
+
+	/* An image destroyed and another made at its address whose view the
+	driver gives the destroyed view's handle: its number is new
+	(xgpu_vulkan_image_create's count, never reused), so a kept set of
+	the old view is never bound for it. */
+	set = texture_set(a);
+	assert(set_updates == 6);
+	first.number = 4;
+	/* (the last set b's, as xgpu_vulkan_image_destroy leaves it) */
+	assert(texture_set(b));
+	assert(texture_set(a) != set && set_updates == 7);
+	assert(written_images[0].imageView == (VkImageView)(uintptr_t)33);
 	slot->descriptor_pools = NULL;
 	slot->descriptor_pool_count = 0;
 	reset();
@@ -1636,6 +1720,16 @@ static void window_test(void)
 	assert(present_mode_choose(all, 3, 0) == VK_PRESENT_MODE_MAILBOX_KHR);
 	assert(present_mode_choose(no_mailbox, 2, 0) == VK_PRESENT_MODE_IMMEDIATE_KHR);
 	assert(present_mode_choose(fifo_only, 1, 0) == VK_PRESENT_MODE_FIFO_KHR);
+	/* debug.vulkan_present_mode's, where the surface has it, over the
+	interval's; else the interval's */
+	vk.present_mode_asked = VK_PRESENT_MODE_IMMEDIATE_KHR + 1;
+	assert(present_mode_choose(all, 3, 1) == VK_PRESENT_MODE_IMMEDIATE_KHR);
+	vk.present_mode_asked = VK_PRESENT_MODE_FIFO_KHR + 1;
+	assert(present_mode_choose(all, 3, 0) == VK_PRESENT_MODE_FIFO_KHR);
+	vk.present_mode_asked = VK_PRESENT_MODE_MAILBOX_KHR + 1;
+	assert(present_mode_choose(no_mailbox, 2, 0) == VK_PRESENT_MODE_IMMEDIATE_KHR);
+	assert(present_mode_choose(no_mailbox, 2, 1) == VK_PRESENT_MODE_FIFO_KHR);
+	vk.present_mode_asked = 0;
 
 	/* the first present makes the surface and the swapchain (vsync: FIFO),
 	and blits the frame itself */
@@ -3060,6 +3154,27 @@ static void discards_test(void)
 	assert(vk.transient == 2);
 	unsetenv("HALO_VULKAN_TRANSIENT");
 	unsetenv("HALO_VULKAN_DISCARDS");
+	/* (by default on a tiler alone: one with lazily allocated memory, or of
+	a tiler's vendor; an immediate GPU records into the main command
+	buffer, unless HALO_VULKAN_DISCARDS=1) */
+	vk.properties.vendorID = 0x10de;
+	discards_choose();
+	assert(!vk.deferred && !vk.aside && !vk.transient);
+	vk.properties.vendorID = 0x5143;
+	discards_choose();
+	assert(vk.deferred && vk.aside);
+	vk.properties.vendorID = 0x1002;
+	vk.memory_properties.memoryTypeCount = 2;
+	discards_choose();
+	assert(vk.deferred && vk.transient == 1);
+	vk.memory_properties.memoryTypeCount = 1;
+	discards_choose();
+	assert(!vk.deferred);
+	setenv("HALO_VULKAN_DISCARDS", "1", 1);
+	discards_choose();
+	assert(vk.deferred);
+	unsetenv("HALO_VULKAN_DISCARDS");
+	vk.properties.vendorID = 0;
 
 	/* a transient multisampled target: an attachment alone, in lazily
 	allocated memory, cleared by a pass of the early work; an ordinary

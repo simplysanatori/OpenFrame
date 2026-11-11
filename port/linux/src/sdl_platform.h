@@ -111,6 +111,18 @@ int platform_display_refresh_rates(long *rates, int maximum);
 that fit the desktop, and display.window_size's; how many. None on
 Android. */
 int platform_window_sizes(long *widths, long *heights, int maximum);
+/* Frame Rate & Sync's Variable Refresh (menu_tags.c, menu_functions.c):
+PLATFORM_VRR_FOUND or _NONE where the system is asked (the Linux builds:
+gamescope's word, a display's DRM), PLATFORM_VRR_UNKNOWN where nothing
+reliable says (Windows), PLATFORM_VRR_SYSTEM where the system sets it (the
+Mac: Metal and ProMotion), PLATFORM_VRR_NOT_HERE where it has no meaning
+(Android) */
+#define PLATFORM_VRR_NONE 0
+#define PLATFORM_VRR_FOUND 1
+#define PLATFORM_VRR_UNKNOWN 2
+#define PLATFORM_VRR_SYSTEM 3
+#define PLATFORM_VRR_NOT_HERE 4
+int platform_vrr_detected(void);
 /* Settings > Audio's devices (port/linux/game/menu_tags.c): the names of
 the output (or, recording, input) devices SDL finds; how many. None on
 Android, which plays and records with the system's. */
@@ -152,6 +164,21 @@ void platform_screenshot_request(void);
 BOOL platform_screenshot_take_request(void);
 /* a snapshot of the input state; consume_motion resets the mouse deltas */
 void platform_input_read(struct platform_input_state *state, BOOL consume_motion);
+/* F3 to F7 pressed since the last call, a bit each from F3's, and F9 the
+seventh bit (the menu studio's keys: port/linux/game/menu_studio.c) */
+int platform_menu_studio_keys(void);
+/* the menu studio's note being typed or not: while it is, the keyboard's
+keys go to it alone; what was typed since the last call (characters, \b,
+\n for Enter and \033 for Escape), its count */
+void platform_menu_studio_typing(BOOL typing);
+int platform_menu_studio_typed(char *typed, int size);
+/* a gamepad's buttons pressed (bits by SDL_GamepadButton) and triggers pulled
+(bit 0 the left, 1 the right) since this was last asked of it, by its
+joystick ID: the controller's reading ORs them into what is held, so a tap
+between two readings still counts */
+/* a trigger past this (of SDL's 0 to 32767) is pulled */
+#define PLATFORM_GAMEPAD_TRIGGER_PRESSED 8000
+void platform_gamepad_presses_take(Uint32 id, Uint32 *buttons, unsigned int *triggers);
 /* the pointer in the menus (d3d8_device.c, halo_ui_pointer_update) */
 struct platform_ui_pointer
 {
@@ -193,6 +220,14 @@ int platform_test_menu_keys(char *typed, int size, int *enter);
 1 once in its second, with the button to click (SDL's numbering, 0 for
 none), or the wheel's turn and in how many events it comes */
 int platform_test_menu_mouse(int *button, float *wheel, int *wheel_events);
+/* a script that starts with "ready": its seconds counted from now, the
+menus' screen up (menu_tour.c's call); whether it waits for that still; the
+second it is in, from 100 ms before it starts (-1: none, or waiting);
+whether it is past its last press */
+void platform_test_menu_start(void);
+int platform_test_menu_waiting(void);
+int platform_test_menu_step(void);
+int platform_test_menu_done(void);
 
 /* returns the window's size in the units that pointer positions come in,
 which differ from the drawable's pixels on displays that scale */

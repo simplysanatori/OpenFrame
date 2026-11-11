@@ -109,6 +109,17 @@ of network.game_mode and network.sim_rate */
 static int server_mode;
 static char server_game_mode[16] = "legacy";
 
+/* (no demo plays: demo.c's) */
+static boolean demo_playback_rules(unsigned long *rules)
+{
+	return FALSE;
+}
+
+static boolean demo_playing(void)
+{
+	return FALSE;
+}
+
 static int halo_server_mode(void)
 {
 	return server_mode;
@@ -129,6 +140,19 @@ static long config_integer(char const *name)
 static int config_boolean(char const *name)
 {
 	return !strcmp(name, "network.allow_opence") && allow_opence;
+}
+
+/* (moves as the settings change, as config.toml's count does) */
+static unsigned long config_changes(void)
+{
+	unsigned long changes = (unsigned long)sim_rate_setting * 2 + (allow_opence ? 1 : 0);
+	char const *text;
+
+	for (text = game_mode; *text; text++)
+		changes = changes * 31 + (unsigned char)*text;
+	for (text = server_game_mode; *text; text++)
+		changes = changes * 31 + (unsigned char)*text;
+	return changes;
 }
 
 static short game_connection(void)

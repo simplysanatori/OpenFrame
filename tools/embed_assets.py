@@ -54,6 +54,7 @@ BUTTON_ASSETS = Path("port/assets/buttons")
 BUTTON_LIST = BUTTON_ASSETS / "buttons.json"
 FONT_ASSETS = Path("port/assets/fonts")
 FONT_LIST = FONT_ASSETS / "fonts.json"
+MSDF_ATLAS = FONT_ASSETS / "msdf_atlas.zlib"
 MENU_ASSETS = Path("port/assets/menus")
 MENU_LIST = MENU_ASSETS / "menus.json"
 # the desktop windows' icon (tools/app_icon.py; port/linux/src/sdl_platform.c)
@@ -72,11 +73,12 @@ PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
 
 def font_files() -> List[str]:
-    """The font files fonts.json uses, each once."""
+    """The font files fonts.json uses (each font, and the fallback that
+    draws what it has not), each once."""
     if not (ROOT / FONT_LIST).is_file():
         return []
     fonts = json.loads((ROOT / FONT_LIST).read_text())["fonts"]
-    return sorted({font["file"] for font in fonts})
+    return sorted({name for font in fonts for name in (font["file"], font.get("fallback")) if name})
 
 
 def textures() -> List[tuple]:
@@ -186,6 +188,7 @@ def hud_asset_inputs() -> List[Path]:
               if (ROOT / listing).is_file()]
     return [*inputs, *(folder / f"{asset['name']}.png" for folder, asset, _ in textures()),
             *(FONT_ASSETS / name for name in font_files()), *(MENU_ASSETS / name for name in menu_files()),
+            *([MSDF_ATLAS] if (ROOT / MSDF_ATLAS).is_file() else []),
             *([WINDOW_ICON] if (ROOT / WINDOW_ICON).is_file() else []),
             *([LOADING_PICTURE] if (ROOT / LOADING_PICTURE).is_file() else []),
             *([MENU_CURSOR] if (ROOT / MENU_CURSOR).is_file() else []),
@@ -370,14 +373,25 @@ def main() -> None:
     lines.append("const struct text_hires_embedded text_hires_embedded[] =")
     lines.append("{")
     for font in fonts:
-        index = files.index(font["file"])
         tag = font["tag"].replace("\\", "\\\\")
-        size = (ROOT / FONT_ASSETS / font["file"]).stat().st_size
-        lines.append(f'\t{{ "{tag}", "{font["file"]}", {font_offsets[index]}u, {size} }},')
+        # (the font, and its fallback: none, 0)
+        fields = []
+        for name in (font["file"], font.get("fallback")):
+            if name:
+                size = (ROOT / FONT_ASSETS / name).stat().st_size
+                fields.append(f'"{name}", {font_offsets[files.index(name)]}u, {size}')
+            else:
+                fields.append("0, 0u, 0")
+        lines.append(f'\t{{ "{tag}", {fields[0]}, {fields[1]} }},')
     if not fonts:
         lines.append("\t{ 0 },")
     lines.append("};")
     lines.append(f"const unsigned int text_hires_embedded_count = {len(fonts)};")
+    # the fonts' glyphs' MSDF atlas (the high-res text's, made by
+    # tools/msdf_atlas.py; of size 0 where the checkout has none)
+    data = (ROOT / MSDF_ATLAS).read_bytes() if files and (ROOT / MSDF_ATLAS).is_file() else b""
+    lines.append(f"const unsigned int text_hires_msdf_offset = {assets.add(data) if data else 0}u;")
+    lines.append(f"const unsigned int text_hires_msdf_size = {len(data)}u;")
     lines.append("")
     # the menus' files (menu_files.h)
     lines.append('#include "menu_files.h"')

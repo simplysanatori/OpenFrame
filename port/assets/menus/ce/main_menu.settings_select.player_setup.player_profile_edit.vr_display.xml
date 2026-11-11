@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- The port's settings screen, in the PC version's style (tools/port_settings.py) -->
 <menus>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/vr_display_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/vr_display_screen" width="640" height="480" flags="pass_unhandled_to_focused_child pause_game" bitmap="bitmaps/gradient" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 		<on event="b" back="true"/>
 		<on event="back" back="true"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/options_menu"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display" controller="1" left="35" top="11" width="605" height="59" bitmap="main_menu/settings_select/player_setup/player_profile_edit/vr_display/header_vr_display" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/help" type="text" controller="1" left="68" top="366" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/help_strings" font="ui\large_ui" color="#FFFFFFFF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/help" type="text" controller="1" left="68" top="366" width="482" height="60" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/help_strings" font="ui\large_ui" color="#FFFFFFFF" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/vr_display/help">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/options_menu" type="column_list" width="640" height="480" flags="pass_unhandled_to_focused_child up_down_tabs_children" description="main_menu/settings_select/player_setup/player_profile_edit/vr_display/help" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 		<data input="port settings help"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_refresh_rate" x="54" y="73"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_resolution_scale" x="54" y="101"/>
@@ -22,80 +22,80 @@
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_menu_width" x="54" y="241"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_bar" y="414"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_bar" type="column_list" width="640" height="28" flags="pass_unhandled_to_focused_child left_right_tabs_items" source="tools/port_settings.py settings_files/_setting_screen/_screen">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_defaults" y="1"/>
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_ok" x="380" y="1"/>
 		<child widget="common_button_cancel" x="510" y="1"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_refresh_rate" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_refresh_rate" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x26" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_spinner" x="286"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_label" type="text" controller="1" width="280" height="26" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="0" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="72 HZ|90 HZ|120 HZ" setting="vr.refresh_rate" values="72|90|120" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/refresh_rate_spinner" type="spinner" top="2" width="206" height="22" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 213 19 219" strings="72 HZ|90 HZ|120 HZ" setting="vr.refresh_rate" values="72|90|120" source="tools/port_settings.py settings_files/_setting_screen">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_resolution_scale" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_resolution_scale" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x26" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/resolution_scale_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/resolution_scale_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/resolution_scale_spinner" x="286"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/resolution_scale_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/resolution_scale_label" type="text" controller="1" width="280" height="26" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="1" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/resolution_scale_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="50%|60%|75%|90%|100%|110%|125%|150%" setting="vr.resolution_scale" values="0.5|0.6|0.75|0.9|1|1.1|1.25|1.5" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/resolution_scale_spinner" type="spinner" top="2" width="206" height="22" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 213 19 219" strings="50%|60%|75%|90%|100%|110%|125%|150%" setting="vr.resolution_scale" values="0.5|0.6|0.75|0.9|1|1.1|1.25|1.5" source="tools/port_settings.py settings_files/_setting_screen">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_foveation" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_foveation" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x26" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_spinner" x="286"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_label" type="text" controller="1" width="280" height="26" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="2" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="OFF|FIXED|EYE TRACKED" setting="vr.foveation" values="off|fixed|eye" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_spinner" type="spinner" top="2" width="206" height="22" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 213 19 219" strings="OFF|FIXED|EYE TRACKED" setting="vr.foveation" values="off|fixed|eye" source="tools/port_settings.py settings_files/_setting_screen">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_foveation_inset" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_foveation_inset" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x26" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_inset_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_inset_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_inset_spinner" x="286"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_inset_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_inset_label" type="text" controller="1" width="280" height="26" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="3" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_inset_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="30%|40%|50%|60%|70%|80%" setting="vr.foveation_inset" values="0.3|0.4|0.5|0.6|0.7|0.8" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/foveation_inset_spinner" type="spinner" top="2" width="206" height="22" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 213 19 219" strings="30%|40%|50%|60%|70%|80%" setting="vr.foveation_inset" values="0.3|0.4|0.5|0.6|0.7|0.8" source="tools/port_settings.py settings_files/_setting_screen">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_late_latch" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_late_latch" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x26" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/late_latch_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/late_latch_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/late_latch_spinner" x="286"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/late_latch_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/late_latch_label" type="text" controller="1" width="280" height="26" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="4" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/late_latch_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="ON|OFF" setting="vr.late_latch" values="true|false" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/late_latch_spinner" type="spinner" top="2" width="206" height="22" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 213 19 219" strings="ON|OFF" setting="vr.late_latch" values="true|false" source="tools/port_settings.py settings_files/_setting_screen">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_menu_distance" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_menu_distance" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x26" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_distance_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_distance_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_distance_spinner" x="286"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_distance_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_distance_label" type="text" controller="1" width="280" height="26" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="5" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_distance_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="1.5 M|2.0 M|2.5 M|3.0 M|3.5 M|4.0 M" setting="vr.menu_distance" values="1.5|2|2.5|3|3.5|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_distance_spinner" type="spinner" top="2" width="206" height="22" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 213 19 219" strings="1.5 M|2.0 M|2.5 M|3.0 M|3.5 M|4.0 M" setting="vr.menu_distance" values="1.5|2|2.5|3|3.5|4" source="tools/port_settings.py settings_files/_setting_screen">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_menu_width" width="512" height="28" flags="pass_unhandled_to_focused_child" bitmap="bitmaps/option_bkds" color="#FF2896FF">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/op_menu_width" width="512" height="26" flags="pass_unhandled_to_focused_child" bitmap="main_menu/parts/option_row_512x26" color="#FF2896FF" source="tools/port_settings.py settings_files/_setting_screen/_option_row">
 		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_width_label"/>
-		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_width_spinner" x="320" y="1"/>
+		<child widget="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_width_spinner" x="286"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_width_label" type="text" controller="1" width="300" height="22" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="4">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_width_label" type="text" controller="1" width="280" height="26" string_list="main_menu/settings_select/player_setup/player_profile_edit/vr_display/labels" string_index="6" font="ui\large_ui" color="#FF2896FF" text_x="13" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_option_label">
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_width_spinner" type="spinner" left="3" top="2" width="147" height="20" flags="pass_unhandled_to_focused_child left_right_tabs_items" strings="1.6 M|2.0 M|2.3 M|2.6 M|3.0 M|3.5 M|4.0 M" setting="vr.menu_width" values="1.6|2|2.3|2.6|3|3.5|4" font="ui\large_ui" color="#FF2896FF" align="center" text_y="1" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -6 19 0" footer_bounds="7 150 19 156">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/menu_width_spinner" type="spinner" top="2" width="206" height="22" flags="pass_unhandled_to_focused_child left_right_tabs_items" font="ui\large_ui" color="#FF2896FF" align="center" text_y="0" header_bitmap="bitmaps/arrow_sm_left" footer_bitmap="bitmaps/arrow_sm_right" header_bounds="7 -13 19 -7" footer_bounds="7 213 19 219" strings="1.6 M|2.0 M|2.3 M|2.6 M|3.0 M|3.5 M|4.0 M" setting="vr.menu_width" values="1.6|2|2.3|2.6|3|3.5|4" source="tools/port_settings.py settings_files/_setting_screen">
 		<on event="created" run="port setting load"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_defaults" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="3" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_button">
 		<on event="a" run="port settings defaults"/>
 		<on event="start" run="port settings defaults"/>
 		<on event="left_mouse" run="mouse emit accept event"/>
 	</widget>
-	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2">
+	<widget name="main_menu/settings_select/player_setup/player_profile_edit/vr_display/button_ok" type="text" width="128" height="24" bitmap="bitmaps/text_button_background" string_list="strings/common_button_captions" string_index="1" font="ui\small_ui" color="#FFFFFFFF" align="center" text_y="2" source="tools/port_settings.py settings_files/_setting_screen/_button">
 		<on event="a" run="port settings save" back="true"/>
 		<on event="start" run="port settings save" back="true"/>
 		<on event="left_mouse" run="mouse emit accept event"/>

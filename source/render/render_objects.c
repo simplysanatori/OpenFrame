@@ -297,9 +297,9 @@ static struct render_object_globals render_object_globals = { 0 };
 boolean debug_inactive_objects = FALSE;
 
 static boolean reported_rendered_object_overflow = FALSE;
-/* port: display.ambient_occlusion's depth pre-pass found the window's
-objects (render_ambient_occlusion_prepass): its draw of them, below, finds
-them no second time */
+/* port: display.ambient_occlusion "world"'s pre-pass found the window's
+objects (render_world_ao_prepass): its draw of them, below, finds them no
+second time */
 static boolean rendered_objects_found_early = FALSE;
 
 /* ---------- public code */
@@ -396,7 +396,7 @@ void render_objects(
 	{
 		find_rendered_objects();
 	}
-	rendered_objects_found_early = render_ambient_occlusion_prepass;
+	rendered_objects_found_early = render_world_ao_prepass;
 
 	data.shadow = FALSE;
 
@@ -435,6 +435,7 @@ void render_objects(
 /* port: port/linux/game/first_person_legs.c */
 boolean first_person_legs_wanted(long object_index);
 real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
+real_matrix4x3 const *first_person_legs_shadow_node_matrices(long object_index, real_matrix4x3 const *nodes);
 #ifdef HALO_VR
 /* port: port/linux/game/vr_death.c */
 real_matrix4x3 const *vr_death_body_nodes(long object_index, real_matrix4x3 const *nodes);
@@ -517,6 +518,14 @@ static boolean object_is_first_person_camera(
 			return FALSE;
 	}
 #endif
+	{
+		/* port: a dead player's view through a teammate's eyes, that
+		teammate's body hidden (port/linux/game/dead_spectate.c) */
+		extern long dead_spectate_eyes_unit(short local_player_index);
+
+		if (object_index != NONE && object_index == dead_spectate_eyes_unit(render.local_player_index))
+			return TRUE;
+	}
 	return (unit_index == object_index &&
 		director_get_perspective(render.local_player_index) ==
 			_director_perspective_first_person) ||
@@ -604,13 +613,14 @@ static void render_object_list(
 	{
 		struct object_datum *object = object_get(object_index);
 		/* port: the player's own legs, seen looking down in first person
-		(port/linux/game/first_person_legs.c): its body drawn from the waist
-		down, nothing it carries */
-		boolean legs = !data->shadow && !render.camera.mirrored &&
+		(port/linux/game/first_person_legs.c): its body drawn from its belly
+		down, nothing it carries; its shadow the whole body's, placed as the
+		legs are */
+		boolean legs = !render.camera.mirrored &&
 			object_is_first_person_camera(object_index) && first_person_legs_wanted(object_index);
-		real_matrix4x3 const *node_matrices = legs ?
-			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index)) :
-			object_get_node_matrices(object_index);
+		real_matrix4x3 const *node_matrices = !legs ? object_get_node_matrices(object_index) :
+			data->shadow ? first_person_legs_shadow_node_matrices(object_index, object_get_node_matrices(object_index)) :
+			first_person_legs_node_matrices(object_index, object_get_node_matrices(object_index));
 
 #ifdef HALO_VR
 		/* port: the VR mode's dead player's body, seen from where its head
@@ -830,10 +840,10 @@ static void render_object_list(
 				}
 			}
 
-			/* port: (not in display.ambient_occlusion's depth pre-pass: the
+			/* port: (not in display.ambient_occlusion "world"'s pre-pass: the
 			widgets draw as transparent geometry, queued for later) */
 			if (!data->shadow && !legs && object->object.first_widget_index != NONE &&
-				!render_ambient_occlusion_prepass)
+				!render_world_ao_prepass)
 			{
 				struct render_animation animation;
 
@@ -1325,7 +1335,11 @@ static void render_object(
 	{
 		struct object_datum *object = object_get(data->object_index);
 
-		if (!object_is_first_person_camera(data->object_index) &&
+		/* port: the player's own body casts its shadow in first person
+		with its legs drawn (port/linux/game/first_person_legs.c) */
+		if ((!object_is_first_person_camera(data->object_index) ||
+				(first_person_legs_wanted(data->object_index) && first_person_legs_shadow_node_matrices(
+					data->object_index, object_get_node_matrices(data->object_index)))) &&
 			!TEST_FLAG(object->object.flags, _object_shadowless_bit) &&
 			(!TEST_FLAG(object->object.flags, _object_invisible_bit) ||
 				object->object.first_child_object_index != NONE))

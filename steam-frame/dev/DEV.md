@@ -4,7 +4,7 @@ OpenFrame is the Steam Frame fork of [OpenH1](https://github.com/OpenH1/OpenH1):
 Halo: Combat Evolved with OpenXR VR, drawn with Vulkan (Mesa's Turnip on the Frame's Adreno), run in
 the Frame's own SteamVR. This folder (`steam-frame/`) is the Frame packaging layer: build, install,
 launch wrapper, logs, release. It touches nothing under `source/`, `port/`, `tools/` or
-`configure.py`. The branch `steam-frame` began at OpenH1's release tag `build-734`; its current base is `build-1615`.
+`configure.py`. The branch `steam-frame` began at OpenH1's release tag `build-734`; its current base is `build-2188` (1.1.0's was `build-1615`).
 
 Everything below is what the scripts do. What has been run and measured on a Frame is in
 [What is confirmed](#what-is-confirmed).
@@ -103,8 +103,8 @@ licence texts (`licenses/`, `LICENSE*`, `COPYING*`, `THIRD-PARTY-NOTICES.md`) ar
 ## Privacy check
 
 ```
-steam-frame/tools/privacy-check.sh              # our files since build-1615 (the base)
-steam-frame/tools/privacy-check.sh --history    # commits after build-1615: lines, authors, messages
+steam-frame/tools/privacy-check.sh              # our files since build-2188 (the base)
+steam-frame/tools/privacy-check.sh --history    # commits after build-2188: lines, authors, messages
 steam-frame/tools/privacy-check.sh TARBALL|DIR
 ```
 

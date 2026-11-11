@@ -77,9 +77,10 @@ struct world_proxy
 /* ---------- prototypes (port/linux/game/world_proxies.c) */
 
 /* a definition's shapes (made the first time it is asked for: from the
-model's nodes and the collision model's pieces, or a sphere of its bound
-radius); NULL none (an object that occludes nothing: a projectile, a
-light-weight effect object) */
+model's nodes and the collision model's pieces, a box of what it draws
+opaque without them, or a sphere of its bound radius); NULL none (an
+object that occludes nothing: a projectile, a light-weight effect object,
+a box without collision geometry that draws nothing opaque) */
 struct world_proxy_set const *world_proxies_definition(long definition);
 /* the map unloaded: every definition's shapes forgotten */
 void world_proxies_map_unloaded(void);
@@ -91,16 +92,42 @@ first, *dynamic_count of them; the static scenery's that the drawn field
 and its pages hold after (world_sdf.h's world_sdf_scenery_baked) */
 long world_proxies_window(float const camera_position[3], struct world_proxy *proxies, long *owners,
 	long maximum, long *dynamic_count);
+/* the scene's shapes about the camera (the distance-field scene's objects,
+world_cascades.h): every drawn instance's within reach of it, in the world,
+whatever the window sees, but for the static scenery the field holds and
+the shapes an occlusion field stands in for (drawn or on its way: the field
+is not a distance); at most maximum, each instance's together; owners[i] is
+the instance's id. Returns how many */
+long world_proxies_scene(float const camera_position[3], float reach, struct world_proxy *proxies, long *owners,
+	long maximum);
 /* whether an object is a static scenery placement that the drawn field
 and its pages hold (world_sdf.h's world_sdf_scenery_baked): its draws take
 none of the field, which holds its own geometry
 (port/linux/game/world_proxies_game.c, which reads the object) */
 int world_proxies_source_baked(long id);
+/* whether a static scenery placement's own geometry is in the field: its
+definition has collision geometry, which the bake folds in (world_sdf.c's
+sdf_scenery_copy). A shrub's or a fern's has none: the field does not hold
+it (port/linux/game/world_proxies_game.c) */
+int world_proxies_source_solid(long id);
 struct world_proxies_frame;
 /* a definition's shapes placed on these nodes (world space; at most
 maximum): how many. The static scenery's, baked where it stands */
 long world_proxies_place(long definition, struct world_proxies_frame const *frames, short node_count,
 	struct world_proxy *proxies, long maximum);
+struct world_proxies_source_field;
+/* an object's occlusion field placed on its node 0 (frame), in the GPU's
+layout (xgpu_stream.h's XGPU_WORLD_AO_PROXY_FIELD): the world to its
+voxels' place, g = (frame^-1 (p) - origin) / voxel, each row an axis of the
+frame over its scale squared and the voxel (a frame of one scale). The
+window's, and the static scenery's pages' where a placement has one */
+void world_proxies_field_place(struct world_proxies_source_field const *field, struct world_proxies_frame const *frame,
+	struct world_proxy proxies[WORLD_PROXY_FIELD_SLOTS]);
+/* whether a definition's occlusion field stands in for this shape of its
+set where the field is drawn: a vehicle's boxes (its wheels' spheres
+stay), and the one shape of anything else (its box: of its collision
+geometry, else of what it draws) */
+int world_proxy_set_fielded(struct world_proxy_set const *set, short shape_index);
 
 /* ---------- the arithmetic (shared with D's shaders: their reference;
 tools/harness/tests/world_proxies.c) */

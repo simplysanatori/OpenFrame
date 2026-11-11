@@ -539,7 +539,9 @@ vdf.write_bytes(data[:-2] + b"\\0" + str(len(data)).encode() + b"\\0" + fields +
 """,
     # (as Steam's command: "steam -shutdown" closes the running Steam, which writes its localconfig.vdf as it
     # exits: the file in ~/steam-exit-writes, if there is one, as Steam's own newer state; STEAM_STAYS, a Steam
-    # that does not close. "steam" starts it, noting whether its Steam Input setting for the shortcut is there.)
+    # that does not close. "steam" starts it, noting whether its Steam Input setting for the shortcut is there.
+    # install.sh runs both in the background, so the call is noted before ~/running changes: a test that sees
+    # Steam closed or started (started_again) has its call already, never one that comes after it has read them)
     "steam": f"""#!{sys.executable}
 import os, sys
 from pathlib import Path
@@ -558,9 +560,9 @@ else:
     note = " ".join(["steam"] + sys.argv[1:]) + (" (its localconfig.vdf has UseSteamControllerConfig)"
         if localconfig.exists() and b"UseSteamControllerConfig" in localconfig.read_bytes() else "")
     names.append("steam")
-running.write_text("".join(name + "\\n" for name in names))
 with open(home / "calls.txt", "a") as calls:
     calls.write(note + "\\n")
+running.write_text("".join(name + "\\n" for name in names))
 """,
 }
 GAME = "#!/bin/sh\necho \"started in $(pwd)\" >> \"$HOME/calls.txt\"\n"
@@ -1069,6 +1071,17 @@ def started_again(home):
     return calls(home)
 
 
+def called(home, call):
+    """the calls, once call is among them: a call install.sh leaves running in the background (steam -shutdown,
+    to a Steam that does not close) may note itself after install.sh has finished"""
+    path = home / "calls.txt"
+    for _ in range(50):
+        if path.exists() and call in path.read_text().splitlines():
+            break
+        time.sleep(0.1)
+    return calls(home)
+
+
 STEAM_TOOLS = ("kdialog", "steamos-add-to-steam", "steam")
 HOW = "in Game Mode, Steam > OpenH1 > the controller icon > Disable Steam Input."
 
@@ -1219,7 +1232,8 @@ def test_steam_input_left_as_it_was(release, tmp_path, case):
     assert (path.read_bytes() if path.exists() else None) == before
     assert not (path.parent / "localconfig.vdf.before-openh1").exists()
     assert HOW in output
-    steam = [line for line in calls(home) if line.startswith("steam ")]
+    noted = called(home, "steam -shutdown") if case == "steam stays" else calls(home)
+    steam = [line for line in noted if line.startswith("steam ")]
     assert steam == (["steam -shutdown"] if case == "steam stays" else [])
     assert (home / "running").read_text().split() == ["steam"]
 
@@ -1340,3 +1354,25 @@ def test_android_release():
     builder = (ROOT / "tools/android_build.py").read_text()
     assert 'assets_dir / "licenses"' in builder and 'release_notices("android")' in builder
     assert '(SDL_DIR / "LICENSE.txt", "SDL3-LICENSE.txt")' in builder
+
+
+def test_embedded_fonts_carry_their_licenses():
+    """Every font the builds embed (port/assets/fonts/fonts.json: each tag's font and its fallback, tools/
+    embed_assets.py) has its licence in every platform's release (desktop and dedicated server alike) and the Steam
+    Frame's package: a font file Family-Style.ttf, a notice Family-*.txt."""
+    import embed_assets
+    import frame_package
+    families = {name.split("-", 1)[0] for name in embed_assets.font_files()}
+    assert {"CyborgInterfaceGothic", "Overpass"} <= families
+    for platform in ("linux_x86_64", "linux_arm64", "windows", "macos", "ios", "android"):
+        names = {name for _, name in linux_package.notices(platform)}
+        for family in families:
+            assert any(name.startswith(f"{family}-") for name in names), (platform, family)
+    for family in families:
+        assert any(name.startswith(f"{family}-") for name in frame_package.LICENSES), family
+    for source, name in linux_package.notices("linux_x86_64"):
+        assert source.is_file(), source
+    # (Cyborg Interface Gothic's notice: both its copyright lines, and the licence's whole text)
+    cyborg = (ROOT / "port/assets/fonts/CyborgInterfaceGothic-OFL.txt").read_text()
+    assert "Copyright 2021 The Overpass Project Authors" in cyborg and "Copyright (c) 2026, fizzy" in cyborg
+    assert "SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007" in cyborg and "DISCLAIMER" in cyborg

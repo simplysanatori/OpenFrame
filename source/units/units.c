@@ -698,6 +698,7 @@ symbols in this file:
 #include "coop_scripts.h" /* port: port/linux/game/coop_scripts.c */
 #include "coop_enemies.h" /* port: port/linux/game/coop_enemies.c */
 #include "sim_rate.h" /* port: port/linux/game/sim_rate.c */
+#include "demo.h" /* port: port/linux/game/demo.c */
 
 /* port: the control and animation impulses the host's actors give their
 units go to the clients' copies (port/linux/game/network_actors.c) */
@@ -3356,16 +3357,14 @@ void unit_impulse(
 	return;
 }
 
-/* the platform layer's (port/linux/src/port_config.c) */
-int config_boolean(const char *name);
-unsigned long config_changes(void);
 /* port/linux/game/network_standard.c's */
 boolean network_standard_turns_with_aim(long player_index);
+boolean network_standard_enhanced_animations(void);
 
 /* port: the animation enhancements (game.enhanced_animations, on unless
-config.toml turns them off) are for the player bipeds (cyborg and
-cyborg_mp), whose animations they were made with; every other unit keeps
-the original animations */
+config.toml turns them off; a rule of the game) are for the player bipeds
+(cyborg and cyborg_mp), whose animations they were made with; every other
+unit keeps the original animations */
 static char const *const enhanced_animation_units[] =
 {
 	"cyborg",
@@ -3395,16 +3394,11 @@ static boolean unit_animation_enhanced_unit(
 boolean unit_animation_enhanced(
 	long unit_index)
 {
-	static boolean enhanced = TRUE;
-	static unsigned long read_at = (unsigned long)-1;
-
-	/* (read again when the settings change) */
-	if (read_at != config_changes())
-	{
-		read_at = config_changes();
-		enhanced = config_boolean("game.enhanced_animations") != 0;
-	}
-	if (!enhanced)
+	/* port: (a rule of the game, as every machine of it has it: the host's
+	in a network game, network_standard_enhanced_animations; it was each
+	machine's own setting, and a client and its host posed that player's
+	body, and so where its shots went and what hit it, differently) */
+	if (!network_standard_enhanced_animations())
 	{
 		return FALSE;
 	}
@@ -3419,17 +3413,12 @@ the host says (network_standard_turns_with_aim: the host's
 game.enhanced_animations, a Legacy game's always), whatever its own
 setting: a client and its host would otherwise turn that player's body
 differently. In a game of one machine the setting decides, as for the other
-enhancements. */
+enhancements (and in a demo's playback, its recording's game). */
 boolean unit_turns_with_aim(
 	long unit_index)
 {
-	if (game_connection() == _game_connection_network_client ||
-		game_connection() == _game_connection_network_server)
-	{
-		return unit_animation_enhanced_unit(unit_index) &&
-			network_standard_turns_with_aim(unit_get(unit_index)->unit.player_index);
-	}
-	return unit_animation_enhanced(unit_index);
+	return unit_animation_enhanced_unit(unit_index) &&
+		network_standard_turns_with_aim(unit_get(unit_index)->unit.player_index);
 }
 
 /* port: a seat whose graph has no reload of its own (a Scorpion rider's)
@@ -8040,6 +8029,9 @@ static void unit_refresh_illumination(
 		lights_illumination_at_point(&unit->object.position, &unit->object.location, &color);
 		unit->unit.ambient_illumination = real_rgb_color_brightness(&color);
 		unit->unit.self_illumination = object_get_self_illumination(unit_index);
+		/* port: the lights at its place are as the frames left them: the
+		demo's (port/linux/game/demo.c) */
+		demo_decide_reals(unit_index, &unit->unit.ambient_illumination, 2);
 	}
 	else
 	{
@@ -11037,6 +11029,10 @@ static boolean unit_animation_set_state(
 				unit_index,
 				unit_definition->object.animation_graph.index,
 				animation_index);
+			/* port: in network co-op an AI's units idle out of step
+			(coop_enemies.c) */
+			if (new_state == _unit_state_idle)
+				coop_enemies_idle_started(unit_index, unit->unit.animation.state);
 
 			interpolation_frame_count =
 				unit_animation_compute_interpolation_frame_count(

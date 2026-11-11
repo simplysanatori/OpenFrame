@@ -35,6 +35,7 @@ default.
 | `vr.height` | `"seated"` | `"seated"` | The eyes are wherever you recentre (both grips held), standing or seated, with no floor or height to get right | `"standing"` needs `vr.player_height` and SteamVR's floor right |
 | `vr.physical_crouch` | `true` | `true` | Standalone, crouching in the room is natural; measured from the recentred height | none |
 | `input.crouch_walk` | `false` | `true` | The left stick's click crouches at a full push of the move stick, as OpenFrame 1.0.0's own crouch did (a sprint's slide stays crouched); Settings > Controls > CROUCH WALK | `false`: a full push of the move stick stands you up from a crouch, as Halo did |
+| `network.allow_opence` | `false` | `true` | When you host an OpenH1 game, OpenCE players and OpenH1 builds of another protocol version (as OpenCE players, at 30 ticks) can join it: the most players to play with | `false`: only OpenH1 players of the same version join |
 | `vr.melee_gesture` | `true` | `true` | The weapon swing melees; B still does | Hard swings near walls |
 | `vr.weapon_haptics` | `1.0` | `1.0` | The Frame's controllers take OpenXR haptics | Their feel on the Frame is untested |
 | `vr.hrtf` | `true` | `true` | Directional sound in the headset's speakers | Its CPU cost on the Frame's 5 usable cores is unmeasured |

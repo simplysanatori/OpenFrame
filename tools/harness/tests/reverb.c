@@ -25,7 +25,13 @@ from a default.xbe):
 	  (scenario.c scenario_get_sound_environment) on the way from one to
 	  another, and the reverb follows: each fade goes on from where the last
 	  got to, never back towards the environment left, and it reaches the
-	  new one soon after the game does.
+	  new one soon after the game does;
+	- "change": a new environment set while the reverb reverberates is
+	  the reverb's within 2 ms, as an Xbox's recordings show (a click
+	  played 2 ms after the environment was set echoed as the new room's
+	  levels);
+	- "delays": but its delays only REVERB_DELAY_HOLD_FRAMES later (the
+	  test bed's ninth run).
 "metrics" prints the figures of each environment, beside the Xbox's;
 "measure" prints those of four-channel responses (raw floats) given, in the
 form of xbox_figures.
@@ -600,7 +606,7 @@ int main(int argc, char **argv)
 		speakers' mix bins (its encode processor's: left = front left + 0.707
 		center + 0.707 back left), each side its front and its back at -3 dB */
 		struct sdl_stream stream;
-		float left, right, room, direct_lowpass, room_lowpass, output[2 * 2048], *four;
+		float left, right, pair[2], room, direct_lowpass, room_lowpass, output[2 * 2048], *four;
 		static float send[2048];
 		BOOL hrtf_on;
 		struct hrtf_parameters hrtf;
@@ -618,7 +624,7 @@ int main(int argc, char **argv)
 		stream.maximum_distance = 100.0f;
 		stream.room = stream.room_hf = DSBVOLUME_MIN;
 		listener.position[0] = listener.position[1] = listener.position[2] = 0.0f;
-		voice_gains(&stream, &left, &right, &room, &direct_lowpass, &room_lowpass, &hrtf_on, &hrtf);
+		voice_gains(&stream, &left, &right, pair, &room, &direct_lowpass, &room_lowpass, &hrtf_on, &hrtf);
 		CHECK(fabs(left * left + right * right - 1.0) < 1e-4, "the direct path's energy %.3f", left * left + right * right);
 
 		properties.lReflections = DSBVOLUME_MIN;
@@ -726,6 +732,117 @@ int main(int argc, char **argv)
 		reverb within two fades after */
 		CHECK(!reverb.silent && settled && settled < 30 * 1600 + 2 * REVERB_FADE_FRAMES + 128,
 			"the reverb reached the mountains' at %.0f ms", settled * 1000.0 / OUTPUT_RATE);
+		return 0;
+	}
+
+	/* the hallway reverberating (a 3D voice of noise sending to it), then
+	the cave set at once: within 2 ms of the mix taking it, the reverb is
+	the cave's, its fade over */
+	CASE("change")
+	{
+		struct sdl_stream *stream = calloc(1, sizeof(*stream));
+		DSI3DL2LISTENER cave = listener_from_tag(&environments[2]);
+		float output[32 * 2];
+		unsigned long chunk, frame = 0, n;
+
+		resampler_initialize();
+		resampler_phases_initialize();
+		stream->channels = 1;
+		stream->sample_rate = OUTPUT_RATE;
+		stream->volume = 1.0f;
+		stream->has_3d = TRUE;
+		stream->mode = DS3DMODE_NORMAL;
+		stream->position[2] = 2.0f;
+		stream->minimum_distance = 1.0f;
+		stream->maximum_distance = 50.0f;
+		stream->mixing[0].frames = OUTPUT_RATE;
+		stream->mixing[0].samples = malloc(stream->mixing[0].frames * sizeof(short));
+		for (n = 0; n < stream->mixing[0].frames; n++)
+			stream->mixing[0].samples[n] = (short)(((n * 2654435761u) >> 16) & 0x1fff) - 0x1000;
+		stream->packets[0] = stream->mixing[0];
+		stream->packet_count = stream->submitted = stream->mixing_count = stream->mixing_next = 1;
+		resampler_reset(stream);
+		streams = stream;
+		environment_set = listener_from_tag(&environments[5]);
+		environment_changed = TRUE;
+		for (chunk = 0; chunk < 100; chunk++)
+			mix(output, 32, FALSE);
+		CHECK(!reverb.silent && !reverb.fade, "the hallway's reverb not running, or still fading in");
+		environment_set = cave;
+		environment_changed = TRUE;
+		for (chunk = 0; chunk < 4 && (reverb.fade || memcmp(&reverb.properties, &cave, sizeof(cave))); chunk++)
+		{
+			mix(output, 32, FALSE);
+			frame += 32;
+		}
+		CHECK(!reverb.fade && !memcmp(&reverb.properties, &cave, sizeof(cave)) && reverb.from.input_gain == -0.5f,
+			"%.1f ms after the cave was set, the reverb still fading to it (%d frames to go)",
+			frame * 1000.0 / OUTPUT_RATE, (int)reverb.fade);
+		return 0;
+	}
+
+	/* "delays": the cave set while the hallway reverberates is the cave's
+	at once in its gains, but its delays wait REVERB_DELAY_HOLD_FRAMES (the
+	test bed's ninth run: a click 2 or 25 ms after the change echoed at the
+	hallway's delays, one 100 ms after it at the cave's); a second change
+	during the hold does not start it again */
+	CASE("delays")
+	{
+		struct sdl_stream *stream = calloc(1, sizeof(*stream));
+		DSI3DL2LISTENER cave = listener_from_tag(&environments[2]), hallway = listener_from_tag(&environments[5]);
+		struct reverb_parameters hall_delays, cave_delays;
+		float output[32 * 2];
+		unsigned long chunk, n;
+
+		reverb_parameters_set(&hall_delays, &hallway);
+		reverb_parameters_set(&cave_delays, &cave);
+		resampler_initialize();
+		resampler_phases_initialize();
+		stream->channels = 1;
+		stream->sample_rate = OUTPUT_RATE;
+		stream->volume = 1.0f;
+		stream->has_3d = TRUE;
+		stream->mode = DS3DMODE_NORMAL;
+		stream->position[2] = 2.0f;
+		stream->minimum_distance = 1.0f;
+		stream->maximum_distance = 50.0f;
+		stream->mixing[0].frames = OUTPUT_RATE;
+		stream->mixing[0].samples = malloc(stream->mixing[0].frames * sizeof(short));
+		for (n = 0; n < stream->mixing[0].frames; n++)
+			stream->mixing[0].samples[n] = (short)(((n * 2654435761u) >> 16) & 0x1fff) - 0x1000;
+		stream->packets[0] = stream->mixing[0];
+		stream->packet_count = stream->submitted = stream->mixing_count = stream->mixing_next = 1;
+		resampler_reset(stream);
+		streams = stream;
+		environment_set = hallway;
+		environment_changed = TRUE;
+		for (chunk = 0; chunk < 300; chunk++)
+			mix(output, 32, FALSE);
+		CHECK(!reverb.silent && !reverb.delay_hold && reverb.delays_from.late_delay == hall_delays.late_delay,
+			"the hallway's reverb not running at its own delays");
+		environment_set = cave;
+		environment_changed = TRUE;
+		for (chunk = 0; chunk < 75; chunk++)
+			mix(output, 32, FALSE);
+		CHECK(!memcmp(&reverb.properties, &cave, sizeof(cave)) && !reverb.fade &&
+			reverb.delays_from.late_delay == hall_delays.late_delay &&
+			reverb.delays_from.reflections_delay == hall_delays.reflections_delay,
+			"50 ms after the cave was set, its gains not in place, or its delays already (%ld, the hallway's %ld)",
+			(long)reverb.delays_from.late_delay, (long)hall_delays.late_delay);
+		/* (the hallway again, then the cave, within the hold) */
+		environment_set = hallway;
+		environment_changed = TRUE;
+		mix(output, 32, FALSE);
+		mix(output, 32, FALSE);
+		mix(output, 32, FALSE);
+		mix(output, 32, FALSE);
+		environment_set = cave;
+		environment_changed = TRUE;
+		for (chunk = 0; chunk < 75; chunk++)
+			mix(output, 32, FALSE);
+		CHECK(!reverb.delay_hold && !reverb.delay_fade && reverb.delays_from.late_delay == cave_delays.late_delay,
+			"%.0f ms after the first change, the cave's delays not in place (%lu frames of the hold left)",
+			(75 + 4 + 75) * 32 * 1000.0 / OUTPUT_RATE, (unsigned long)reverb.delay_hold);
 		return 0;
 	}
 
