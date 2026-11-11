@@ -152,6 +152,6 @@
 		<string text="A hard swing of the right controller melees, as\nB does; with its grip held, a softer one will do."/>
 		<string text="Hand: hold the left grip, draw the hand back, swing\nand let go. Both: or the left trigger. Trigger: only it."/>
 		<string text="How strongly the controllers feel each weapon\nfiring, and the hits on you."/>
-		<string text="Punching and parrying, pulling a weapon to your\nhand, passing it across, holding and throwing things."/>
+		<string text="Punching, parrying and deflecting shots, pulling a\nweapon to you, passing it across, holding and throwing."/>
 	</strings>
 </menus>
