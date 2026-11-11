@@ -59,6 +59,12 @@ static void decal_new_from_collision(long index, struct collision_result const *
 	decals_made++;
 }
 
+/* (game.blood_layers: off; tests/decal_blood_layers.c has it) */
+static boolean decal_blood_layers_full(long index, struct collision_result const *collision, real radius_modifier)
+{
+	return FALSE;
+}
+
 #include "under_test.inc"
 
 int main(int argc, char **argv)

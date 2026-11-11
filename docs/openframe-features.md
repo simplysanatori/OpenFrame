@@ -9,7 +9,7 @@ Every one is off, or as OpenH1 had it, until you choose it, apart from four
 things that are on from the start: the third person's hold on the turning
 stick, the HUD's corners placed for the Frame, no magazine eject on the
 stick, your body's shadow, the hands keeping their angle on a vehicle's
-controls, and smooth turning in a vehicle's seat.
+controls, smooth turning in a vehicle's seat, and blood layers.
 
 The VR Setup menu (Settings > CONTROLS tab > VR SETUP, in the CONTROLLER
 section; also at the foot of the player profile menu) is a tree of pages of
@@ -597,6 +597,30 @@ the helmet's shadow turns.
   64 joints made twice a frame on the CPU. The wider sphere spreads the
   body's shadow over more of the atlas's region (a little softer) and draws
   its receivers over a larger area.
+
+### Blood layers
+
+In a long fight the game lays splat after splat of blood on the same patch
+of floor or wall, each one blended over the ones before it: past a few
+layers the patch is no redder, but every layer more is its pixels drawn
+again, in both eyes. With `game.blood_layers` a new splat of blood is not
+laid where that many splats of blood, not yet faded, already lie within its
+radius. It is HaloFreak95's (Test72), as moistman42069's fork carries it,
+with 6 on the Quest; rewritten for OpenFrame's decals
+(`source/effects/decals.c`, `decal_blood_layers_full`).
+
+- Key: `game.blood_layers` (default `6` in OpenFrame; `0`: every splat, as
+  the game lays them). Not in VR Setup.
+- What counts: splats of blood in the new splat's layer of the cluster it
+  lands in, whose middles are within the new splat's largest radius and
+  that have faded less than half way. The map's own (permanent) decals never
+  count, and bullet holes, scorches and the rest are never left out. A
+  decal is blood by its tag's name (`effects\decals\blood splats\...`):
+  no field of the tag says so.
+- Where: everywhere. Decals are only drawn, on each machine's own seed, so
+  nothing of the game's or of a network game changes.
+- Not yet tried in the headset: whether 6 hides no visible blood, and what
+  it saves in a long fight, are to be measured on the Frame.
 
 ## Recentring and the Pillar of Autumn tutorial
 
