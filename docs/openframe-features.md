@@ -5,10 +5,10 @@ where each came from, and how to turn it on. Each is set in `config.toml`
 (the `vr.*` keys below) or in VR Setup: MOVEMENT AND COMFORT..., HANDS AND
 WEAPONS... (and its FISTS AND GRABBING...), HUD... (WRIST HUD..., HUD
 LAYOUT...) and PLAYER....
-Every one is off, or as OpenH1 had it, until you choose it, apart from three
+Every one is off, or as OpenH1 had it, until you choose it, apart from four
 things that are on from the start: the third person's hold on the turning
-stick, the HUD's corners placed for the Frame, and no magazine eject on the
-stick.
+stick, the HUD's corners placed for the Frame, no magazine eject on the
+stick, and the grenade in the hand at the size it is thrown at.
 
 The VR Setup menu (Settings > CONTROLS tab > VR SETUP, in the CONTROLLER
 section; also at the foot of the player profile menu) is a tree of pages of
@@ -420,6 +420,24 @@ snap turn.
   how much of the edges, and how dark). `vr.comfort_vignette = false`, the
   older switch, still turns it off.
 - Input: none.
+
+### Grenade size in the hand
+
+From the grip taking a grenade until it is thrown (`vr.grenade_throw`), the
+left hand holds the current type's grenade. OpenH1 drew it at 0.6 of the
+game's size, so it grew as it left the hand. It is now drawn at the size it
+is thrown at by default, scaled about its own centre, and held in the palm:
+its centre 3 cm forward of the grip (under the knuckles), 1 cm down, and
+toward the palm by 1 cm plus its radius at its size (2 to 5 cm), so its side
+rests in the palm and the half-closed fingers curl round it instead of the
+hand burying it. The thrown grenade starts with its centre where the held
+one's was; it is otherwise unchanged. As in moistman42069's mod (GRENADE
+SIZE, `vr.grenade_scale`, and its palm offset).
+
+- Key: `vr.grenade_scale` (`HALO_VR_GRENADE_SCALE`; 0.5 to 1.5, default
+  `1.0`: the grenade as thrown; `0.6` is OpenH1's). No menu row: set it in
+  `config.toml`.
+- Code: `vr_grenade_draw`, `port/linux/game/vr_grenade.c`.
 
 ### Wrist HUD and HUD modes
 
