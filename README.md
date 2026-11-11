@@ -34,13 +34,13 @@ The Xbox game's own code, rebuilt, runs on the Frame itself. It shows in VR thro
    cd OpenFrame
    ```
 
-2. Download `openframe-1.1.0-linux-arm64.tar.gz` and `SHA256SUMS` from [Releases](https://github.com/simplysanatori/OpenFrame/releases) to `~/Downloads`.
+2. Download `openframe-1.2.0-linux-arm64.tar.gz` and `SHA256SUMS` from [Releases](https://github.com/simplysanatori/OpenFrame/releases) to `~/Downloads`.
 
 3. Check it and install with your maps:
 
    ```sh
    (cd ~/Downloads && sha256sum -c --ignore-missing SHA256SUMS)
-   steam-frame/install.sh --maps /path/to/your/maps ~/Downloads/openframe-1.1.0-linux-arm64.tar.gz
+   steam-frame/install.sh --maps /path/to/your/maps ~/Downloads/openframe-1.2.0-linux-arm64.tar.gz
    ```
 
 Or copy your maps into `~/.local/share/OpenFrame/maps`, then:

@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.2.0 (November 2026)
 
 OpenFrame is now on OpenH1 `build-2188`, and it runs far smoother in the headset. I also added a body shadow, a wait for SteamVR at start, punches online, smooth turning in vehicles and shot deflection.
 
