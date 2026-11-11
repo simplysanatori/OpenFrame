@@ -325,11 +325,26 @@ static void slide_end(char const *why)
 	parkour.slide_ticks = parkour.slide_airborne_ticks = parkour.slide_stall_ticks = 0;
 }
 
+/* a slide on, stepped by vr_parkour_tick this tick or the last, in a game
+of this computer alone: one left on as its game ended (quit mid-slide) is
+none in the next game until vr_parkour_tick resets it, and a network game,
+which never steps it, never has one (a map begun or a revert: the game's
+time goes back, below the slide's) */
+static boolean slide_current(void)
+{
+	long now;
+
+	if (!parkour.sliding || parkour.tick == NONE || game_connection() != _game_connection_local)
+		return FALSE;
+	now = game_time_get();
+	return now >= parkour.tick && now <= parkour.tick + 2;
+}
+
 /* player_control.c's (the crouch flag): a slide is latched on, so that the
 game's crouch is held for it with the click let go */
 boolean vr_parkour_slide_active(void)
 {
-	return parkour.sliding && parkour.slide_latched;
+	return slide_current() && parkour.slide_latched;
 }
 
 /* a tick of the slide: begun, stepped or ended (forward: the facing,
@@ -872,7 +887,7 @@ void vr_parkour_movement(
 	real_vector3d forward = *facing;
 	real vx, vy, speed;
 
-	if (!parkour.sliding || biped_index != parkour.unit_index)
+	if (!slide_current() || biped_index != parkour.unit_index)
 		return;
 	forward.k = 0.0f;
 	if (normalize3d(&forward) <= 0.0f)
