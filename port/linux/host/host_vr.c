@@ -151,6 +151,16 @@ static struct
 	/* host_vr_probe's: done, and the binding it chose (VR_BINDING_*) */
 	int probed;
 	int binding;
+	/* (OpenFrame) instance_create's last call to the runtime and its result
+	(its extensions listed, the instance made), its list of extensions
+	logged once, and the runtime's not being ready logged last
+	(runtime_waiting: the call and its result, each said once while the
+	guest waits, host_vr_runtime_ready) */
+	const char *instance_call;
+	XrResult instance_result;
+	int extensions_logged;
+	const char *waiting_call;
+	XrResult waiting_result;
 	int has_frame_controller;
 	int has_refresh_rate;
 	int want_depth, has_depth;
@@ -239,6 +249,39 @@ static int check(XrResult result, const char *what)
 		return 1;
 	host_logf(HOST_LOG_ERROR, "vr: %s: %s", what, result_name(result, text));
 	return 0;
+}
+
+/* (OpenFrame) whether a call's failure is the runtime or the headset not
+ready yet, which a later call may find ready: SteamVR still starting, or
+not running (XR_ERROR_RUNTIME_UNAVAILABLE, the loader's; XR_ERROR_RUNTIME_
+FAILURE, the runtime's), the headset asleep or off (XR_ERROR_FORM_FACTOR_
+UNAVAILABLE: the spec's "may be retried"), or the runtime gone since the
+instance was made (XR_ERROR_INSTANCE_LOST: a new instance is to be made) */
+static int runtime_not_ready(XrResult result)
+{
+	return result == XR_ERROR_RUNTIME_UNAVAILABLE || result == XR_ERROR_RUNTIME_FAILURE ||
+		result == XR_ERROR_FORM_FACTOR_UNAVAILABLE || result == XR_ERROR_INSTANCE_LOST;
+}
+
+/* (OpenFrame) a call's failure, the runtime or the headset not ready yet:
+logged once while it stays the same (the guest asks again each second,
+host_vr_runtime_ready) */
+static void runtime_waiting(const char *call, XrResult result)
+{
+	char text[XR_MAX_RESULT_STRING_SIZE];
+	const char *name;
+
+	if (vr.waiting_call == call && vr.waiting_result == result)
+		return;
+	vr.waiting_call = call;
+	vr.waiting_result = result;
+	/* (named here: without an instance the runtime names no result) */
+	name = result == XR_ERROR_RUNTIME_UNAVAILABLE ? "XR_ERROR_RUNTIME_UNAVAILABLE" :
+		result == XR_ERROR_RUNTIME_FAILURE ? "XR_ERROR_RUNTIME_FAILURE" :
+		result == XR_ERROR_FORM_FACTOR_UNAVAILABLE ? "XR_ERROR_FORM_FACTOR_UNAVAILABLE" :
+		result == XR_ERROR_INSTANCE_LOST ? "XR_ERROR_INSTANCE_LOST" : result_name(result, text);
+	host_logf(HOST_LOG_WARN, "vr: %s: %s: the OpenXR runtime or the headset is not ready yet (SteamVR starting, "
+		"or the headset asleep)", call, name);
 }
 
 /* ---------- loading the runtime */
@@ -436,26 +479,36 @@ static int instance_create(void)
 
 	if (vr.instance)
 		return 1;
+	/* (what failed, if not the runtime: never waited for) */
+	vr.instance_call = "xrEnumerateInstanceExtensionProperties";
+	vr.instance_result = XR_ERROR_INITIALIZATION_FAILED;
 	global_functions_load();
-	if (!xrEnumerateInstanceExtensionProperties || !xrCreateInstance ||
-		xrEnumerateInstanceExtensionProperties(NULL, 0, &count, NULL) != XR_SUCCESS)
-	{
+	if (!xrEnumerateInstanceExtensionProperties || !xrCreateInstance)
 		return 0;
-	}
+	if ((vr.instance_result = xrEnumerateInstanceExtensionProperties(NULL, 0, &count, NULL)) != XR_SUCCESS)
+		return 0;
 	extensions = calloc(count ? count : 1, sizeof(*extensions));
+	vr.instance_result = XR_ERROR_INITIALIZATION_FAILED;
 	if (!extensions)
 		return 0;
 	for (index = 0; index < count; index++)
 		extensions[index].type = XR_TYPE_EXTENSION_PROPERTIES;
-	if (!check(xrEnumerateInstanceExtensionProperties(NULL, count, &count, extensions),
-		"xrEnumerateInstanceExtensionProperties"))
+	vr.instance_result = xrEnumerateInstanceExtensionProperties(NULL, count, &count, extensions);
+	if (XR_FAILED(vr.instance_result))
 	{
+		/* (the runtime not ready yet is the waiting's to say, once:
+		runtime_waiting) */
+		if (!runtime_not_ready(vr.instance_result))
+			check(vr.instance_result, "xrEnumerateInstanceExtensionProperties");
 		free(extensions);
 		return 0;
 	}
+	vr.instance_result = XR_ERROR_INITIALIZATION_FAILED;
 	/* every extension the runtime offers, with its version, on one line:
 	what a headset's runtime has (foveation, eye tracking, layers) is read
-	from its log, where the runtime's own documentation says less */
+	from its log, where the runtime's own documentation says less (once:
+	OpenFrame makes the instance again while it waits for the runtime) */
+	if (!vr.extensions_logged)
 	{
 		size_t size = 64, at = 0;
 		char *text;
@@ -471,6 +524,7 @@ static int instance_create(void)
 			host_logf(HOST_LOG_INFO, "vr: the runtime's extensions (%u): %s", (unsigned)count, text);
 			free(text);
 		}
+		vr.extensions_logged = 1;
 	}
 	if (!extension_listed(extensions, count, XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME))
 	{
@@ -516,8 +570,15 @@ static int instance_create(void)
 	create.applicationInfo.apiVersion = XR_MAKE_VERSION(1, 0, 0);
 	create.enabledExtensionCount = enabled_count;
 	create.enabledExtensionNames = enabled;
-	if (!check(xrCreateInstance(&create, &vr.instance), "xrCreateInstance"))
+	vr.instance_call = "xrCreateInstance";
+	vr.instance_result = xrCreateInstance(&create, &vr.instance);
+	if (XR_FAILED(vr.instance_result))
+	{
+		vr.instance = XR_NULL_HANDLE;
+		if (!runtime_not_ready(vr.instance_result))
+			check(vr.instance_result, "xrCreateInstance");
 		return 0;
+	}
 	if (!functions_load(vr.instance))
 		return 0;
 #define XR_VULKAN_LOAD(name) \
@@ -2112,6 +2173,60 @@ void host_vr_haptic(int hand, float amplitude, float seconds)
 	pthread_mutex_unlock(&haptics.lock);
 }
 
+/* ---------- the runtime awaited (OpenFrame) */
+
+/* Before the window is made (vr.runtime_wait, sdl_platform.c), once a
+second while it says the runtime is not ready: the instance made (the one
+host_vr_vulkan_prepare then takes) and the headset's system found. The
+runtime or the headset not ready yet (runtime_not_ready) is logged once
+for each call and result, and the instance is given back for the next
+call to make again, but for a headset not yet there (XR_ERROR_FORM_FACTOR_
+UNAVAILABLE), whose system the spec lets the same instance look for again.
+The idea, a minute of tries a second apart, is astromaddie's HaloCE-VR's
+(CC0) as moistman42069's HaloCE-DecompRemix-VR carries it (AGPL-3.0-or-
+later: host_xr.c), for SteamVR on the Steam Frame, asleep or still
+starting. */
+int host_vr_runtime_ready(void)
+{
+	XrSystemGetInfo system = { XR_TYPE_SYSTEM_GET_INFO };
+	XrResult result;
+
+	if (host_vr_probe() != VR_BINDING_VULKAN)
+		return VR_RUNTIME_NONE;
+	if (vr.instance && vr.system != XR_NULL_SYSTEM_ID)
+		return VR_RUNTIME_READY;
+	/* (the extensions as host_vr_vulkan_prepare asks for them) */
+	vr.want_depth = vr.want_eye_gaze = 1;
+	if (!instance_create())
+	{
+		if (!runtime_not_ready(vr.instance_result))
+			return VR_RUNTIME_NONE;
+		runtime_waiting(vr.instance_call, vr.instance_result);
+		return VR_RUNTIME_WAIT;
+	}
+	system.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
+	result = xrGetSystem(vr.instance, &system, &vr.system);
+	if (XR_SUCCEEDED(result))
+	{
+		if (vr.waiting_call)
+			host_logf(HOST_LOG_INFO, "vr: the OpenXR runtime and the headset are ready");
+		return VR_RUNTIME_READY;
+	}
+	vr.system = XR_NULL_SYSTEM_ID;
+	if (!runtime_not_ready(result))
+	{
+		check(result, "xrGetSystem (is the headset on?)");
+		return VR_RUNTIME_NONE;
+	}
+	runtime_waiting("xrGetSystem", result);
+	if (result != XR_ERROR_FORM_FACTOR_UNAVAILABLE && xrDestroyInstance)
+	{
+		xrDestroyInstance(vr.instance);
+		vr.instance = XR_NULL_HANDLE;
+	}
+	return VR_RUNTIME_WAIT;
+}
+
 /* ---------- the Vulkan device and runtime images (host only) */
 
 int host_vr_vulkan_requested(void)
@@ -2128,8 +2243,14 @@ int host_vr_vulkan_prepare(void)
 	/* The device is made before the guest supplies its settings. Enable
 	the optional extensions here; initialize uses only the ones requested. */
 	vr.want_depth = vr.want_eye_gaze = 1;
-	if (host_vr_probe() != VR_BINDING_VULKAN || !instance_create())
+	if (host_vr_probe() != VR_BINDING_VULKAN)
 		goto failed;
+	if (!instance_create())
+	{
+		if (runtime_not_ready(vr.instance_result))
+			runtime_waiting(vr.instance_call, vr.instance_result);
+		goto failed;
+	}
 	system.formFactor = XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY;
 	if (!check(xrGetSystem(vr.instance, &system, &vr.system), "xrGetSystem (is the headset on?)"))
 		goto failed;

@@ -1631,6 +1631,86 @@ static void menu_cursor_mouse_used(BOOL in_menus)
 }
 #endif
 
+#ifdef HALO_VR
+/* (OpenFrame) whether the game runs under gamescope (the Steam Frame), as
+first_start.c's first_start_gamescope */
+static BOOL platform_gamescope(void)
+{
+	const char *wayland_display = getenv("GAMESCOPE_WAYLAND_DISPLAY");
+	const char *desktop = getenv("XDG_CURRENT_DESKTOP");
+	const char *steam_deck = getenv("SteamDeck");
+	const char *gamepad_ui = getenv("SteamGamepadUI");
+
+	return (wayland_display && wayland_display[0]) || (desktop && strstr(desktop, "gamescope")) ||
+		(steam_deck && !strcmp(steam_deck, "1") && gamepad_ui && !strcmp(gamepad_ui, "1"));
+}
+
+/* (OpenFrame) vr.runtime_wait: before the VR build's window is made, the
+OpenXR runtime and its headset waited for while they are not ready yet
+(SteamVR still starting, or the headset asleep, as the game starts on the
+Steam Frame), asked once a second (host_vr_runtime_ready, which logs each
+reason once). On this thread, the main one, before anything is drawn or
+any session made, so nothing waits on it: no window yet, and no session
+whose frames the runtime would miss. A request to quit (Steam's Exit game,
+SIGTERM, which SDL makes a quit event; Ctrl+C) ends the game while it
+waits. Not ready when the wait is over: under gamescope (the Steam Frame,
+whose flat window is not seen in the headset) the game quits, its log
+saying why; on a computer's desktop it plays flat in its window, as it did
+without the wait. 0 waits for nothing, as before. A computer without a
+runtime (host_vr_probe found none) is not waited for. */
+static void platform_vr_runtime_wait(void)
+{
+	long seconds = config_integer("vr.runtime_wait");
+	Uint64 start, next;
+	BOOL waited = FALSE;
+	int ready;
+
+	if (seconds <= 0)
+		return;
+	start = SDL_GetTicks();
+	for (;;)
+	{
+		next = SDL_GetTicks() + 1000;
+		ready = host_vr_runtime_ready();
+		if (ready != VR_RUNTIME_WAIT)
+		{
+			if (waited)
+				platform_log("vr: %s after %.0f s", ready == VR_RUNTIME_READY ? "the headset is ready" :
+					"the OpenXR runtime cannot start VR", (double)(SDL_GetTicks() - start) / 1000.0);
+			return;
+		}
+		if (SDL_GetTicks() - start >= (Uint64)seconds * 1000)
+		{
+			if (!platform_gamescope())
+			{
+				platform_log("vr: the headset is not ready after %ld s (vr.runtime_wait): playing flat", seconds);
+				return;
+			}
+			platform_log("vr: the headset is not ready after %ld s (vr.runtime_wait): is SteamVR running and the "
+				"headset awake? Quitting: this build plays in the headset, where a flat window is not seen", seconds);
+			exit(EXIT_FAILURE);
+		}
+		if (!waited)
+		{
+			platform_log("vr: waiting up to %ld s for SteamVR and the headset (vr.runtime_wait)", seconds);
+			waited = TRUE;
+		}
+		/* (a quit asked for meanwhile, a tenth of a second at most later; the
+		other events, the gamepads found among them, left for the game) */
+		while (SDL_GetTicks() < next)
+		{
+			SDL_PumpEvents();
+			if (SDL_HasEvent(SDL_EVENT_QUIT))
+			{
+				platform_log("vr: asked to quit while waiting for the headset");
+				exit(EXIT_SUCCESS);
+			}
+			SDL_Delay(100);
+		}
+	}
+}
+#endif
+
 BOOL platform_video_initialize(unsigned long width, unsigned long height)
 {
 	if (platform_window)
@@ -1663,6 +1743,8 @@ BOOL platform_video_initialize(unsigned long width, unsigned long height)
 	game (vr.c) */
 	if (halo_vr_enabled() && host_vr_probe() != VR_BINDING_NONE)
 	{
+		/* (SteamVR and the headset waited for: vr.runtime_wait) */
+		platform_vr_runtime_wait();
 		platform_window = SDL_CreateWindow("Halo", (int)platform_window_width, (int)platform_window_height,
 			PLATFORM_WINDOW_DRAWING | SDL_WINDOW_HIDDEN);
 	}

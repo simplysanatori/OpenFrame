@@ -59,6 +59,7 @@ Everything is also in `~/.local/share/OpenFrame/config.toml`, with a comment on 
 | `vr.turn`, `vr.snap_turn_angle` | snap, 30 | Snap or smooth turning |
 | `vr.height` | `"seated"` | Your eyes are wherever you recentre. `"standing"` uses your height and the floor |
 | `vr.auto_recentre` | true | Recentre at each level start, and open menus in front of you |
+| `vr.runtime_wait` | 60 | Seconds to wait at the start for SteamVR and the headset, then quit. 0 does not wait |
 
 For one launch only, put `NAME=value` lines in `~/.local/share/OpenFrame/session.env`. It is read once and renamed `session.env.used`. The wrapper's own settings:
 
@@ -119,7 +120,8 @@ The Vulkan pipeline cache is shared with OpenH1, in `~/.cache/openh1`. Nothing e
 
 - **`install.sh` says Steam's debugging port is not reachable.** Start Steam and run it again, or set `OPENFRAME_SKIP_STEAM=1`.
 - **The game asks for the disc image at start.** It did not find `maps/` in `~/.local/share/OpenFrame`. Run `install.sh --maps` with your maps folder.
-- **It plays flat in a window.** SteamVR was not running when the game started. Start SteamVR first.
+- **It takes a while to start, or quits by itself after a minute.** When SteamVR is still starting, or the headset is asleep, the game waits for them, trying once a second, for up to `vr.runtime_wait` seconds (60 by default). If they are still not ready, it quits, since a flat window cannot be seen in the headset. Wake the headset, let SteamVR start, and start the game again. `stdout.log` says `vr: waiting up to 60 s for SteamVR and the headset` and why. Steam's Exit game ends it while it waits. `vr.runtime_wait = 0` turns the wait off.
+- **It plays flat in a window.** SteamVR was not running when the game started, and the game found no OpenXR runtime at all. Start SteamVR first.
 - **The menu is off to the side, or the view is not where the player is.** Hold both grips for a moment to recentre. SteamVR's own recentre works too.
 - **The HUD's corners are cut off,** for example with a glasses spacer. VR Setup > HUD... > HUD LAYOUT... > **HUD INSET** brings them all in. Each corner also has its own sliders.
 - **Something went wrong.** `~/.local/share/OpenFrame/sessions/latest/stdout.log` is the game's output, with a crash's backtrace.
