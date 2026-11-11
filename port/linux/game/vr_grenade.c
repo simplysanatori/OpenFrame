@@ -32,10 +32,12 @@ another player's copy of the throw, released when its own animation lets
 go, goes the same way.
 
 From the grip taking it until the game throws it, the grenade (the current
-type's projectile's model) is drawn in the left hand, in the first-person
-pass, whatever the hands; the game's own grenade hangs from the hand of the
+type's projectile's model, at vr.grenade_scale of its size: by default the
+size it is thrown at) is drawn in the left hand, in the first-person pass,
+whatever the hands; the game's own grenade hangs from the hand of the
 player's body, which is not drawn in first person. The thrown grenade
-starts where the held one was drawn last, and is drawn from there
+starts where the held one was drawn last (its centre where the held one's
+was), and is drawn from there
 (render_interpolation_object_from), not from the body's hand.
 
 At game.sim_rate 60 or 120 (sim_rate.h) the hand's release does not wait
@@ -81,16 +83,31 @@ as it always was. (A network game, or a film, is at 30.)
 #include <math.h>
 #include <stdio.h>
 
-/* the grenade held in the left hand (vr_grenade_draw): its middle from the
-controller's grip, in metres along where the hand points, to its right (the
-left palm's side) and up; the hand's fingers close about it there */
-#define HELD_FORWARD 0.02f
-#define HELD_RIGHT 0.03f
+/* the grenade held in the left hand (vr_grenade_draw): its centre from the
+controller's grip, in metres along where the hand points and up. The hand's
+middle (its wrist and knuckles, vr_hands.c) is at the grip, so the middle
+of its palm is a little forward of it, under the knuckles, where the
+fingers close; the grenade is to its right (the left palm's side), off the
+skin of the palm (HELD_PALM: the hand drawn about 3 cm thick there, its
+bones in the middle, less a little for the grenade to sit pressed into it)
+by its own radius at its size (the projectile's bounding radius, pinned to
+HELD_RADIUS_MINIMUM to HELD_RADIUS_MAXIMUM), so that whatever its size its
+side rests in the palm and the fingers, half closed (vr_hands.c's
+GRIP_GRENADE), curl round its far side: at a fixed place, a grenade of the
+game's size was buried in the closed hand (the same idea, and the palm's
+place, as moistman42069's HaloCE-DecompRemix-VR, AGPL-3.0-or-later:
+extra_grenade_palm_offset, vr_extra_interaction.c) */
+#define HELD_FORWARD 0.03f
 #define HELD_UP -0.01f
-/* its size, of the game's: the game's grenades are large for a human hand
-(a frag about 20 cm), but smaller here, the one thrown would grow as it
-leaves the hand */
-#define HELD_SCALE 0.6f
+#define HELD_PALM 0.01f
+#define HELD_RADIUS_MINIMUM 0.02f
+#define HELD_RADIUS_MAXIMUM 0.05f
+/* its size, of the game's, about its centre: vr.grenade_scale, 1 the
+grenade as it is thrown (the game's grenades are large for a human hand, a
+frag about 20 cm, but smaller, the one thrown grows as it leaves the
+hand) */
+#define HELD_SCALE_MINIMUM 0.5f
+#define HELD_SCALE_MAXIMUM 1.5f
 /* drawn at its finest detail (as many pixels as its finest level wants) */
 #define HELD_DETAIL_PIXELS 1000.0f
 /* the plasma grenade (the game's second type) lit by its own light, as a
@@ -101,6 +118,7 @@ static real_rgb_color const plasma_glow = { 0.30f, 0.55f, 1.00f };
 
 void platform_log(char const *format, ...);
 char const *config_string(char const *name);
+double config_real(char const *name);
 /* vr_render.c's */
 boolean vr_render_left_hand(real_matrix4x3 *hand, real *units);
 /* render_interpolation.c's */
@@ -310,9 +328,14 @@ void vr_grenade_draw(unsigned long flags)
 	real_matrix4x3 node_matrices[MAXIMUM_NODES_PER_MODEL];
 	real function_values[NUMBER_OF_OUTGOING_OBJECT_FUNCTIONS];
 	struct render_lighting lighting;
+	struct object_definition *definition;
+	real_matrix4x3 held;
+	real_point3d centre;
+	real scale;
 	long unit_index = vr_grenade_player_unit();
 	long model_index;
-	short grenade_type, function_index;
+	short grenade_type, function_index, node_index;
+	boolean placed;
 
 	halo_vr_throw(&throw_state);
 	if (unit_index == NONE || !throw_state.held)
@@ -333,37 +356,76 @@ void vr_grenade_draw(unsigned long flags)
 	model = model_definition_get(model_index);
 	if (model->nodes.count <= 0 || model->nodes.count > MAXIMUM_NODES_PER_MODEL)
 		return;
+	definition = object_definition_get(grenade->projectile.index);
+	scale = (real)config_real("vr.grenade_scale");
+	if (!(scale >= HELD_SCALE_MINIMUM))
+		scale = scale > 0.0f ? HELD_SCALE_MINIMUM : 1.0f;
+	if (scale > HELD_SCALE_MAXIMUM)
+		scale = HELD_SCALE_MAXIMUM;
 	/* (let go of: where it was drawn last) */
-	if (throw_state.phase != HALO_VR_THROW_RELEASED || !vr_grenade.drawn_valid)
+	placed = throw_state.phase != HALO_VR_THROW_RELEASED || !vr_grenade.drawn_valid;
+	if (placed)
 	{
-		real_matrix4x3 hand;
-		real units;
-		/* (a left-hander's in the right hand, whose palm is to its left) */
-		real right = halo_vr_left_handed() ? -HELD_RIGHT : HELD_RIGHT;
+		real units, radius, right;
 
-		if (!vr_render_left_hand(&hand, &units))
+		if (!vr_render_left_hand(&held, &units))
 			return;
-		hand.position.x += (hand.forward.i * HELD_FORWARD - hand.left.i * right + hand.up.i * HELD_UP) * units;
-		hand.position.y += (hand.forward.j * HELD_FORWARD - hand.left.j * right + hand.up.j * HELD_UP) * units;
-		hand.position.z += (hand.forward.k * HELD_FORWARD - hand.left.k * right + hand.up.k * HELD_UP) * units;
-		vr_grenade.drawn = hand;
+		/* (its radius at its size, in metres) */
+		radius = definition->object.bounding_radius * scale / units;
+		if (!(radius >= HELD_RADIUS_MINIMUM))
+			radius = HELD_RADIUS_MINIMUM;
+		if (radius > HELD_RADIUS_MAXIMUM)
+			radius = HELD_RADIUS_MAXIMUM;
+		right = HELD_PALM + radius;
+		/* (a left-hander's in the right hand, whose palm is to its left) */
+		if (halo_vr_left_handed())
+			right = -right;
+		held.position.x += (held.forward.i * HELD_FORWARD - held.left.i * right + held.up.i * HELD_UP) * units;
+		held.position.y += (held.forward.j * HELD_FORWARD - held.left.j * right + held.up.j * HELD_UP) * units;
+		held.position.z += (held.forward.k * HELD_FORWARD - held.left.k * right + held.up.k * HELD_UP) * units;
+		vr_grenade.drawn = held;
 		vr_grenade.drawn_valid = TRUE;
 	}
-	/* the model's nodes in their default pose about the hand */
+	/* the model's nodes in their default pose about the hand, and its
+	centre (its bounding sphere's, as objects.c finds an object's) */
 	model_get_node_matrices(model, node_matrices, &vr_grenade.drawn.position, &vr_grenade.drawn.forward,
 		&vr_grenade.drawn.up);
-	if (HELD_SCALE != 1.0f)
+	matrix4x3_transform_point(&node_matrices[0], &definition->object.bounding_offset, &centre);
+	/* just placed, its centre moved to the place in the hand, and its origin
+	with it: kept for the frames after the hand lets go, and the thrown
+	grenade's place (vr_grenade_hand_release), whose centre is then where
+	the held one's was */
+	if (placed)
 	{
-		short node_index;
+		real_vector3d move;
 
+		move.i = held.position.x - centre.x;
+		move.j = held.position.y - centre.y;
+		move.k = held.position.z - centre.z;
 		for (node_index = 0; node_index < model->nodes.count; node_index++)
 		{
 			real_point3d *position = &node_matrices[node_index].position;
 
-			node_matrices[node_index].scale *= HELD_SCALE;
-			position->x = vr_grenade.drawn.position.x + (position->x - vr_grenade.drawn.position.x) * HELD_SCALE;
-			position->y = vr_grenade.drawn.position.y + (position->y - vr_grenade.drawn.position.y) * HELD_SCALE;
-			position->z = vr_grenade.drawn.position.z + (position->z - vr_grenade.drawn.position.z) * HELD_SCALE;
+			position->x += move.i;
+			position->y += move.j;
+			position->z += move.k;
+		}
+		vr_grenade.drawn.position.x += move.i;
+		vr_grenade.drawn.position.y += move.j;
+		vr_grenade.drawn.position.z += move.k;
+		centre = held.position;
+	}
+	/* its size, about its centre */
+	if (scale != 1.0f)
+	{
+		for (node_index = 0; node_index < model->nodes.count; node_index++)
+		{
+			real_point3d *position = &node_matrices[node_index].position;
+
+			node_matrices[node_index].scale *= scale;
+			position->x = centre.x + (position->x - centre.x) * scale;
+			position->y = centre.y + (position->y - centre.y) * scale;
+			position->z = centre.z + (position->z - centre.z) * scale;
 		}
 	}
 	/* (its shader's functions as a live grenade's: the plasma grenade's
