@@ -5,7 +5,7 @@ where each came from, and how to turn it on. Each is set in `config.toml`
 (the `vr.*` keys below) or in VR Setup: MOVEMENT AND COMFORT..., HANDS AND
 WEAPONS... (and its FISTS AND GRABBING...), HUD... (WRIST HUD..., HUD
 LAYOUT...) and PLAYER....
-Every one is off, or as OpenH1 had it, until you choose it, apart from four
+Every one is off, or as OpenH1 had it, until you choose it, apart from eight
 things that are on from the start: the third person's hold on the turning
 stick, the HUD's corners placed for the Frame, no magazine eject on the
 stick, your body's shadow, the hands keeping their angle on a vehicle's
