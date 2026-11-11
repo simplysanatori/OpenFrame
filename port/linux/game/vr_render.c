@@ -909,6 +909,10 @@ boolean vr_render_camera(struct render_camera *camera, struct render_camera *ras
 	body's climb in and out (or blinks: vr_seat.c). */
 	if (view->vehicle_first_person && halo_vr_aiming())
 		vr_render.seated_unit_index = seated_unit();
+	/* (OpenFrame, vr.seat_smooth_turn: in any seat, whatever the view, the
+	turning stick turns smoothly) */
+	if (seated_unit() != NONE)
+		halo_vr_seated();
 	/* (on foot, crouched by the head: the game's drop taken back out of
 	the player's eye, before the seat's blinks hold it) */
 	if (vr_render.seated_unit_index == NONE)

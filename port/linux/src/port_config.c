@@ -903,6 +903,11 @@ static const struct config_setting config_settings[] =
 		"Degrees of each snap turn." },
 	{ "vr.smooth_turn_speed", _config_real, "150.0", "HALO_VR_SMOOTH_TURN_SPEED", _environment_value, _platform_desktop,
 		"Degrees a second of smooth turning, the stick pushed all the way." },
+	{ "vr.seat_smooth_turn", _config_boolean, "true", "HALO_VR_SEAT_SMOOTH_TURN", _environment_value,
+		_platform_desktop,
+		"With vr.turn = \"snap\", in a vehicle's seat the turning stick turns\n"
+		"smoothly (vr.smooth_turn_speed); out of it, it snaps again once the\n"
+		"stick is back in the middle. false: it snaps in a seat too." },
 	{ "vr.height", _config_string, "\"seated\"", "HALO_VR_HEIGHT", _environment_value, _platform_desktop,
 		"\"seated\": the head where it is when recentred (both grips, or a\n"
 		"gamepad's Back, held) is the player's eye. \"standing\": the head\n"
