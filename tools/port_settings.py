@@ -465,7 +465,7 @@ VR_SCREENS["vr_hands"] = {
          [("OFF", "0"), *((f"{round(haptics * 100)}%", f"{haptics:g}") for haptics in (0.25, 0.5, 0.75, 1))],
          "How strongly the controllers feel each weapon\nfiring, and the hits on you.", None),
         ("FISTS AND GRABBING...", None, VR_FISTS,
-         "Punching and parrying, pulling a weapon to your\nhand, passing it across, holding and throwing things.", None),
+         "Punching, parrying and deflecting shots, pulling a\nweapon to you, passing it across, holding and throwing.", None),
     ],
 }
 # (OpenFrame) the hands' fists, pull, swap and throw, a page of HANDS AND
@@ -475,7 +475,7 @@ VR_SCREENS["vr_hands"] = {
 VR_SCREENS["vr_fists"] = {
     "screen": "vr_fists_screen",
     "header": ("header_vr_fists", f"{PE}/vr_fists/header_vr_fists"),
-    # (nine rows)
+    # (ten rows)
     "spacing": 28,
     "help_top": 366,
     "rows": [
@@ -487,6 +487,8 @@ VR_SCREENS["vr_fists"] = {
         ("PUNCH DAMAGE:", "vr.fist_damage",
          [(f"{round(damage * 100)}%", f"{damage:g}") for damage in (0.15, 0.25, 0.33, 0.5, 0.75, 1)],
          "A punch's damage, of the weapon's melee blow.", None),
+        ("DEFLECT SHOTS:", "vr.deflect", ON_OFF,
+         "Offline: hold your gun in a shot's path to block\nit, or swing the gun or a fist to bat it away.", None),
         ("WEAPON PULL:", "vr.weapon_pull", ON_OFF,
          "Offline: point your free hand at a weapon, grip,\nand flick the hand back: it flies to you.", None),
         ("PULL RANGE:", "vr.weapon_pull_range",

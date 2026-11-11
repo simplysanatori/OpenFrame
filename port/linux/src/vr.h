@@ -878,8 +878,10 @@ body's moving or turning); whether it punched (a swing past vr.fist_speed,
 neither carried by the head nor holding anything) since the last call, the
 swing's count (a blow a swing), the fastest it went since then and its
 velocity at that; whether its grip took the claim (held since); whether the
-weapon has passed to the other hand (vr.hand_swap); the world's units a
-metre. Hand 1 is the weapon's, 0 the other. */
+weapon has passed to the other hand (vr.hand_swap); whether the hand is
+free as a fist (the other hand not on the foregrip nor holding anything,
+the weapon's hand holding no weapon: vr.deflect, vr_deflect.c); the world's
+units a metre. Hand 1 is the weapon's, 0 the other. */
 struct halo_vr_hands
 {
 	int claim[2];
@@ -896,6 +898,7 @@ struct halo_vr_hands
 	float peak_velocity[2][3];
 	int taken[2];
 	int swapped;
+	int free[2];
 	float world_units_per_metre;
 };
 int halo_vr_hands(struct halo_vr_hands *hands);
