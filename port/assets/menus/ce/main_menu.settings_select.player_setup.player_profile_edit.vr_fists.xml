@@ -133,7 +133,7 @@
 	</strings>
 	<strings name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/help_strings">
 		<string text=""/>
-		<string text="Offline: punch with your free hand, or with an\nempty one; swipe across a blow to parry it."/>
+		<string text="Punch with your free or empty hand; swipe across a\nblow to parry it. Online a punch is a melee (B)."/>
 		<string text="How fast a hand must swing to punch."/>
 		<string text="A punch's damage, of the weapon's melee blow."/>
 		<string text="Offline: point your free hand at a weapon, grip,\nand flick the hand back: it flies to you."/>
