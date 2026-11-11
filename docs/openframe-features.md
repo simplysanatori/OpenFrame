@@ -437,7 +437,8 @@ next push snaps.
 
 - Key: `vr.seat_smooth_turn` (default `true`; `false`, OpenH1's behaviour:
   the seat snaps as on foot). With `vr.turn = "smooth"` it changes nothing.
-  No menu row yet (`config.toml`).
+  VR Setup > MOVEMENT AND COMFORT > GESTURES... > SMOOTH TURN IN SEATS (the
+  MOVEMENT AND COMFORT page has no room left).
 - After moistman42069's VEHICLE TURN (`vr.vehicle_smooth_turn`). How:
   `port/linux/src/vr.c`, `turn_smoothly` (in `input_update`); the game tells
   `halo_vr_seated` each frame the first player sits in any seat
