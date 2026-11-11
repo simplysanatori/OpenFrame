@@ -917,6 +917,20 @@ static const struct config_setting config_settings[] =
 	{ "vr.fist_damage", _config_real, "0.33", "HALO_VR_FIST_DAMAGE", _environment_value, _platform_desktop,
 		"Fists, a punch's damage, 0.1 to 1, of the weapon's melee blow (less on\n"
 		"the harder difficulties)." },
+	{ "vr.deflect", _config_boolean, "false", "HALO_VR_DEFLECT", _environment_value, _platform_desktop,
+		"Shot deflection, in a game of this computer alone (the campaign; never\n"
+		"online, split screen or with bots): a shot met by the gun in your hand\n"
+		"glances off it, held still in its path; swung, the gun or a free fist\n"
+		"bats it along the swing (past 1.2 m/s). Plasma and needles by either,\n"
+		"bullets only off the gun, grenades batted or bounced, rockets and fuel\n"
+		"rods only by a hard swing (2.5 m/s), tank shells and flame never. A\n"
+		"deflected shot is yours: its damage and kills." },
+	{ "vr.deflect_strength", _config_real, "1.0", "HALO_VR_DEFLECT_STRENGTH", _environment_value, _platform_desktop,
+		"Shot deflection, a deflected shot's speed against what it had, 0.5 to\n"
+		"1.5 (a block keeps a little less)." },
+	{ "vr.deflect_assist", _config_real, "0.03", "HALO_VR_DEFLECT_ASSIST", _environment_value, _platform_desktop,
+		"Shot deflection, metres added round the gun and the fist where a shot\n"
+		"is met, 0 to 0.1." },
 	{ "vr.weapon_pull", _config_boolean, "false", "HALO_VR_WEAPON_PULL", _environment_value, _platform_desktop,
 		"Weapon pull, in a game of this computer alone: point the hand without\n"
 		"the weapon at a weapon lying within vr.weapon_pull_range, grip, and\n"

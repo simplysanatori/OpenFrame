@@ -148,6 +148,11 @@ boolean overshield_effect_hit_effect_allowed(long effect_index);
 /* port: port/linux/game/powerup_hit_effects.c */
 long powerup_hit_effect(long object_index, short material_type, struct projectile_definition const *definition,
 	struct projectile_material_response_definition const *material_response, short response, long effect_index);
+#ifdef HALO_VR
+/* port: the VR mode's shot deflection (vr.deflect, port/linux/game/vr_deflect.c) */
+boolean vr_deflect_projectile(long projectile_index, real_point3d const *end, real_vector3d const *end_velocity,
+	real solid_fraction, real *fraction);
+#endif
 
 /* ---------- constants */
 
@@ -1161,6 +1166,9 @@ static boolean projectile_step(
 		real_vector3d average_velocity = projectile->object.translational_velocity;
 		long ignore_object_index = projectile->projectile.ignore_object_index;
 		real distance_fraction;
+		/* port: whether the pass strikes something (the VR mode's shot
+		deflection asks before the strike) */
+		boolean hit;
 		/* port: (in a sub-step) how far into its tick this pass starts; and
 		whether its speed is set under its final velocity at a strike */
 		real now_ticks;
@@ -1379,10 +1387,47 @@ static boolean projectile_step(
 		global_current_collision_users[global_current_collision_user_depth++] =
 			_collision_user_projectiles;
 
-		if (collision_count != MAXIMUM_PROJECTILE_COLLISIONS_PER_UPDATE &&
+		hit = collision_count != MAXIMUM_PROJECTILE_COLLISIONS_PER_UPDATE &&
 			projectile->projectile.action != _projectile_action_disappear &&
 			(moved = TRUE) &&
-			projectile_collision_test_line(projectile_index, &new_position, &collision))
+			projectile_collision_test_line(projectile_index, &new_position, &collision);
+#ifdef HALO_VR
+		/* port: the VR mode's shot deflection (vr.deflect, a game of this
+		computer alone; port/linux/game/vr_deflect.c): a shot flying on its
+		own met by the player's gun or fist before what it strikes travels
+		to there and on from there with its new velocity, the rest of its
+		pass (a sub-step's, as a strike's below) */
+		if (moved &&
+			projectile->projectile.action == _projectile_action_none &&
+			!TEST_FLAG(projectile->projectile.flags, _projectile_stopped_after_collision_bit) &&
+			!TEST_FLAG(projectile->projectile.flags, _projectile_already_super_exploded_bit) &&
+			!TEST_FLAG(projectile->projectile.flags, _projectile_will_super_explode_bit))
+		{
+			real deflected_fraction;
+
+			if (vr_deflect_projectile(projectile_index, &new_position, &new_velocity,
+				hit ? collision.t : 1.0f, &deflected_fraction))
+			{
+				real_vector3d travel;
+				real_point3d contact;
+
+				vector_from_points3d(&projectile->object.position, &new_position, &travel);
+				point_from_line3d(&projectile->object.position, &travel, deflected_fraction, &contact);
+				projectile->projectile.odometer += magnitude3d(&travel) * deflected_fraction;
+				object_translate(projectile_index, &contact, NULL);
+				time_remaining *= 1.0f - deflected_fraction;
+				if (!whole_tick)
+				{
+					segment_start = tick_elapsed + (1.0f - time_remaining) * tick_fraction;
+					projectile_segment_set(projectile_index, segment_start);
+				}
+				collision_count++;
+				--global_current_collision_user_depth;
+				continue;
+			}
+		}
+#endif
+		if (hit)
 		{
 			SIM_TRACE(sim_trace_projectile_collision(projectile_index, &collision.point, &collision.plane.n, time_remaining, collision.t)); /* port: debug.trace */
 			/* port: (in a sub-step, what is left of it) */
