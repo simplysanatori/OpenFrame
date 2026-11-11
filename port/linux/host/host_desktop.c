@@ -71,6 +71,14 @@ int host_sdl_push_event(const void *event)
 	return SDL_PushEvent(&copy) ? 1 : 0;
 }
 
+/* whether an event of this type is queued, left there (the VR build's wait
+for the headset asks after a quit, sdl_platform.c, and leaves the rest,
+the gamepads found among them, for the game) */
+int host_sdl_has_event(uint32_t type)
+{
+	return SDL_HasEvent(type) ? 1 : 0;
+}
+
 /* ---------- windows and displays */
 
 static SDL_Window *window_of(uint32_t window)
