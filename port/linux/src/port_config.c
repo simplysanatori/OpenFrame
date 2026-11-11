@@ -665,6 +665,10 @@ static const struct config_setting config_settings[] =
 		"back, swing and let go: it flies where the hand threw it, as hard as it\n"
 		"did; the left trigger throws nothing on foot); \"both\" with the hand or\n"
 		"the left trigger; \"button\" with the left trigger alone." },
+	{ "vr.grenade_scale", _config_real, "1.0", "HALO_VR_GRENADE_SCALE", _environment_value, _platform_desktop,
+		"The size of the grenade held in the left hand before you throw it, of\n"
+		"the game's own (0.5 to 1.5; 1: the size it is thrown at), about its\n"
+		"centre, in the palm." },
 	{ "vr.holsters", _config_boolean, "true", "HALO_VR_HOLSTERS", _environment_value, _platform_desktop,
 		"With vr.aim = \"controller\", the weapon you carry but do not hold is on\n"
 		"your body: a long gun over your right shoulder, a pistol or the needler\n"
