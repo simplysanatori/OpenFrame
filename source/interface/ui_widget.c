@@ -1552,6 +1552,14 @@ the text waiting for its dialog, then the dialog's text box showing it */
 static wchar_t const *ui_widget_port_error_pending_text = NULL;
 static wchar_t const *ui_widget_port_error_text = NULL;
 static struct widget_instance *ui_widget_port_error_text_box = NULL;
+/* port: (OpenFrame) its title in place of the dialog's header ("ATTENTION"),
+if it has one (display_error_text_titled_deferred), and the header showing it */
+/* (the width a title is drawn in: the dialog's box, 280, less the header's
+place in it) */
+#define UI_WIDGET_PORT_ERROR_TITLE_WIDTH 256
+static wchar_t const *ui_widget_port_error_pending_title = NULL;
+static wchar_t const *ui_widget_port_error_title = NULL;
+static struct widget_instance *ui_widget_port_error_header = NULL;
 
 static struct ui_widget_bss_prefix ui_widget_globals_storage;
 
@@ -2160,6 +2168,17 @@ is queued already. */
 void display_error_text_when_main_menu_loaded(
 	wchar_t const *text)
 {
+	display_error_text_titled_when_main_menu_loaded(NULL, text);
+
+	return;
+}
+
+/* port: (OpenFrame) ... with a title of its own in place of the dialog's
+header (NULL: the header's own), a string that lasts (a literal) */
+void display_error_text_titled_when_main_menu_loaded(
+	wchar_t const *title,
+	wchar_t const *text)
+{
 	static wchar_t queued_text[512];
 
 	if (widget_globals.main_menu_deferred_error_code != NONE)
@@ -2170,6 +2189,7 @@ void display_error_text_when_main_menu_loaded(
 	ustrncpy(queued_text, text, NUMBEROF(queued_text) - 1);
 	queued_text[NUMBEROF(queued_text) - 1] = 0;
 	ui_widget_port_error_pending_text = queued_text;
+	ui_widget_port_error_pending_title = title;
 	widget_globals.main_menu_deferred_error_code = _error_cannot_create_saved_game_file_with_empty_name;
 
 	return;
@@ -2515,6 +2535,11 @@ void ui_widget_delete(
 		{
 			ui_widget_port_error_text_box = NULL;
 			ui_widget_port_error_text = NULL;
+		}
+		if (widget == ui_widget_port_error_header)
+		{
+			ui_widget_port_error_header = NULL;
+			ui_widget_port_error_title = NULL;
 		}
 		break;
 	case _ui_widget_type_spinner_list:
@@ -4766,11 +4791,24 @@ void display_error_text_deferred(
 	wchar_t const *text,
 	short local_player_index)
 {
+	display_error_text_titled_deferred(NULL, text, local_player_index);
+
+	return;
+}
+
+/* port: (OpenFrame) ... with a title of its own in place of the dialog's
+header (NULL: the header's own), a string that lasts (a literal) */
+void display_error_text_titled_deferred(
+	wchar_t const *title,
+	wchar_t const *text,
+	short local_player_index)
+{
 	short index = local_player_index == NONE ? 0 : local_player_index;
 
 	if (!VALID_INDEX(index, MAXIMUM_NUMBER_OF_LOCAL_PLAYERS) || widget_globals.deferred_errors[index].error_code != NONE)
 		return;
 	ui_widget_port_error_pending_text = text;
+	ui_widget_port_error_pending_title = title;
 	display_error_deferred(_error_cannot_create_saved_game_file_with_empty_name, local_player_index, TRUE, FALSE);
 
 	return;
@@ -4860,6 +4898,27 @@ boolean ui_widgets_port_active_for_everyone(
 	return FALSE;
 }
 
+/* port: (OpenFrame) an error dialog's header beside its text box: the text
+box of the error headers' strings ("ATTENTION"), NULL if the dialog has none */
+static struct widget_instance *ui_widget_port_error_header_find(
+	struct widget_instance *text_box)
+{
+	long headers = tag_loaded(UNICODE_STRING_LIST_TAG, "ui\\shell\\error\\error_headers");
+	struct widget_instance *sibling;
+
+	if (headers == NONE || !text_box->parent)
+		return NULL;
+	for (sibling = text_box->parent->child; sibling; sibling = sibling->next)
+	{
+		if (sibling != text_box && sibling->type == _ui_widget_type_text_box &&
+			ui_widget_definition_get(sibling->definition_tag_index)->text_label_string_list.index == headers)
+		{
+			return sibling;
+		}
+	}
+	return NULL;
+}
+
 void display_error(
 	short error_code,
 	short local_player_index,
@@ -4898,11 +4957,14 @@ void display_error(
 		/* (port: the port's own text for this error, taken whether or not its
 		dialog opens, so that it is never another's) */
 		wchar_t const *port_text = NULL;
+		wchar_t const *port_title = NULL;
 
 		if (error_code == _error_cannot_create_saved_game_file_with_empty_name)
 		{
 			port_text = ui_widget_port_error_pending_text;
 			ui_widget_port_error_pending_text = NULL;
+			port_title = ui_widget_port_error_pending_title;
+			ui_widget_port_error_pending_title = NULL;
 		}
 		if (local_player_index != NONE)
 		{
@@ -5021,6 +5083,9 @@ void display_error(
 				{
 					ui_widget_port_error_text_box = text_box;
 					ui_widget_port_error_text = port_text;
+					/* (OpenFrame: and its title, in its header) */
+					ui_widget_port_error_header = port_title ? ui_widget_port_error_header_find(text_box) : NULL;
+					ui_widget_port_error_title = ui_widget_port_error_header ? port_title : NULL;
 				}
 				widget->widget_is_error_dialog = TRUE;
 				if (!widget->pause_game_time)
@@ -5786,6 +5851,9 @@ static void widget_instance_render_text_box(
 		string = widget == ui_widget_port_error_text_box && ui_widget_port_error_text ?
 			(wchar_t *)ui_widget_port_error_text :
 			unicode_string_list_get_string(definition->text_label_string_list.index, string_list_index);
+		/* port: (OpenFrame) the port's own title in its dialog's header */
+		if (widget == ui_widget_port_error_header && ui_widget_port_error_title)
+			string = (wchar_t *)ui_widget_port_error_title;
 		/* port: the description of a spinner's extra item */
 		if (string_list_index >= SPINNER_EXTRA_DESCRIPTION_BASE &&
 			string_list_index < SPINNER_EXTRA_DESCRIPTION_BASE + (short)NUMBEROF(kills_to_win_extra_descriptions))
@@ -5877,6 +5945,13 @@ static void widget_instance_render_text_box(
 	bounds.y0 += offset.y;
 	bounds.x0 += definition->horizontal_offset;
 	bounds.y0 += definition->vertical_offset;
+	/* port: (OpenFrame) that title, longer than the header's own words
+	("VERSION DIFFERENCE"), on one line as wide as its dialog's box */
+	if (widget == ui_widget_port_error_header && ui_widget_port_error_title)
+	{
+		bounds.x1 = MAX(bounds.x1, (short)(bounds.x0 + UI_WIDGET_PORT_ERROR_TITLE_WIDTH));
+		clip.x1 = MAX(clip.x1, bounds.x1);
+	}
 	if (focus)
 	{
 		color = get_ui_argb_white();

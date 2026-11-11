@@ -2406,6 +2406,14 @@ struct network_game_client *network_game_client_create(
 	return client;
 }
 
+/* port: (OpenFrame) a host of another version, told in the menus' dialog
+under this title (network_game_client_tell_version_difference): the host's
+version newer than this machine's, or older. OpenFrame's own updater is off
+(updater.c): it is updated by installing its next release. */
+#define NETWORK_VERSION_DIFFERENCE_TITLE L"VERSION DIFFERENCE"
+#define NETWORK_VERSION_NEWER_TEXT L"This game is on a newer version. Install the latest OpenFrame release to join it."
+#define NETWORK_VERSION_OLDER_TEXT L"This game is on an older version. The host needs to update."
+
 /* port: what the player is told when a host turns the join away, by its
 rejection code: what happened, and what to do, in words for anyone (the code
 itself in the log: network_game_client_rejected_by_game) */
@@ -2415,9 +2423,9 @@ static wchar_t const *network_game_client_rejection_text(
 	switch (rejection_code)
 	{
 	case _rejection_code_version_too_old:
-		return L"This game is on a newer version of OpenH1 or OpenCE. Update OpenH1 to join it, or if no update is out yet, try again soon.";
+		return NETWORK_VERSION_NEWER_TEXT;
 	case _rejection_code_version_too_new:
-		return L"This game is on an older version of OpenH1. Ask the host to update to the latest version.";
+		return NETWORK_VERSION_OLDER_TEXT;
 	case _rejection_code_bad_password:
 		return L"That isn't this game's password. Ask the host for it, then try again.";
 	case _rejection_code_game_is_full:
@@ -2562,7 +2570,11 @@ void network_game_client_rejected_by_game(
 	it): with no game behind it, it is left for the main menu, which says
 	why, and what to do (rather than the game's "Failed to join the game."),
 	rather than sitting in a lobby that will never start */
-	display_error_text_when_main_menu_loaded(network_game_client_rejection_text(rejection_code));
+	/* (OpenFrame: a version's refusal under its own title) */
+	display_error_text_titled_when_main_menu_loaded(
+		rejection_code == _rejection_code_version_too_old || rejection_code == _rejection_code_version_too_new ?
+			NETWORK_VERSION_DIFFERENCE_TITLE : NULL,
+		network_game_client_rejection_text(rejection_code));
 	network_game_abort();
 	network_game_client_reset(client, TRUE);
 
@@ -3366,8 +3378,22 @@ static void network_game_client_set_error(
 /* the native ports' automated network tests (port/linux/game/network_test.c):
 joins the first open game the client's search has found, as picking it in
 the system link list does (network_game_join_game_from_server_list) */
-/* the platform layer's (sdl_platform.c) */
-void platform_show_message(char const *title, char const *message);
+
+/* port: (OpenFrame) the player told that the host is of another version, in
+the menus' error dialog, which the headset shows too (the desktop's message
+box, platform_show_message, which the network code showed before, is not seen
+in VR, and holds the game up while it is open); the versions in the log */
+static void network_game_client_tell_version_difference(
+	boolean host_newer)
+{
+	/* (a run nobody watches: the log only, as platform_show_message's) */
+	if (config_boolean("debug.hidden_window") || config_boolean("debug.null_renderer"))
+		return;
+	display_error_text_titled_deferred(NETWORK_VERSION_DIFFERENCE_TITLE,
+		host_newer ? NETWORK_VERSION_NEWER_TEXT : NETWORK_VERSION_OLDER_TEXT, NONE);
+
+	return;
+}
 
 /* whether this client can join the advertised game: its host's network
 version is this machine's (HALO_PORT_NETWORK_VERSION), and it plays the
@@ -3383,7 +3409,6 @@ boolean network_game_client_advertised_game_compatible(
 	unsigned int ours = HALO_PORT_NETWORK_VERSION;
 	unsigned int theirs;
 	boolean distributed;
-	char message[400];
 
 	if (game_index < 0 || game_index >= MAXIMUM_NETWORK_ADVERTISED_GAMES)
 		return FALSE;
@@ -3403,16 +3428,11 @@ boolean network_game_client_advertised_game_compatible(
 			return TRUE;
 		}
 		/* port: (the versions in the log, the player told what to do) */
-		csprintf(message,
-			"This game is on %s version of OpenH1.\n\n"
-			"%s",
-			theirs > ours ? "a newer" : "an older",
-			theirs > ours ? "Update OpenH1 to join it." : "Ask the host to update to the latest version.");
 		if (tell)
 		{
 			network_event("not joining an OpenH1 %u Tick host of protocol version %u (this machine's is %u)",
 				(unsigned int)network_game_client_advertised_versions[game_index].rate, theirs, ours);
-			platform_show_message("Halo: cannot join this game", message);
+			network_game_client_tell_version_difference(theirs > ours);
 		}
 		return FALSE;
 	}
@@ -3452,29 +3472,12 @@ void network_game_client_tell_version(
 	boolean distributed)
 {
 	unsigned int ours = HALO_PORT_NETWORK_VERSION;
-	char message[400];
 
-	if (theirs == ours)
-	{
-		csprintf(message,
-			"This server runs an older Halo version that OpenH1 can't join.\n\n"
-			"Join another game, or ask the host to update to the latest OpenH1.");
-	}
-	else if (theirs > ours)
-	{
-		csprintf(message,
-			"This game is on a newer version of OpenH1 or OpenCE.\n\n"
-			"Update OpenH1 to join it. If no update is out yet, OpenH1 will catch up soon.");
-	}
-	else
-	{
-		csprintf(message,
-			"This game is on an older version of OpenH1, OpenCE or Halo that this one can't join.\n\n"
-			"Join another game, or ask the host to update to the latest OpenH1.");
-	}
 	network_event("not joining a host of network version %u%s (this machine's is %u)", theirs,
 		distributed ? "" : " with the lockstep netcode", ours);
-	platform_show_message("Halo: cannot join this game", message);
+	/* (OpenFrame: a host of this version that plays the lockstep netcode
+	is of an older build) */
+	network_game_client_tell_version_difference(theirs > ours);
 }
 
 /* port: whether the advertised game is under way (HALO_PORT_ADVERTISED_IN_PROGRESS_FLAG),
