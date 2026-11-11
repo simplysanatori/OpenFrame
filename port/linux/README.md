@@ -407,9 +407,9 @@ A report gathers what helps the developers find a problem, in a zip in
 Press **F8** (`controls.report`, rebindable under Controls Setup > Actions)
 the moment something goes wrong, in a game or in the menus, or choose
 **Settings > Profiles > Report a Problem**. The game saves a report, its
-screenshot that moment, and opens a new issue on OpenH1's GitHub
-repository in the browser, its title and body filled in with the report's
-summary, and, on a computer, the `reports/` folder beside it. Say what
+screenshot that moment, and opens a new issue on the GitHub repository
+(OpenFrame's, in OpenFrame's build; OpenH1's in OpenH1's) in the browser,
+its title and body filled in with the report's summary, and, on a computer, the `reports/` folder beside it. Say what
 happened at the top of the issue, drag the zip into it, and submit it (a
 GitHub account is needed). In a game nothing opens over it: F8 takes the
 screenshot and the frame times at once, and opens a line where the chat's
@@ -447,7 +447,7 @@ The zip holds:
 | `crash.txt` | A crash's report (the next start's, above): what the host wrote at the crash and that run's log, or, if it wrote none, what that run's start recorded. |
 
 A crash ends the game before F8 can be pressed, so the next start asks,
-once, over the main menu: "OpenH1 closed unexpectedly last time. Report
+once, over the main menu: "The game closed unexpectedly last time. Report
 it?" **Report** saves a report headed by the crash and opens its issue, as
 Report a Problem does; **Skip** (or B) lets that crash go, never asked
 about again. The crash's section of `report.md` gives the build that

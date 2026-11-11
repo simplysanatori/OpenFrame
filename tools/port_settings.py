@@ -8219,7 +8219,7 @@ def _crash() -> list:
     lines += _text_button(f"{base}/button_skip", "SKIP", [f'<on event="a" {dismiss}/>',
                                                           f'<on event="start" {dismiss}/>'])
     lines += _strings(f"{base}/crash_prompt",
-                      ["OpenH1 closed unexpectedly last time. Report it? A report is saved, and its GitHub issue "
+                      ["The game closed unexpectedly last time. Report it? A report is saved, and its GitHub issue "
                        "opens for you to send."])
     return lines
 
