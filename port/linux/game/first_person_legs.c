@@ -83,7 +83,10 @@ of their near plane, and the collar's opening out of their view
 (first_person_legs_lean): looking down, the eyes nod forward over the chest.
 Its neck is a little behind the real one (the armour's chest is deeper than
 a person's). The headset's eyes are where the real head is, not over the
-body's spine, so its body is not set back.
+body's spine, so its body is not set back. On foot, with vr.body_shadow, it
+casts its shadow whole, upright where it stands: its head turned as the
+headset is, and its own arms reaching the controllers
+(first_person_legs_vr_shadow_pose).
 
 In the VR mode's seats (vr.vehicle_view = "first_person": vr_seat.c) the
 body is drawn too, once the eye is in the seat and the body is seated
@@ -128,6 +131,8 @@ body, what others see, is as ever: nothing of the unit changes.
 boolean vr_render_body_anchor(real_point3d *neck, real *yaw);
 boolean vr_render_body_eyes(real_point3d eyes[2], struct render_frustum const *views[2], real *near, real *seconds);
 boolean vr_render_body_seat(long object_index, struct vr_body_seat *seat);
+boolean vr_render_body_reach(real_vector3d *head_forward, real_vector3d *head_up, real_point3d wrists[2],
+	boolean reach[2]);
 #endif
 
 /* port/linux/src/port_config.c */
@@ -856,63 +861,83 @@ void first_person_legs_vr_hips(real_point3d const *anchor, real yaw, real_point3
 	*side = first_person_legs_vr_chest.hips_side;
 }
 
-/* the pose to draw the body with in the VR mode, the head's place and the
-body's heading the real ones (vr_render_body_anchor); NULL: the game's
-(no eye pass, a body without a spine, a neck and upper arms named) */
-static real_matrix4x3 const *first_person_legs_vr_body(
-	long object_index,
+/* the nodes the VR mode's body is placed by (first_person_legs_vr_stand):
+the hips (the pelvis), the foot of the spine, the neck, the head, and the
+upper arms (0 the left, 1 the right) */
+struct first_person_legs_vr_nodes
+{
+	short pelvis, spine, neck, head;
+	short arms[2];
+};
+
+/* the VR mode's body placed, into placed, nothing folded: the game's pose
+stood upright and square over its hips, turned to the body's heading and
+moved under the top of the real neck, a little behind it, the head's place
+and the body's heading the real ones (vr_render_body_anchor); its nodes
+(found), the top of the real neck (anchor) and the heading's forward and
+left. FALSE: none (no eye pass, a body without a spine, a neck, a head and
+upper arms named) */
+static boolean first_person_legs_vr_stand(
 	struct object_datum const *object,
 	struct model const *model,
 	long count,
-	real_matrix4x3 const *nodes)
+	real_matrix4x3 const *nodes,
+	real_matrix4x3 *placed,
+	struct first_person_legs_vr_nodes *found,
+	real_point3d *anchor,
+	real_vector3d *forward,
+	real_vector3d *left)
 {
-	short pelvis = NONE, spine = NONE, neck = NONE, head = NONE, left_arm = NONE, right_arm = NONE;
 	short index;
-	real_point3d anchor, collar;
+	real_point3d collar;
 	real_vector3d from[3], to[3], move;
 	real heading, along, c, s;
 
-	if (!vr_render_body_anchor(&anchor, &heading))
-		return NULL;
+	if (!vr_render_body_anchor(anchor, &heading))
+		return FALSE;
+	found->pelvis = found->spine = found->neck = found->head = found->arms[0] = found->arms[1] = NONE;
 	for (index = 0; index < count; index++)
 	{
 		char const *name = TAG_BLOCK_GET_ELEMENT(&model->nodes, index, struct model_node)->name;
 
-		if (pelvis == NONE && first_person_legs_name_has(name, "pelvis"))
-			pelvis = index;
-		if (spine == NONE && first_person_legs_name_has(name, "spine"))
-			spine = index;
-		if (neck == NONE && first_person_legs_name_has(name, "neck"))
-			neck = index;
-		if (head == NONE && first_person_legs_name_has(name, "head"))
-			head = index;
-		if (left_arm == NONE && first_person_legs_name_has(name, "l upperarm"))
-			left_arm = index;
-		if (right_arm == NONE && first_person_legs_name_has(name, "r upperarm"))
-			right_arm = index;
+		if (found->pelvis == NONE && first_person_legs_name_has(name, "pelvis"))
+			found->pelvis = index;
+		if (found->spine == NONE && first_person_legs_name_has(name, "spine"))
+			found->spine = index;
+		if (found->neck == NONE && first_person_legs_name_has(name, "neck"))
+			found->neck = index;
+		if (found->head == NONE && first_person_legs_name_has(name, "head"))
+			found->head = index;
+		if (found->arms[0] == NONE && first_person_legs_name_has(name, "l upperarm"))
+			found->arms[0] = index;
+		if (found->arms[1] == NONE && first_person_legs_name_has(name, "r upperarm"))
+			found->arms[1] = index;
 	}
-	if (pelvis == NONE || spine == NONE || neck == NONE || head == NONE || left_arm == NONE || right_arm == NONE)
-		return NULL;
+	if (found->pelvis == NONE || found->spine == NONE || found->neck == NONE || found->head == NONE ||
+		found->arms[0] == NONE || found->arms[1] == NONE)
+	{
+		return FALSE;
+	}
 
 	/* (the upper body upright and square over the hips: the frame of its
 	spine, from its foot up to the neck and across the shoulders, turned
 	about its foot to the body's own, upright and to the unit's left) */
-	vector_from_points3d(&nodes[spine].position, &nodes[neck].position, &from[2]);
-	vector_from_points3d(&nodes[right_arm].position, &nodes[left_arm].position, &from[1]);
+	vector_from_points3d(&nodes[found->spine].position, &nodes[found->neck].position, &from[2]);
+	vector_from_points3d(&nodes[found->arms[1]].position, &nodes[found->arms[0]].position, &from[1]);
 	if (normalize3d(&from[2]) <= 0.f)
-		return NULL;
+		return FALSE;
 	along = dot_product3d(&from[1], &from[2]);
 	from[1].i -= from[2].i * along;
 	from[1].j -= from[2].j * along;
 	from[1].k -= from[2].k * along;
 	if (normalize3d(&from[1]) <= 0.f)
-		return NULL;
+		return FALSE;
 	cross_product3d(&from[1], &from[2], &from[0]);
 	to[0].i = object->object.forward.i;
 	to[0].j = object->object.forward.j;
 	to[0].k = 0.f;
 	if (normalize3d(&to[0]) <= 0.f)
-		return NULL;
+		return FALSE;
 	to[1].i = -to[0].j;
 	to[1].j = to[0].i;
 	to[1].k = 0.f;
@@ -922,32 +947,16 @@ static real_matrix4x3 const *first_person_legs_vr_body(
 	{
 		struct model_node const *node = TAG_BLOCK_GET_ELEMENT(&model->nodes, index, struct model_node);
 
-		first_person_legs_matrices[index] = nodes[index];
+		placed[index] = nodes[index];
 		if (node->parent_node_index != NONE && !first_person_legs_node(node->name))
-			first_person_legs_rotate(&first_person_legs_matrices[index], from, to, &nodes[spine].position, &move);
-	}
-	/* (the head folded into the top of the neck, and each arm into its
-	shoulder, closing them: folded into the base of the neck, the neck
-	opened a dark hole before the eyes, and the arms drew the armpits up
-	across the chest; the collarbones are the shoulders' tops) */
-	collar = first_person_legs_matrices[neck].position;
-	for (index = 0; index < count; index++)
-	{
-		short up;
-
-		for (up = index; up != NONE && up != head && up != left_arm && up != right_arm;
-			up = TAG_BLOCK_GET_ELEMENT(&model->nodes, up, struct model_node)->parent_node_index);
-		if (up != NONE)
-		{
-			first_person_legs_matrices[index].position = first_person_legs_matrices[up].position;
-			first_person_legs_matrices[index].scale = FIRST_PERSON_LEGS_FOLDED;
-		}
+			first_person_legs_rotate(&placed[index], from, to, &nodes[found->spine].position, &move);
 	}
 
 	/* (all of it turned from the unit's facing to the body's heading about
 	the base of the neck, and that moved under the top of the real neck, a
 	little behind it (FIRST_PERSON_LEGS_VR_BACK), at its own height: the
 	body stands where it stands, the head bowing or not) */
+	collar = placed[found->neck].position;
 	from[0] = to[0];
 	from[1] = to[1];
 	from[2] = to[2];
@@ -959,11 +968,53 @@ static real_matrix4x3 const *first_person_legs_vr_body(
 	to[1].i = -s;
 	to[1].j = c;
 	to[1].k = 0.f;
-	move.i = anchor.x - collar.x - c * FIRST_PERSON_LEGS_VR_BACK;
-	move.j = anchor.y - collar.y - s * FIRST_PERSON_LEGS_VR_BACK;
+	move.i = anchor->x - collar.x - c * FIRST_PERSON_LEGS_VR_BACK;
+	move.j = anchor->y - collar.y - s * FIRST_PERSON_LEGS_VR_BACK;
 	move.k = 0.f;
 	for (index = 0; index < count; index++)
-		first_person_legs_rotate(&first_person_legs_matrices[index], from, to, &collar, &move);
+		first_person_legs_rotate(&placed[index], from, to, &collar, &move);
+	*forward = to[0];
+	*left = to[1];
+	return TRUE;
+}
+
+/* the pose to draw the body with in the VR mode, the head's place and the
+body's heading the real ones (first_person_legs_vr_stand), its head and arms
+folded away and its upper body leant back clear of the eyes; NULL: the
+game's (no eye pass, a body without a spine, a neck and upper arms named) */
+static real_matrix4x3 const *first_person_legs_vr_body(
+	long object_index,
+	struct object_datum const *object,
+	struct model const *model,
+	long count,
+	real_matrix4x3 const *nodes)
+{
+	struct first_person_legs_vr_nodes found;
+	short index;
+	real_point3d anchor;
+	real_vector3d forward, left;
+
+	if (!first_person_legs_vr_stand(object, model, count, nodes, first_person_legs_matrices, &found, &anchor, &forward,
+			&left))
+	{
+		return NULL;
+	}
+	/* (the head folded into the top of the neck, and each arm into its
+	shoulder, closing them: folded into the base of the neck, the neck
+	opened a dark hole before the eyes, and the arms drew the armpits up
+	across the chest; the collarbones are the shoulders' tops) */
+	for (index = 0; index < count; index++)
+	{
+		short up;
+
+		for (up = index; up != NONE && up != found.head && up != found.arms[0] && up != found.arms[1];
+			up = TAG_BLOCK_GET_ELEMENT(&model->nodes, up, struct model_node)->parent_node_index);
+		if (up != NONE)
+		{
+			first_person_legs_matrices[index].position = first_person_legs_matrices[up].position;
+			first_person_legs_matrices[index].scale = FIRST_PERSON_LEGS_FOLDED;
+		}
+	}
 	/* (and its upper body leant back about its hips, as far as keeps it
 	clear of the eyes) */
 	{
@@ -973,18 +1024,18 @@ static real_matrix4x3 const *first_person_legs_vr_body(
 
 		if (vr_render_body_eyes(eyes, views, &near, &seconds))
 		{
-			first_person_legs_lean(object_index, model, count, &first_person_legs_matrices[pelvis].position,
-				&first_person_legs_matrices[head].position, &to[0], &to[1], eyes, views, near, seconds,
+			first_person_legs_lean(object_index, model, count, &first_person_legs_matrices[found.pelvis].position,
+				&first_person_legs_matrices[found.head].position, &forward, &left, eyes, views, near, seconds,
 				FIRST_PERSON_LEGS_LEAN_MAXIMUM);
 		}
 	}
 	/* (and its chest's frame and back noted, as drawn, for the long gun
 	slung across it, and its hips' side, for the pistol at the hip) */
-	if (TAG_BLOCK_GET_ELEMENT(&model->nodes, neck, struct model_node)->parent_node_index != NONE)
+	if (TAG_BLOCK_GET_ELEMENT(&model->nodes, found.neck, struct model_node)->parent_node_index != NONE)
 	{
 		first_person_legs_vr_chest_note(object_index, model, count,
-			TAG_BLOCK_GET_ELEMENT(&model->nodes, neck, struct model_node)->parent_node_index, neck, pelvis, &anchor,
-			&to[0], &to[1]);
+			TAG_BLOCK_GET_ELEMENT(&model->nodes, found.neck, struct model_node)->parent_node_index, found.neck,
+			found.pelvis, &anchor, &forward, &left);
 	}
 	return first_person_legs_matrices;
 }
@@ -1192,6 +1243,206 @@ static real_matrix4x3 const *first_person_legs_vr_seated(
 		}
 	}
 	return first_person_legs_matrices;
+}
+
+/* ---------- the VR mode's body's shadow (vr.body_shadow) */
+
+/* The VR mode's body is drawn without its head and arms (the VR mode's
+arms are its own: vr_hands.c), and its upper body leant back from the eyes.
+Its shadow is cast whole, as the body stands under the real head: the head
+turned as the headset is, and the body's own arms reaching the controllers,
+as moistman42069's HaloCE-DecompRemix-VR casts its body's
+(port/linux/game/vr_render.c there: vr_publish_body, vr_body_arms_to_hands,
+vr_render_body_shadow_radius; AGPL-3.0-or-later), written again here on
+this file's pose. Nothing of it is drawn in the eyes' view; only the
+shadow's caster in the shadow atlas, and its receivers. */
+
+/* the shadow's sphere reaches this far past each of its pose's joints
+(world units: about 30 cm; a hand's and the helmet's mesh reach past their
+joints) */
+#define FIRST_PERSON_LEGS_SHADOW_MARGIN 0.1f
+
+/* the pose the VR mode's body's shadow was cast with last
+(first_person_legs_shadow_node_matrices), for its sphere
+(first_person_legs_shadow_radius); object_index NONE: none */
+static struct
+{
+	long object_index;
+	long count;
+	real_matrix4x3 nodes[FIRST_PERSON_LEGS_MAXIMUM_NODES];
+} first_person_legs_vr_shadow = { NONE };
+
+static boolean first_person_legs_vr_shadow_enabled(
+	void)
+{
+	static unsigned long changes = (unsigned long)-1;
+	static boolean enabled = FALSE;
+
+	if (changes != config_changes())
+	{
+		changes = config_changes();
+		enabled = config_boolean("vr.body_shadow") != 0;
+	}
+	return enabled;
+}
+
+/* an arm of the shadow's pose reaching the joint of its hand (hand) to
+the wrist where its controller has it: the upper arm and the forearm,
+their lengths the pose's, each turned (all below it with it) about its
+joint, the shoulder where the body has it, the elbow bent down and out and
+a little back, as the VR mode's own arms' are (vr_hands.c, arm_reach: two
+bones, the law of cosines); out of reach, the arm straight toward the
+wrist. The hand turns with the forearm. out: 1 the left arm, -1 the
+right */
+static void first_person_legs_vr_arm_reach(
+	struct model const *model,
+	long count,
+	real_matrix4x3 *placed,
+	short upper,
+	short fore,
+	short hand,
+	real_point3d const *wrist,
+	real out,
+	real_vector3d const *forward,
+	real_vector3d const *left)
+{
+	real_point3d shoulder = placed[upper].position, elbow, reached, pivot;
+	real_vector3d along, bend, bone, toward, from[3], to[3];
+	real a, b, reach, cosine, sine, dot;
+	short index;
+
+	a = distance3d(&placed[upper].position, &placed[fore].position);
+	b = distance3d(&placed[fore].position, &placed[hand].position);
+	vector_from_points3d(&shoulder, wrist, &along);
+	reach = normalize3d(&along);
+	if (a <= 0.f || b <= 0.f || reach <= 0.f)
+		return;
+	if (reach > (a + b) * 0.999f)
+		reach = (a + b) * 0.999f;
+	if (reach < (real)fabs(a - b) + 0.05f * a)
+		reach = (real)fabs(a - b) + 0.05f * a;
+	cosine = (a * a + reach * reach - b * b) / (2.f * a * reach);
+	cosine = cosine > 1.f ? 1.f : cosine < -1.f ? -1.f : cosine;
+	sine = (real)sqrt(1.f - cosine * cosine);
+	/* (the elbow down and out, a little back) */
+	bend.i = left->i * out * 0.6f - forward->i * 0.3f;
+	bend.j = left->j * out * 0.6f - forward->j * 0.3f;
+	bend.k = left->k * out * 0.6f - forward->k * 0.3f - 1.f;
+	dot = dot_product3d(&bend, &along);
+	bend.i -= along.i * dot;
+	bend.j -= along.j * dot;
+	bend.k -= along.k * dot;
+	if (normalize3d(&bend) <= 0.f)
+		return;
+	elbow.x = shoulder.x + along.i * a * cosine + bend.i * a * sine;
+	elbow.y = shoulder.y + along.j * a * cosine + bend.j * a * sine;
+	elbow.z = shoulder.z + along.k * a * cosine + bend.k * a * sine;
+	reached.x = shoulder.x + along.i * reach;
+	reached.y = shoulder.y + along.j * reach;
+	reached.z = shoulder.z + along.k * reach;
+
+	/* (the upper arm turned about the shoulder to the elbow) */
+	vector_from_points3d(&shoulder, &placed[fore].position, &bone);
+	vector_from_points3d(&shoulder, &elbow, &toward);
+	if (first_person_legs_vr_turn_toward(&bone, &toward, 3.2f, from, to))
+	{
+		for (index = 0; index < count; index++)
+		{
+			if (first_person_legs_below(model, index, upper))
+				first_person_legs_rotate(&placed[index], from, to, &shoulder, global_zero_vector3d);
+		}
+	}
+	/* (and the forearm about the elbow to the wrist) */
+	pivot = placed[fore].position;
+	vector_from_points3d(&pivot, &placed[hand].position, &bone);
+	vector_from_points3d(&pivot, &reached, &toward);
+	if (first_person_legs_vr_turn_toward(&bone, &toward, 3.2f, from, to))
+	{
+		for (index = 0; index < count; index++)
+		{
+			if (first_person_legs_below(model, index, fore))
+				first_person_legs_rotate(&placed[index], from, to, &pivot, global_zero_vector3d);
+		}
+	}
+}
+
+/* the pose to cast the VR mode's body's shadow with, on foot: placed as
+the body is drawn (first_person_legs_vr_stand: upright under the real neck,
+turned to the body's heading), but whole, its head turned from the body's
+heading to the headset's (about its joint), and its own arms reaching the
+controllers (first_person_legs_vr_arm_reach; an arm no controller places is
+the game's); not leant back from the eyes, which do not see it. NULL: none
+(as first_person_legs_vr_stand) */
+static real_matrix4x3 const *first_person_legs_vr_shadow_pose(
+	struct object_datum const *object,
+	struct model const *model,
+	long count,
+	real_matrix4x3 const *nodes)
+{
+	static char const *const forearms[2] = { "l forearm", "r forearm" };
+	static char const *const hands[2] = { "l hand", "r hand" };
+	real_matrix4x3 *placed = first_person_legs_vr_shadow.nodes;
+	struct first_person_legs_vr_nodes found;
+	real_point3d anchor, wrists[2];
+	real_vector3d forward, left, from[3], to[3];
+	boolean reach[2];
+	real dot;
+	short index, side;
+
+	if (!first_person_legs_vr_stand(object, model, count, nodes, placed, &found, &anchor, &forward, &left))
+		return NULL;
+	if (!vr_render_body_reach(&to[0], &to[2], wrists, reach))
+		return placed;
+
+	/* (the head, all below it with it, turned about its joint as the
+	headset is turned from the body's heading) */
+	if (normalize3d(&to[0]) > 0.f)
+	{
+		dot = dot_product3d(&to[2], &to[0]);
+		to[2].i -= to[0].i * dot;
+		to[2].j -= to[0].j * dot;
+		to[2].k -= to[0].k * dot;
+		if (normalize3d(&to[2]) > 0.f)
+		{
+			real_point3d pivot = placed[found.head].position;
+
+			cross_product3d(&to[2], &to[0], &to[1]);
+			from[0] = forward;
+			from[1] = left;
+			from[2] = *global_up3d;
+			for (index = 0; index < count; index++)
+			{
+				if (first_person_legs_below(model, index, found.head))
+					first_person_legs_rotate(&placed[index], from, to, &pivot, global_zero_vector3d);
+			}
+		}
+	}
+
+	/* (each arm the controllers place, to its wrist) */
+	for (side = 0; side < 2; side++)
+	{
+		short fore = NONE, hand = NONE;
+
+		if (!reach[side])
+			continue;
+		for (index = 0; index < count; index++)
+		{
+			char const *name = TAG_BLOCK_GET_ELEMENT(&model->nodes, index, struct model_node)->name;
+
+			if (fore == NONE && first_person_legs_name_has(name, forearms[side]))
+				fore = index;
+			if (hand == NONE && first_person_legs_name_has(name, hands[side]))
+				hand = index;
+		}
+		if (fore == NONE || hand == NONE || fore == found.arms[side] || hand == fore ||
+			!first_person_legs_below(model, fore, found.arms[side]) || !first_person_legs_below(model, hand, fore))
+		{
+			continue;
+		}
+		first_person_legs_vr_arm_reach(model, count, placed, found.arms[side], fore, hand, &wrists[side],
+			side == 0 ? 1.f : -1.f, &forward, &left);
+	}
+	return placed;
 }
 #endif
 
@@ -1818,10 +2069,14 @@ real_matrix4x3 const *first_person_legs_node_matrices(
 	return first_person_legs_matrices;
 }
 
-/* render_objects.c: the pose to draw the body's shadow with on the flat
+/* render_objects.c: the pose to draw the body's shadow with: on the flat
 screen, the whole body placed as its legs are (first_person_legs_place), so
-that they stand on their own shadow; NULL: none (the VR mode's, whose body
-casts none, as the stock game's first-person body casts none) */
+that they stand on their own shadow; in the VR mode on foot, with
+vr.body_shadow, the whole body as it stands under the real head, its head
+turned as the headset is and its arms reaching the controllers
+(first_person_legs_vr_shadow_pose). NULL: none (in a seat; the VR mode's
+without vr.body_shadow, as the stock game's first-person body casts none).
+Asked for only while the object shadows are drawn (render_object_shadows) */
 real_matrix4x3 const *first_person_legs_shadow_node_matrices(
 	long object_index,
 	real_matrix4x3 const *nodes)
@@ -1832,11 +2087,64 @@ real_matrix4x3 const *first_person_legs_shadow_node_matrices(
 	long count;
 	short chest, belly;
 
+#ifdef HALO_VR
+	first_person_legs_vr_shadow.object_index = NONE;
+#endif
 	if (!object || !nodes || object->object.parent_object_index != NONE ||
-		!first_person_legs_model(object, &model, &count) ||
-		!first_person_legs_place(object_index, object, model, count, nodes, shadow, &chest, &belly))
+		!first_person_legs_model(object, &model, &count))
 	{
 		return NULL;
 	}
+#ifdef HALO_VR
+	if (halo_vr_running())
+	{
+		real_matrix4x3 const *pose;
+
+		if (!first_person_legs_vr_shadow_enabled())
+			return NULL;
+		pose = first_person_legs_vr_shadow_pose(object, model, count, nodes);
+		if (pose)
+		{
+			first_person_legs_vr_shadow.object_index = object_index;
+			first_person_legs_vr_shadow.count = count;
+		}
+		return pose;
+	}
+#endif
+	if (!first_person_legs_place(object_index, object, model, count, nodes, shadow, &chest, &belly))
+		return NULL;
 	return shadow;
+}
+
+/* render_objects.c: the radius of the sphere the player's body's shadow is
+cast in (center, radius: the body's bounding sphere), asked for just after
+its pose (first_person_legs_shadow_node_matrices): in the VR mode, wide
+enough for the whole of that pose, FIRST_PERSON_LEGS_SHADOW_MARGIN past each
+of its joints (its hands where the controllers are, the body under the real
+head, which the game's sphere about the unit does not reach); else as it
+is */
+real first_person_legs_shadow_radius(
+	long object_index,
+	real_point3d const *center,
+	real radius)
+{
+#ifdef HALO_VR
+	long index;
+
+	if (object_index != NONE && object_index == first_person_legs_vr_shadow.object_index)
+	{
+		for (index = 0; index < first_person_legs_vr_shadow.count; index++)
+		{
+			real reach = distance3d(center, &first_person_legs_vr_shadow.nodes[index].position) +
+				FIRST_PERSON_LEGS_SHADOW_MARGIN;
+
+			if (reach > radius)
+				radius = reach;
+		}
+	}
+#else
+	(void)object_index;
+	(void)center;
+#endif
+	return radius;
 }

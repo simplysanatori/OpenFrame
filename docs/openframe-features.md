@@ -5,10 +5,10 @@ where each came from, and how to turn it on. Each is set in `config.toml`
 (the `vr.*` keys below) or in VR Setup: MOVEMENT AND COMFORT..., HANDS AND
 WEAPONS... (and its FISTS AND GRABBING...), HUD... (WRIST HUD..., HUD
 LAYOUT...) and PLAYER....
-Every one is off, or as OpenH1 had it, until you choose it, apart from three
+Every one is off, or as OpenH1 had it, until you choose it, apart from four
 things that are on from the start: the third person's hold on the turning
-stick, the HUD's corners placed for the Frame, and no magazine eject on the
-stick.
+stick, the HUD's corners placed for the Frame, no magazine eject on the
+stick, and your body's shadow.
 
 The VR Setup menu (Settings > CONTROLS tab > VR SETUP, in the CONTROLLER
 section; also at the foot of the player profile menu) is a tree of pages of
@@ -467,6 +467,44 @@ glass, glow and reaction to the world (`port/linux/vulkan/host_vulkan_vr.c`).
   the temple hides the HUD) and the menus' placement (`vr.menu_anchor`
   head, world, follow). A lag for the HUD following the head needs nothing
   new: OpenH1 has `vr.hud_lag`.
+
+### Your body's shadow
+
+OpenH1 draws your body under you in the headset (`display.first_person_legs`,
+on in the VR build) without its head and arms, and casts no shadow of it.
+With `vr.body_shadow` your body casts its shadow, whole, as it stands under
+your head: upright, turned to your body's heading, its head turned as the
+headset is, and its own arms (the Master Chief's, not the VR mode's drawn
+arms) reaching where your controllers hold the wrists, the elbows bent down
+and out and a little back. Wave a hand and its shadow waves; look about and
+the helmet's shadow turns.
+
+- Key: `vr.body_shadow` (`HALO_VR_BODY_SHADOW`, default `true`; `false`: no
+  body shadow in the headset, as OpenH1 had it). Needs
+  `display.first_person_legs` and the game's object shadows.
+- Where: on foot. In a seat, none. The weapon in hand casts none. An arm no
+  controller places (the left with `vr.hands = "game"`, both with
+  `vr.aim = "gamepad"`) keeps the game's pose. Not in a cinematic.
+- How: `port/linux/game/first_person_legs.c`
+  (`first_person_legs_shadow_node_matrices`, `first_person_legs_vr_shadow_pose`:
+  the drawn body's placement, `first_person_legs_vr_stand`, then the head
+  turned and each arm solved as two bones by the law of cosines, as
+  `vr_hands.c`'s arms are), the wrists and the head from
+  `port/linux/game/vr_render.c` (`vr_render_body_reach`: 7.5 cm behind each
+  controller's grip, along its pointing), and the shadow's sphere widened to
+  reach the hands (`first_person_legs_shadow_radius`, from
+  `source/render/render_objects.c`'s `render_object_shadow_begin`, a marked
+  port change). The idea, the 7.5 cm and the widened sphere are
+  moistman42069's (`vr_publish_body`, `vr_body_arms_to_hands`,
+  `vr_render_body_shadow_radius`); the code is written again on OpenH1's
+  body.
+- Cost: nothing while the object shadows are off (the pose is made only in
+  their pass) or `vr.body_shadow` is off. On, one more caster in the shadow
+  atlas (the body's skinned mesh drawn once into it) and its receivers drawn
+  once in the eyes' pass, as every other unit's shadow is; a pose of at most
+  64 joints made twice a frame on the CPU. The wider sphere spreads the
+  body's shadow over more of the atlas's region (a little softer) and draws
+  its receivers over a larger area.
 
 ## Recentring and the Pillar of Autumn tutorial
 
