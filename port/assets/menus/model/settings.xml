@@ -1842,8 +1842,8 @@ slow the world, again to end it (GESTURES: others).</help>
 			<choice shown="80%" value="0.8"/>
 		</row>
 		<row key="vr_gestures_screen" kind="link" label="GESTURES..." open="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/vr_gestures_screen">
-			<help>Which press or stick gesture starts bullet time and
-switches the third person.</help>
+			<help>Which stick gesture starts bullet time and switches
+the third person, and turning in a vehicle's seat.</help>
 		</row>
 	</screen>
 	<screen name="main_menu/settings_select/player_setup/player_profile_edit/vr_gestures/vr_gestures_screen" kind="settings" layout="options" spacing="28">
@@ -1862,6 +1862,12 @@ switches the third person.</help>
 			<choice shown="HOLD" value="hold"/>
 			<choice shown="DOUBLE FLICK DOWN" value="double_flick_down"/>
 			<choice shown="OFF" value="off"/>
+		</row>
+		<row key="seat_smooth_turn" kind="choice" setting="vr.seat_smooth_turn" label="SMOOTH TURN IN SEATS:">
+			<help>With snap turning, the turning stick turns smoothly
+in a vehicle's seat, and snaps again once you are out.</help>
+			<choice shown="ON" value="true"/>
+			<choice shown="OFF" value="false"/>
 		</row>
 	</screen>
 	<screen name="main_menu/settings_select/player_setup/player_profile_edit/vr_hands/vr_hands_screen" kind="settings" layout="options" spacing="28">
@@ -1928,14 +1934,14 @@ firing, and the hits on you.</help>
 			<choice shown="100%" value="1"/>
 		</row>
 		<row key="vr_fists_screen" kind="link" label="FISTS AND GRABBING..." open="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/vr_fists_screen">
-			<help>Punching and parrying, pulling a weapon to your
-hand, passing it across, holding and throwing things.</help>
+			<help>Punching, parrying and deflecting shots, pulling a
+weapon to you, passing it across, holding and throwing.</help>
 		</row>
 	</screen>
 	<screen name="main_menu/settings_select/player_setup/player_profile_edit/vr_fists/vr_fists_screen" kind="settings" layout="options" spacing="28">
 		<row key="fists" kind="choice" setting="vr.fists" label="FISTS:">
-			<help>Offline: punch with your free hand, or with an
-empty one; swipe across a blow to parry it.</help>
+			<help>Punch with your free or empty hand; swipe across a
+blow to parry it. Online a punch is a melee (B).</help>
 			<choice shown="ON" value="true"/>
 			<choice shown="OFF" value="false"/>
 		</row>
@@ -1956,6 +1962,12 @@ empty one; swipe across a blow to parry it.</help>
 			<choice shown="50%" value="0.5"/>
 			<choice shown="75%" value="0.75"/>
 			<choice shown="100%" value="1"/>
+		</row>
+		<row key="deflect" kind="choice" setting="vr.deflect" label="DEFLECT SHOTS:">
+			<help>Offline: hold your gun in a shot's path to block
+it, or swing the gun or a fist to bat it away.</help>
+			<choice shown="ON" value="true"/>
+			<choice shown="OFF" value="false"/>
 		</row>
 		<row key="weapon_pull" kind="choice" setting="vr.weapon_pull" label="WEAPON PULL:">
 			<help>Offline: point your free hand at a weapon, grip,
