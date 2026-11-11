@@ -468,6 +468,33 @@ glass, glow and reaction to the world (`port/linux/vulkan/host_vulkan_vr.c`).
   head, world, follow). A lag for the HUD following the head needs nothing
   new: OpenH1 has `vr.hud_lag`.
 
+### Waiting for SteamVR and the headset
+
+OpenH1 asks the OpenXR runtime for its instance and headset once, as the
+game starts. On the Frame that fails when SteamVR is still starting or the
+headset is asleep, and the game then played flat in a window that cannot be
+seen in the headset. Now, before its window is made, the game asks again
+once a second while the runtime says it is not ready (`xrCreateInstance` or
+`xrGetSystem` answering `XR_ERROR_RUNTIME_UNAVAILABLE`,
+`XR_ERROR_RUNTIME_FAILURE`, `XR_ERROR_FORM_FACTOR_UNAVAILABLE` or
+`XR_ERROR_INSTANCE_LOST`), for up to `vr.runtime_wait` seconds. Each reason
+is logged once (stdout.log: `vr: waiting up to 60 s for SteamVR and the
+headset`, then the call and its result). An instance the runtime made is
+kept while only the headset is missing (the spec lets `xrGetSystem` be asked
+again), and made again otherwise.
+
+- Still not ready after the wait: under gamescope (the Frame) the game quits,
+  its log saying why; on a computer's desktop it plays flat in its window,
+  as before. A computer with no OpenXR runtime at all is not waited for.
+- Steam's Exit game (SIGTERM) or Ctrl+C ends the game while it waits. Nothing
+  is drawn and no session exists yet, so SteamVR has nothing to see hang.
+- Key: `vr.runtime_wait` (`HALO_VR_RUNTIME_WAIT`; whole seconds, default
+  `60`; `0` waits for nothing, as OpenH1).
+- From moistman42069's mod (`host_xr.c`, a minute of tries a second apart,
+  then quitting), which carries astromaddie's HaloCE-VR's; rewritten for
+  OpenH1's host (`host_vr_runtime_ready`, `port/linux/host/host_vr.c`;
+  `platform_vr_runtime_wait`, `port/linux/src/sdl_platform.c`).
+
 ## Recentring and the Pillar of Autumn tutorial
 
 These keep the player's eye in the cryo tube, let the tutorial go on as the

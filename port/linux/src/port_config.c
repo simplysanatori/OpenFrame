@@ -541,6 +541,15 @@ static const struct config_setting config_settings[] =
 	/* the VR build's (configure.py --vr; vr.c) */
 	{ "vr.enabled", _config_boolean, "true", "HALO_VR", _environment_value, _platform_desktop,
 		"Play in the VR headset (OpenXR); false plays flat, in the window." },
+	/* OpenFrame: the Steam Frame's SteamVR, asleep or still starting as the
+	game starts (sdl_platform.c's platform_vr_runtime_wait) */
+	{ "vr.runtime_wait", _config_integer, "60", "HALO_VR_RUNTIME_WAIT", _environment_value, _platform_desktop,
+		"How long to wait at the start for SteamVR and the headset (OpenXR)\n"
+		"while they are not ready yet (SteamVR starting, the headset asleep), in\n"
+		"seconds, trying each second. Still not ready, the game quits on the\n"
+		"Steam Frame (under gamescope, where a flat window is not seen) and\n"
+		"plays flat in its window on a computer's desktop. 0 waits for nothing:\n"
+		"VR not ready at once, the game plays flat." },
 	/* OpenFrame: 0.9 (OpenH1's was 1.0), as headset trials on the Steam Frame
 	settled it */
 	{ "vr.resolution_scale", _config_real, "0.9", "HALO_VR_RESOLUTION_SCALE", _environment_value, _platform_desktop,

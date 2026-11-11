@@ -32,6 +32,7 @@ void host_sdl_get_base_path(char *buffer, unsigned int size);
 void host_sdl_pump_events(void);
 int host_sdl_wait_event(int milliseconds);
 int host_sdl_push_event(const void *event);
+int host_sdl_has_event(unsigned int type);
 long long host_sdl_get_window_flags(unsigned int window);
 int host_sdl_set_window_fullscreen(unsigned int window, int fullscreen);
 int host_sdl_set_window_fullscreen_mode(unsigned int window, unsigned int display, int width, int height,
@@ -123,6 +124,11 @@ void SDL_PumpEvents(void)
 bool SDL_PushEvent(SDL_Event *event)
 {
 	return host_sdl_push_event(event) != 0;
+}
+
+bool SDL_HasEvent(Uint32 type)
+{
+	return host_sdl_has_event(type) != 0;
 }
 
 /* (only to wait: the event stays queued for SDL_PollEvent, which is how

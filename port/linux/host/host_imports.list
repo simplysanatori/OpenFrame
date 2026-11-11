@@ -5,6 +5,7 @@ host_sdl_get_base_path
 host_sdl_pump_events
 host_sdl_wait_event
 host_sdl_push_event
+host_sdl_has_event
 host_sdl_get_window_flags
 host_sdl_set_window_fullscreen
 host_sdl_set_window_fullscreen_mode
