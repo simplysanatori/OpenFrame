@@ -224,6 +224,6 @@
 		<string text="How strong a jump off a wall is."/>
 		<string text="Offline: flick the turning stick down and let go to\nslow the world, again to end it (GESTURES: others)."/>
 		<string text="How fast the world runs in bullet time."/>
-		<string text="Which press or stick gesture starts bullet time and\nswitches the third person."/>
+		<string text="Which stick gesture starts bullet time and switches\nthe third person, and turning in a vehicle's seat."/>
 	</strings>
 </menus>
