@@ -152,6 +152,15 @@ void display_error_text_deferred(
 	short local_player_index);
 void display_error_text_when_main_menu_loaded(
 	wchar_t const *text);
+/* port: (OpenFrame) the two above with a title in place of the dialog's
+header */
+void display_error_text_titled_deferred(
+	wchar_t const *title,
+	wchar_t const *text,
+	short local_player_index);
+void display_error_text_titled_when_main_menu_loaded(
+	wchar_t const *title,
+	wchar_t const *text);
 void display_error_abort_to_dashboard_deferred(
 	short error_code,
 	boolean optional);
