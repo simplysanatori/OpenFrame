@@ -796,6 +796,12 @@ static const struct config_setting config_settings[] =
 		"with both hands and turn it, the view turning with the Warthog;\n"
 		"\"look\" it steers where the right controller points, the view turned\n"
 		"by the stick." },
+	{ "vr.vehicle_grip_angle", _config_boolean, "true", "HALO_VR_VEHICLE_GRIP_ANGLE", _environment_value,
+		_platform_desktop,
+		"A hand holding a vehicle's control (the Warthog's wheel, the Ghost's\n"
+		"handlebars, a turret's handles) keeps the angle it took hold at,\n"
+		"turning with the control, until it lets go; false: it is drawn turned\n"
+		"as the control is, in the same pose each time." },
 	{ "vr.scorpion_view", _config_string, "\"feed\"", "HALO_VR_SCORPION_VIEW", _environment_value,
 		_platform_desktop,
 		"Driving a Scorpion with vr.vehicle_view = \"first_person\": \"feed\" you\n"
