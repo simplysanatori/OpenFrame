@@ -69,7 +69,7 @@ port/android/host/host_common.c); a fatal error's halt writes it too
 (report_session_halted, main.c), and keeps both at the exit that follows.
 The next start finds them, keeps them as
 reports/.crashed and .crashed.txt until they are answered, and at the main
-menu asks once, "OpenH1 closed unexpectedly last time. Report it?"
+menu asks once, "The game closed unexpectedly last time. Report it?"
 (pc_menu_crash_question_open, menu_functions.c): REPORT saves a report
 headed by the crash (report_crash_summary), with crash.txt in its zip, and
 opens its issue; SKIP never asks of that crash again. On Android and iOS,
@@ -81,6 +81,16 @@ logs what the report would say, and debug.crash_answer answers for a test.
 A frame's time costs a clock reading and six stores (report_frame_presented,
 on the render thread, as report_write is); a log line a copy into the ring.
 */
+
+#ifdef OPENFRAME
+/* (OpenFrame, the Steam Frame fork: its reports go to its own issues, not
+OpenH1's, and name it) */
+#define REPORT_ISSUES "https://github.com/simplysanatori/OpenFrame/issues/new"
+#define REPORT_GAME_NAME "OpenFrame"
+#else
+#define REPORT_ISSUES "https://github.com/OpenH1/OpenH1/issues/new"
+#define REPORT_GAME_NAME "OpenH1"
+#endif
 
 #include "platform.h"
 #include "port_config.h"
@@ -1525,7 +1535,7 @@ void report_crash_summary(const char *session, const char *record, char *text, s
 	}
 #define REPORT_PRINT(...) \
 	(used += (size_t)snprintf(text + (used < size ? used : size - 1), used < size ? size - used : 1, __VA_ARGS__))
-	REPORT_PRINT("## The crash\n\nOpenH1 closed unexpectedly the last time it ran.\n\n");
+	REPORT_PRINT("## The crash\n\n" REPORT_GAME_NAME " closed unexpectedly the last time it ran.\n\n");
 	REPORT_PRINT("- Build: %s\n", build[0] ? build : "unknown");
 	if (started[0])
 		REPORT_PRINT("- Started: %s\n", started);
@@ -1818,13 +1828,6 @@ void report_crash_answer(int report)
 
 /* ---------- the issue */
 
-#ifdef OPENFRAME
-/* (OpenFrame, the Steam Frame fork: its reports go to its own issues, not
-OpenH1's) */
-#define REPORT_ISSUES "https://github.com/simplysanatori/OpenFrame/issues/new"
-#else
-#define REPORT_ISSUES "https://github.com/OpenH1/OpenH1/issues/new"
-#endif
 /* GitHub's addresses: some 8 KB at most */
 #define REPORT_URL_MOST 7800
 
@@ -2298,7 +2301,7 @@ static void report_finish(const char *note, int wait)
 	if (issue)
 	{
 		if (report_capture.crash)
-			snprintf(issue, issue_size, "**What happened:** OpenH1 closed unexpectedly.\n\n(Say what you were doing "
+			snprintf(issue, issue_size, "**What happened:** " REPORT_GAME_NAME " closed unexpectedly.\n\n(Say what you were doing "
 				"when it closed, if you remember. Then drag %s.zip, from the reports folder that opened, into this "
 				"box.)\n\n%s", name, report_capture.text ? report_capture.text : "");
 		else if (note && note[0])
