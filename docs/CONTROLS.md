@@ -55,7 +55,7 @@ The GESTURES page, under MOVEMENT AND COMFORT, offers other bindings. **BULLET T
 
 ## The added features
 
-These come from moistman42069's Halo VR mod, rewritten for OpenH1's renderer and the Frame's controllers. Sprint, bullet time, parkour, fists, shot deflection, weapon pull, prop throw and hand swap are each off until you turn them on in VR Setup. They work only in a game on your own Frame, such as the campaign. Online, in split screen and in games with bots they do nothing, and the HUD says "offline only" for sprint and bullet time. The VR Tutorial has bots, so they are off there too. The third person works in the campaign with no setting. The wrist HUD and the vignette are options for everywhere.
+These come from moistman42069's Halo VR mod, rewritten for OpenH1's renderer and the Frame's controllers. Sprint, bullet time, parkour, fists, shot deflection, weapon pull, prop throw and hand swap are each off until you turn them on in VR Setup. They work only in a game on your own Frame, such as the campaign. Online, in split screen and in games with bots they do nothing, and the HUD says "offline only" for sprint and bullet time. The one exception is FISTS: there a punch is the game's own melee, as if you pressed **B**. The VR Tutorial has bots, so they are off there too. The third person works in the campaign with no setting. The wrist HUD and the vignette are options for everywhere.
 
 ### MOVEMENT AND COMFORT
 
@@ -70,7 +70,7 @@ These come from moistman42069's Halo VR mod, rewritten for OpenH1's renderer and
 
 ### HANDS AND WEAPONS, under FISTS AND GRABBING
 
-- **FISTS**: your free hand punches, and so does your weapon hand when it holds no weapon. Swing it at an enemy at 2 m/s or more. A hard swing staggers them for a second. Hunters, and Elites whose shields still hold, are never staggered. Swipe across an enemy's melee as it lands to parry it; the HUD says "Parry". **PUNCH SPEED** and **PUNCH DAMAGE** tune it.
+- **FISTS**: your free hand punches, and so does your weapon hand when it holds no weapon. Swing it at an enemy at 2 m/s or more. A hard swing staggers them for a second. Hunters, and Elites whose shields still hold, are never staggered. Swipe across an enemy's melee as it lands to parry it; the HUD says "Parry". **PUNCH SPEED** and **PUNCH DAMAGE** tune it. Online, in split screen and with bots, a punch is a normal melee, as **B** is: no stagger or parry, and **PUNCH DAMAGE** does nothing. A punch and a swing of the weapon together melee once.
 - **DEFLECT SHOTS**: hold your gun in the path of an incoming shot and it glances off. Swing the gun, or a free fist, at 1.2 m/s or more to bat a shot away along your swing. Plasma and needles deflect off either; bullets only off the gun; grenades bounce or are batted; rockets and fuel rods need a hard swing of 2.5 m/s; tank shells and flame never. A deflected shot is yours, and its kills count for you. Your hand buzzes when it deflects one. `vr.deflect_strength` and `vr.deflect_assist` in `config.toml` set its speed and how near it must pass.
 - **WEAPON PULL**: hold your free hand out, point it at a weapon on the floor within **PULL RANGE**, 3 m by default, squeeze the grip and flick the hand back. The weapon flies to your hand. Keep the grip squeezed to catch it.
 - **PROP THROW**: squeeze the grip with your free hand on a loose weapon or piece of equipment to pick it up, and let go to throw it. **THROW STRENGTH** scales the throw.
