@@ -917,7 +917,9 @@ static const struct config_setting config_settings[] =
 		"split screen or with bots): the hand without the weapon (and the\n"
 		"weapon's hand when it holds none) punches the enemies it hits as it\n"
 		"swings past vr.fist_speed, a hard punch staggering them; a hand swiped\n"
-		"across an enemy's blow just before it lands parries it." },
+		"across an enemy's blow just before it lands parries it. Elsewhere\n"
+		"(online, split screen, with bots) such a punch is the game's melee,\n"
+		"pressed as B is, and nothing else." },
 	{ "vr.fist_speed", _config_real, "2.0", "HALO_VR_FIST_SPEED", _environment_value, _platform_desktop,
 		"Fists, how fast a hand must swing to punch, in metres a second, 1 to 4." },
 	{ "vr.fist_damage", _config_real, "0.33", "HALO_VR_FIST_DAMAGE", _environment_value, _platform_desktop,
