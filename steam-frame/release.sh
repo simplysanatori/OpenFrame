@@ -23,7 +23,7 @@
 # tarball, and SHA256SUMS is written beside it. Any failure deletes the tarball again.
 set -euo pipefail
 
-VERSION=1.1.1
+VERSION=1.2.0
 here=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
 repo=$(cd "$here/.." && pwd)
 build=$repo/build/linux_arm64 out=$here/release stage_only=
