@@ -9,11 +9,97 @@ static XrResult wait_result = XR_SUCCESS;
 static XrResult create_result = XR_SUCCESS;
 static VkResult create_vk_result = VK_SUCCESS;
 static VkPhysicalDevice chosen_physical;
+static int warnings;
 
 void host_logf(int priority, const char *format, ...)
 {
-	(void)priority;
 	(void)format;
+	if (priority == HOST_LOG_WARN)
+		warnings++;
+}
+
+/* the runtime awaited (host_vr_runtime_ready): a runtime whose instance
+and system answer as the test says, through its xrGetInstanceProcAddr */
+static XrResult instance_answer, system_answer;
+static int instances_made, instances_destroyed, systems_asked;
+
+static XrResult XRAPI_CALL fake_extensions(const char *layer, uint32_t capacity, uint32_t *count,
+	XrExtensionProperties *properties)
+{
+	(void)layer;
+	*count = 1;
+	if (capacity)
+		snprintf(properties[0].extensionName, sizeof(properties[0].extensionName), "%s",
+			XR_KHR_VULKAN_ENABLE2_EXTENSION_NAME);
+	return XR_SUCCESS;
+}
+
+static XrResult XRAPI_CALL fake_create_instance(const XrInstanceCreateInfo *info, XrInstance *instance)
+{
+	(void)info;
+	if (XR_FAILED(instance_answer))
+		return instance_answer;
+	instances_made++;
+	*instance = (XrInstance)(uintptr_t)0x100000077ull;
+	return XR_SUCCESS;
+}
+
+static XrResult XRAPI_CALL fake_destroy_instance(XrInstance instance)
+{
+	assert(instance == (XrInstance)(uintptr_t)0x100000077ull);
+	instances_destroyed++;
+	return XR_SUCCESS;
+}
+
+static XrResult XRAPI_CALL fake_get_system(XrInstance instance, const XrSystemGetInfo *info, XrSystemId *system)
+{
+	assert(instance == (XrInstance)(uintptr_t)0x100000077ull);
+	assert(info->formFactor == XR_FORM_FACTOR_HEAD_MOUNTED_DISPLAY);
+	systems_asked++;
+	if (XR_FAILED(system_answer))
+		return system_answer;
+	*system = 42;
+	return XR_SUCCESS;
+}
+
+static XrResult XRAPI_CALL fake_failing(void)
+{
+	return XR_ERROR_FUNCTION_UNSUPPORTED;
+}
+
+static XrResult XRAPI_CALL fake_instance_properties(XrInstance instance, XrInstanceProperties *properties)
+{
+	(void)instance;
+	(void)properties;
+	return XR_ERROR_FUNCTION_UNSUPPORTED;
+}
+
+static XrResult XRAPI_CALL fake_result_string(XrInstance instance, XrResult result, char text[XR_MAX_RESULT_STRING_SIZE])
+{
+	(void)instance;
+	(void)result;
+	(void)text;
+	return XR_ERROR_FUNCTION_UNSUPPORTED;
+}
+
+static XrResult XRAPI_CALL fake_proc_address(XrInstance instance, const char *name, PFN_xrVoidFunction *function)
+{
+	(void)instance;
+	if (!strcmp(name, "xrEnumerateInstanceExtensionProperties"))
+		*function = (PFN_xrVoidFunction)fake_extensions;
+	else if (!strcmp(name, "xrCreateInstance"))
+		*function = (PFN_xrVoidFunction)fake_create_instance;
+	else if (!strcmp(name, "xrDestroyInstance"))
+		*function = (PFN_xrVoidFunction)fake_destroy_instance;
+	else if (!strcmp(name, "xrGetSystem"))
+		*function = (PFN_xrVoidFunction)fake_get_system;
+	else if (!strcmp(name, "xrGetInstanceProperties"))
+		*function = (PFN_xrVoidFunction)fake_instance_properties;
+	else if (!strcmp(name, "xrResultToString"))
+		*function = (PFN_xrVoidFunction)fake_result_string;
+	else
+		*function = (PFN_xrVoidFunction)fake_failing;
+	return XR_SUCCESS;
 }
 
 static XrResult XRAPI_CALL acquire_image(XrSwapchain swapchain, const XrSwapchainImageAcquireInfo *info,
@@ -237,6 +323,49 @@ int main(void)
 	create_vk_result = VK_SUCCESS;
 	create_result = XR_ERROR_RUNTIME_FAILURE;
 	assert(host_vr_vulkan_create_instance(NULL, &instance_info, NULL, &instance) == VK_ERROR_INITIALIZATION_FAILED);
+
+	/* The runtime awaited: SteamVR not started yet refuses the instance,
+	asked again each time and said once; the headset asleep keeps the
+	instance, whose system is asked for again; the runtime lost gives the
+	instance back; then both ready, and asked no more. Any other failure
+	is not waited for. */
+	get_instance_proc_address = fake_proc_address;
+	vr.instance = XR_NULL_HANDLE;
+	vr.system = XR_NULL_SYSTEM_ID;
+	vr.probed = 1;
+	vr.binding = VR_BINDING_VULKAN;
+	warnings = 0;
+	instance_answer = XR_ERROR_RUNTIME_FAILURE;
+	assert(host_vr_runtime_ready() == VR_RUNTIME_WAIT);
+	assert(host_vr_runtime_ready() == VR_RUNTIME_WAIT);
+	assert(!vr.instance && instances_made == 0 && warnings == 1);
+	instance_answer = XR_ERROR_RUNTIME_UNAVAILABLE;
+	assert(host_vr_runtime_ready() == VR_RUNTIME_WAIT);
+	assert(warnings == 2);
+	instance_answer = XR_SUCCESS;
+	system_answer = XR_ERROR_FORM_FACTOR_UNAVAILABLE;
+	assert(host_vr_runtime_ready() == VR_RUNTIME_WAIT);
+	assert(host_vr_runtime_ready() == VR_RUNTIME_WAIT);
+	assert(vr.instance && instances_made == 1 && instances_destroyed == 0 && systems_asked == 2);
+	assert(vr.system == XR_NULL_SYSTEM_ID && warnings == 3);
+	system_answer = XR_ERROR_INSTANCE_LOST;
+	assert(host_vr_runtime_ready() == VR_RUNTIME_WAIT);
+	assert(!vr.instance && instances_destroyed == 1 && warnings == 4);
+	system_answer = XR_SUCCESS;
+	assert(host_vr_runtime_ready() == VR_RUNTIME_READY);
+	assert(vr.instance && vr.system == 42 && instances_made == 2 && systems_asked == 4);
+	assert(host_vr_runtime_ready() == VR_RUNTIME_READY);
+	assert(instances_made == 2 && systems_asked == 4 && warnings == 4);
+	vr.instance = XR_NULL_HANDLE;
+	vr.system = XR_NULL_SYSTEM_ID;
+	instance_answer = XR_ERROR_VALIDATION_FAILURE;
+	assert(host_vr_runtime_ready() == VR_RUNTIME_NONE);
+	instance_answer = XR_SUCCESS;
+	system_answer = XR_ERROR_FORM_FACTOR_UNSUPPORTED;
+	assert(host_vr_runtime_ready() == VR_RUNTIME_NONE);
+	vr.binding = VR_BINDING_NONE;
+	assert(host_vr_runtime_ready() == VR_RUNTIME_NONE);
+
 	free(vulkan.images[VR_SWAPCHAIN_EYES]);
 	free(vulkan.images[VR_SWAPCHAIN_HUD]);
 	free(vulkan.images[VR_SWAPCHAIN_DEPTH]);

@@ -41,6 +41,14 @@ enum
 	VR_BINDING_VULKAN, /* XR_KHR_vulkan_enable2: the host owns its instance, device and images */
 };
 
+/* whether the runtime and its headset are ready (host_vr_runtime_ready) */
+enum
+{
+	VR_RUNTIME_NONE = 0,
+	VR_RUNTIME_READY,
+	VR_RUNTIME_WAIT,
+};
+
 /* the controllers' buttons (struct vr_host_input) */
 enum
 {
@@ -221,6 +229,12 @@ reads its extensions (without starting it, nor asking for a headset), and
 says which binding its session will take: VR_BINDING_VULKAN if it offers
 XR_KHR_vulkan_enable2, else VR_BINDING_NONE (the reason is logged). */
 int host_vr_probe(void);
+/* (OpenFrame) after host_vr_probe and before the window is made: makes the
+runtime's instance and finds its headset, once (vr.runtime_wait asks again
+each second): VR_RUNTIME_READY, VR_RUNTIME_WAIT while the runtime or the
+headset is not ready yet (SteamVR starting, the headset asleep: logged once
+for each reason), VR_RUNTIME_NONE when VR cannot start (logged) */
+int host_vr_runtime_ready(void);
 /* after the host has bound its Vulkan device (on its render thread).
 0 if there is no OpenXR runtime, headset or graphics binding. */
 int host_vr_initialize(struct vr_host_info *info);
