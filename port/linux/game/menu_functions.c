@@ -8278,8 +8278,9 @@ static void browser_empty_text(short mode, short tab, boolean online, boolean pu
 		usnprintf(text, size - 1, L"No games on your network yet.\r\nHost one from Create Game.");
 	else if (newer)
 	{
-		/* (an old build sees none of the games: it says why) */
-		usnprintf(text, size - 1, L"%d %s on a newer version.\r\nUpdate OpenH1 to join %s.", newer,
+		/* (an old build sees none of the games: it says why; OpenFrame
+		is updated by its next release, its updater off: updater.c) */
+		usnprintf(text, size - 1, L"%d %s on a newer version.\r\nUpdate OpenFrame to join %s.", newer,
 			newer == 1 ? L"game is" : L"games are", newer == 1 ? L"it" : L"them");
 	}
 	else
