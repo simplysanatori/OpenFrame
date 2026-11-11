@@ -769,6 +769,12 @@ static struct
 	told last (vr.presents) */
 	unsigned long drive_told;
 	int drive_told_valid;
+	/* (OpenFrame, vr.seat_smooth_turn) in a vehicle's seat (halo_vr_seated):
+	when told last (vr.presents); and the turning stick turning smoothly for
+	it, a seat's or one just left (turn_smoothly) */
+	unsigned long seated_told;
+	int seated_told_valid;
+	int seat_smooth;
 	/* the comfort vignette: asked for (and at which frame), and as drawn */
 	float vignette_asked;
 	unsigned long vignette_asked_at;
@@ -1118,6 +1124,8 @@ static struct
 	int smooth_turn;
 	float snap_angle;
 	float smooth_speed;
+	/* (OpenFrame) vr.seat_smooth_turn */
+	int seat_smooth_turn;
 	int standing;
 	float player_height;
 	float world_scale;
@@ -1295,6 +1303,7 @@ static void settings_read(void)
 	settings.smooth_turn = !strcmp(config_string("vr.turn"), "smooth");
 	settings.snap_angle = (float)config_real("vr.snap_turn_angle") * (float)M_PI / 180.0f;
 	settings.smooth_speed = (float)config_real("vr.smooth_turn_speed") * (float)M_PI / 180.0f;
+	settings.seat_smooth_turn = config_boolean("vr.seat_smooth_turn");
 	settings.standing = !strcmp(config_string("vr.height"), "standing");
 	settings.player_height = (float)config_real("vr.player_height");
 	settings.world_scale = (float)config_real("vr.world_scale");
@@ -4213,6 +4222,41 @@ void halo_vr_seat_drive(void)
 	vr.drive_told_valid = 1;
 }
 
+void halo_vr_seated(void)
+{
+	if (!vr.initialized)
+		return;
+	vr.seated_told = vr.presents;
+	vr.seated_told_valid = 1;
+}
+
+/* (OpenFrame) in a vehicle's seat, any (halo_vr_seated), told this frame or
+the last; or one placed or driven */
+static int seat_seated(void)
+{
+	return (vr.seated_told_valid && vr.presents - vr.seated_told <= HANDLEBAR_PLACED_FRAMES) || handlebars_active() ||
+		seat_drives();
+}
+
+/* (OpenFrame, vr.seat_smooth_turn) whether the turning stick turns smoothly
+this frame, its sideways push x: as vr.turn says, but in a vehicle's seat
+smoothly with snap turning on foot, and out of the seat still smoothly until
+the stick is back in the middle (below a snap's latch, 0.3), so a stick held
+as the player gets out does not snap at once */
+static int turn_smoothly(int seated, float x)
+{
+	if (settings.smooth_turn || !settings.seat_smooth_turn)
+	{
+		vr.seat_smooth = 0;
+		return settings.smooth_turn;
+	}
+	if (seated)
+		vr.seat_smooth = 1;
+	else if (vr.seat_smooth && fabsf(x) < 0.3f)
+		vr.seat_smooth = 0;
+	return vr.seat_smooth;
+}
+
 int halo_vr_seat_enabled(int kind)
 {
 	return vr.initialized && settings.controller_aim &&
@@ -5245,7 +5289,7 @@ static void input_update(void)
 		vr.body_yaw -= stick_steer_push(vr.input.left_stick[0]) * STICK_DRIVE_FASTEST * seconds;
 		turn = fabsf(stick_steer_push(vr.input.left_stick[0]));
 	}
-	if (settings.smooth_turn)
+	if (turn_smoothly(seat_seated(), x))
 	{
 		if (fabsf(x) > 0.2f)
 		{
