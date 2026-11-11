@@ -4717,7 +4717,8 @@ wheel does; let it come back and they straighten.
 - Take hold: squeeze each grip with the hand near its side of the wheel
   (within 30 cm of the wheel's grips: about 70 cm before your eyes and 25 cm
   below them, 29 cm apart), a tick in that hand; from then on that hand is
-  drawn on the wheel, closed about its rim, and turns with it.
+  drawn on the wheel, closed about its rim, and turns with it (turned as it
+  was when it took hold: `vr.vehicle_grip_angle`).
 - Steer: with both hands on, turn the wheel (the line from your left hand
   to your right, turned about the wheel's axis from where it was as you took
   hold) and the Warthog's front wheels turn a quarter as far, to their
@@ -5393,6 +5394,7 @@ the next start.
 | `vr.shoulders` | `"0.19, -0.20, -0.07"` | `HALO_VR_SHOULDERS` | With `vr.hands = "arms"`: where each shoulder is from the eyes, in metres: out to its side, up, forward, turned with the body (the holsters' heading: it faces where the head does, follows it past a 40 degree turn, and slowly). From the eyes as they would be with the head level and turned with the body: the shoulders hang from the neck, so a nod or a turn of the head does not move them. |
 | `vr.vehicle_view` | `"first_person"` | `HALO_VR_VEHICLE_VIEW` | `"first_person"`: in a vehicle's seat, the view is from the seated player's head, level with the horizon. `"third_person"`: the game's camera following the vehicle. |
 | `vr.warthog_steering` | `"wheel"` | `HALO_VR_WARTHOG_STEERING` | With `vr.aim = "controller"`, in a Warthog's driver seat: `"wheel"`, grip its wheel and turn it to steer, the view turning with the Warthog ("Driving a Warthog by its wheel"); `"look"`, it steers where the right controller points, the view turned by the stick. |
+| `vr.vehicle_grip_angle` | `true` | `HALO_VR_VEHICLE_GRIP_ANGLE` | With `vr.hands` not `"game"`: a hand gripping a vehicle's control (a Warthog's wheel, a Ghost's handlebars, a turret's handles) is drawn on its handle turned as it was when it took hold, turning with the control (its turn kept in the control's axes), until it lets go; `false`, in one pose along the control. |
 | `vr.ghost_steering` | `"handlebars"` | `HALO_VR_GHOST_STEERING` | With `vr.aim = "controller"`, in a Ghost's driver seat: `"handlebars"`, grip its handles and turn them to steer, the view turning with the Ghost ("Driving a Ghost by its handlebars"); `"look"`, it steers and aims where the right controller points, the view turned by the stick. |
 | `vr.scorpion_view` | `"feed"` | `HALO_VR_SCORPION_VIEW` | With `vr.vehicle_view = "first_person"`, in a Scorpion's driver seat: `"feed"`, you ride the body's climb in (and out), in the first person, into a closed cockpit inside the hull and see the world on a display all the way round you (true to size; the zoom within its front), the tank's hologram on the dash; `"hatch"`, you stand in the turret's hatch, the eye above the turret on its axis, seeing all about over the hull; `"inside"`, you sit in the driver's compartment at the front of the hull, seeing out through its vision blocks ("Driving a Scorpion"). |
 | `vr.comfort_vignette` | `true` | `HALO_VR_COMFORT_VIGNETTE` | The edges of the view dim a little while the view turns fast with a Ghost steered by its handlebars, or it speeds up or slows hard. |

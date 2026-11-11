@@ -755,6 +755,13 @@ static struct
 	struct halo_vr_seat seat;
 	float bars_wheel_zero[3];
 	int bars_held[2];
+	/* (OpenFrame, vr.vehicle_grip_angle) each hand's holds counted, the
+	hold whose turn is kept, and the hand's pointing and up then in the
+	control's axes (along it, to its left, up: held_hand_axes) */
+	unsigned long bars_grips[2];
+	unsigned long bars_grip_kept[2];
+	float bars_grip_forward[2][3];
+	float bars_grip_up[2][3];
 	float bars_turn;
 	float bars_pitch;
 	float bars_pitch_zero;
@@ -1162,9 +1169,10 @@ static struct
 	int melee_log;
 	int vehicle_first_person;
 	/* vr.ghost_steering = "handlebars", vr.warthog_steering = "wheel",
-	vr.comfort_vignette */
+	vr.vehicle_grip_angle, vr.comfort_vignette */
 	int handlebars;
 	int wheel;
+	int grip_angle;
 	int comfort_vignette;
 	/* vr.vignette (VIGNETTE_OFF, _VEHICLE, _ALWAYS) and vr.vignette_strength;
 	vr.sprint_mode (SPRINT_OFF, _TOGGLE, _ARM_SWING) and vr.sprint_speed;
@@ -1334,6 +1342,7 @@ static void settings_read(void)
 	settings.vehicle_first_person = strcmp(config_string("vr.vehicle_view"), "third_person") != 0;
 	settings.handlebars = strcmp(config_string("vr.ghost_steering"), "look") != 0;
 	settings.wheel = strcmp(config_string("vr.warthog_steering"), "look") != 0;
+	settings.grip_angle = config_boolean("vr.vehicle_grip_angle");
 	settings.comfort_vignette = config_boolean("vr.comfort_vignette");
 	settings.vignette_mode = !settings.comfort_vignette || !strcmp(config_string("vr.vignette"), "off") ? VIGNETTE_OFF :
 		!strcmp(config_string("vr.vignette"), "always") ? VIGNETTE_ALWAYS : VIGNETTE_VEHICLE;
@@ -4060,6 +4069,7 @@ static void handlebars_update(float seconds)
 			if (length3(v) < HANDLEBAR_REACH)
 			{
 				vr.bars_held[hand] = 1;
+				vr.bars_grips[hand]++;
 				hand_haptic(hand, 0.3f, 0.02f);
 				platform_log("vr: %s: the %s hand takes its handle (%.2f m from it, at %.2f %.2f %.2f m: forward, left, "
 					"up of the recentred head)", vr.seat.kind == HALO_VR_SEAT_WHEEL ? "wheel" : vr.seat.kind ==
@@ -4115,6 +4125,71 @@ static void handlebars_update(float seconds)
 		stick_steer_update(seconds, ease);
 		vr.bars_pitch -= vr.bars_pitch * ease;
 	}
+}
+
+/* (OpenFrame, vr.vehicle_grip_angle; after moistman42069's HAND LOCK,
+HaloCE-DecompRemix-VR's vr_vehicle_handles_hand_turn) a hand holding its
+handle, turned as it was when it took hold, with the control: `forward` and
+`up` come in as the hand's now (game axes from the recentred head; `now`:
+whether they are, the controller tracked) and go out as it is drawn. On the
+first frame drawn of a hold they are kept in the control's axes (the seat's
+handle_forward, handle_up and the left between them), then turned with it
+(the wheel's rim as it turns, a turret's handles). 0: drawn as the control
+is turned (the setting off, or no turn kept yet) */
+static int held_hand_axes(int hand, int now, float forward[3], float up[3])
+{
+	const float *along = vr.seat.handle_forward, *upright = vr.seat.handle_up;
+	float axes[3][3], f[3], u[3], length, dot;
+	int axis, a;
+
+	if (!settings.grip_angle || !vr.bars_held[hand])
+		return 0;
+	for (axis = 0; axis < 3; axis++)
+	{
+		axes[0][axis] = along[axis];
+		axes[2][axis] = upright[axis];
+	}
+	axes[1][0] = upright[1] * along[2] - upright[2] * along[1];
+	axes[1][1] = upright[2] * along[0] - upright[0] * along[2];
+	axes[1][2] = upright[0] * along[1] - upright[1] * along[0];
+	if (vr.bars_grip_kept[hand] != vr.bars_grips[hand])
+	{
+		if (!now)
+			return 0;
+		for (a = 0; a < 3; a++)
+		{
+			vr.bars_grip_forward[hand][a] = forward[0] * axes[a][0] + forward[1] * axes[a][1] + forward[2] * axes[a][2];
+			vr.bars_grip_up[hand][a] = up[0] * axes[a][0] + up[1] * axes[a][1] + up[2] * axes[a][2];
+		}
+		vr.bars_grip_kept[hand] = vr.bars_grips[hand];
+	}
+	for (axis = 0; axis < 3; axis++)
+	{
+		f[axis] = u[axis] = 0.0f;
+		for (a = 0; a < 3; a++)
+		{
+			f[axis] += axes[a][axis] * vr.bars_grip_forward[hand][a];
+			u[axis] += axes[a][axis] * vr.bars_grip_up[hand][a];
+		}
+	}
+	/* (kept of length 1 and at right angles) */
+	length = length3(f);
+	if (!(length > 0.5f))
+		return 0;
+	for (axis = 0; axis < 3; axis++)
+		f[axis] /= length;
+	dot = f[0] * u[0] + f[1] * u[1] + f[2] * u[2];
+	for (axis = 0; axis < 3; axis++)
+		u[axis] -= f[axis] * dot;
+	length = length3(u);
+	if (!(length > 0.5f))
+		return 0;
+	for (axis = 0; axis < 3; axis++)
+	{
+		forward[axis] = f[axis];
+		up[axis] = u[axis] / length;
+	}
+	return 1;
 }
 
 void halo_vr_seat_place(const struct halo_vr_seat *seat)
@@ -6373,15 +6448,21 @@ int halo_vr_refresh_tracking(struct halo_vr_view *view)
 		if (vr.bars_held[1])
 		{
 			memcpy(view->right_grip_position, vr.seat.handles[hand_controller(1)], sizeof(view->right_grip_position));
-			memcpy(view->hand_forward, along, sizeof(view->hand_forward));
-			memcpy(view->hand_up, upright, sizeof(view->hand_up));
+			if (!held_hand_axes(1, 1, view->hand_forward, view->hand_up))
+			{
+				memcpy(view->hand_forward, along, sizeof(view->hand_forward));
+				memcpy(view->hand_up, upright, sizeof(view->hand_up));
+			}
 		}
 		if (vr.bars_held[0])
 		{
+			if (!held_hand_axes(0, view->left_hand_valid, view->left_hand_forward, view->left_hand_up))
+			{
+				memcpy(view->left_hand_forward, along, sizeof(view->left_hand_forward));
+				memcpy(view->left_hand_up, upright, sizeof(view->left_hand_up));
+			}
 			view->left_hand_valid = 1;
 			memcpy(view->left_grip_position, vr.seat.handles[hand_controller(0)], sizeof(view->left_grip_position));
-			memcpy(view->left_hand_forward, along, sizeof(view->left_hand_forward));
-			memcpy(view->left_hand_up, upright, sizeof(view->left_hand_up));
 		}
 	}
 
@@ -6558,17 +6639,23 @@ int halo_vr_view(struct halo_vr_view *view)
 		if (vr.bars_held[1])
 		{
 			memcpy(view->right_grip_position, vr.seat.handles[hand_controller(1)], sizeof(view->right_grip_position));
-			memcpy(view->hand_forward, along, sizeof(view->hand_forward));
-			memcpy(view->hand_up, upright, sizeof(view->hand_up));
+			if (!held_hand_axes(1, 1, view->hand_forward, view->hand_up))
+			{
+				memcpy(view->hand_forward, along, sizeof(view->hand_forward));
+				memcpy(view->hand_up, upright, sizeof(view->hand_up));
+			}
 			view->right_trigger = 1.0f;
 			view->right_trigger_touch = 1.0f;
 		}
 		if (vr.bars_held[0])
 		{
+			if (!held_hand_axes(0, view->left_hand_valid, view->left_hand_forward, view->left_hand_up))
+			{
+				memcpy(view->left_hand_forward, along, sizeof(view->left_hand_forward));
+				memcpy(view->left_hand_up, upright, sizeof(view->left_hand_up));
+			}
 			view->left_hand_valid = 1;
 			memcpy(view->left_grip_position, vr.seat.handles[hand_controller(0)], sizeof(view->left_grip_position));
-			memcpy(view->left_hand_forward, along, sizeof(view->left_hand_forward));
-			memcpy(view->left_hand_up, upright, sizeof(view->left_hand_up));
 			view->left_grip = 1.0f;
 		}
 	}
