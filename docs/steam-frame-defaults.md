@@ -39,6 +39,7 @@ default.
 | `vr.weapon_haptics` | `1.0` | `1.0` | The Frame's controllers take OpenXR haptics | Their feel on the Frame is untested |
 | `vr.hrtf` | `true` | `true` | Directional sound in the headset's speakers | Its CPU cost on the Frame's 5 usable cores is unmeasured |
 | `vr.dominant_hand`, `vr.swap_sticks` | right, as the hand | right, as the hand | VR Setup > PLAYER... > DOMINANT HAND; `docs/openframe-features.md` "Left-handed" | none |
+| `game.blood_layers` | none (OpenFrame's key; the game lays every splat) | `6` | Splats of blood past six unfaded ones in one place are no redder, but each is its pixels blended again in both eyes; 6 is moistman42069's fork's choice for the Quest (`docs/openframe-features.md`, "Blood layers") | Unmeasured on the Frame; `0` gives the game's own blood, a smaller number thins piles of blood further |
 | `update.auto` | `true` | `false` (installer) | OpenH1's updater would replace this fork | none |
 | `TU_DEBUG` | unset | `sysmem` (wrapper; `OPENFRAME_SYSMEM=0` leaves it unset) | The GPU renders straight to memory instead of in tiles: about 10 fps more in the same rooms | Left as the sibling Frame ports have it |
 

@@ -2272,6 +2272,91 @@ void decal_new_from_collision(
 	return;
 }
 
+/* port: blood layers (game.blood_layers): a splat of blood is not laid where
+that many splats of blood, not yet faded, already lie within its radius, in
+its layer of the cluster it lands in. Blood on blood is solid after a few
+layers and no redder for the rest, and every layer more is its pixels blended
+again, in both eyes in VR. 0: every splat, as the game lays them. Ported from
+HaloCE-DecompRemix-VR by moistman42069 (AGPL-3.0-or-later), which carries
+HaloFreak95's build (Test72): its decal_blood_layers_full, rewritten here.
+Decals are only drawn (the frames' seed, in decal_new): nothing of the game's
+changes */
+
+/* the platform layer's (port/linux/src/port_config.c) */
+long config_integer(const char *name);
+unsigned long config_changes(void);
+
+/* whether a decal definition is blood: no field of the tag says so, so its
+name does, as the stock ones' do ("effects\decals\blood splats\...") */
+static boolean decal_definition_is_blood(
+	long decal_definition_index)
+{
+	char const *name= decal_definition_index!=NONE ? tag_get_name(decal_definition_index) : NULL;
+
+	return name && strstr(name, "blood")!=NULL;
+}
+
+/* whether a new decal landing at the collision is to be left out: blood
+where game.blood_layers splats of blood already lie */
+static boolean decal_blood_layers_full(
+	long decal_definition_index,
+	struct collision_result const *collision,
+	real radius_modifier)
+{
+	static unsigned long read_at= (unsigned long)-1;
+	static long layers= 0;
+	struct decal_definition *definition;
+	short cluster_index= collision->location.cluster_index;
+	long decal_index;
+	long count= 0;
+	real radius;
+
+	/* (read again when the settings change) */
+	if (read_at!=config_changes())
+	{
+		read_at= config_changes();
+		layers= config_integer("game.blood_layers");
+	}
+	if (layers<=0 || !decal_globals ||
+		cluster_index<0 || cluster_index>=MAXIMUM_CLUSTERS_PER_STRUCTURE ||
+		!decal_definition_is_blood(decal_definition_index))
+	{
+		return FALSE;
+	}
+
+	definition= decal_definition_get(decal_definition_index);
+	if (definition->layer<0 || definition->layer>=NUMBER_OF_DECAL_LAYERS)
+	{
+		return FALSE;
+	}
+	/* (the largest the new splat can be) */
+	radius= definition->radius_upper_bound*(radius_modifier==0.0f ? 1.0f : radius_modifier);
+	if (!(radius>0.0f))
+	{
+		return FALSE;
+	}
+
+	for (decal_index= decal_get_first_decal_index(cluster_index, definition->layer);
+		decal_index!=NONE;
+		decal_index= DECAL_GET(decal_index)->next_decal_index)
+	{
+		struct decal_datum *decal= DECAL_GET(decal_index);
+
+		/* (the map's own decals never count: only the fight's) */
+		if (!TEST_FLAG(decal->flags, _decal_permanent_bit) &&
+			decal->intensity>=128 &&
+			distance_squared3d(&decal->position, &collision->point)<radius*radius &&
+			(decal->definition_index==decal_definition_index ||
+				decal_definition_is_blood(decal->definition_index)) &&
+			++count>=layers)
+		{
+			return TRUE;
+		}
+	}
+
+	return FALSE;
+}
+
 void decal_new(
 	long decal_definition_index,
 	real_point3d const *origin,
@@ -2333,7 +2418,10 @@ void decal_new(
 			{
 				struct decal_definition *definition= decal_definition_get(decal_definition_index);
 
-				if (!TEST_FLAG(definition->flags, _decal_definition_water_effect_bit))
+				/* port: and not where enough blood lies (game.blood_layers) */
+				if (!TEST_FLAG(definition->flags, _decal_definition_water_effect_bit) &&
+					(permanent || editor_geometry ||
+						!decal_blood_layers_full(decal_definition_index, &collision, radius_modifier)))
 				{
 					decal_new_from_collision(decal_definition_index, &collision, velocity,
 						radius_modifier, permanent, forced_sequence_index, editor_geometry);

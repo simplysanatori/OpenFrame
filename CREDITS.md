@@ -40,6 +40,7 @@ The game's code is the Xbox build 2342 (`cachebeta.exe`), decompiled to C by the
   - Fists: punch, stagger and parry
   - Weapon pull, prop throw and hand swap
   - The wrist HUD and HUD modes
+  - Blood layers (`game.blood_layers`): HaloFreak95's work, as that fork carries it
 
   That fork's own credits (to LivingFray's HaloCEVR, to the OpenCE fork by jcompto95-tech, to Mjolnir VR by Cesarus85 for the Frame findings, to ChupathingyCE and others) are in its `CREDITS.md`; they carry over to what is ported.
 - **[thelinkin3000/halo-ce-universal](https://github.com/thelinkin3000/halo-ce-universal)** (thelinkin3000): an OpenCE fork with Android, Turnip, Nintendo Switch and PlayStation 5 ports. Prior Turnip work on the road to this one, and a contributor to OpenH1.
