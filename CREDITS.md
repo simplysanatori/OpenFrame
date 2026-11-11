@@ -38,6 +38,7 @@ The game's code is the Xbox build 2342 (`cachebeta.exe`), decompiled to C by the
   - Third person on foot
   - Slide, wall jump and wall run
   - Fists: punch, stagger and parry
+  - Shot deflection: the gun's block and the swing
   - Weapon pull, prop throw and hand swap
   - The wrist HUD and HUD modes
 

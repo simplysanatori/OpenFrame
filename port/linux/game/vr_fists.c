@@ -91,6 +91,8 @@ boolean vr_render_hand_world(const float place[3], const float direction[3], rea
 /* vr_grab.c's: what it has for the hands' grips, and its tick */
 void vr_grab_hands_claims(int claim[2]);
 void vr_grab_hands_tick(struct halo_vr_hands const *hands, long unit_index);
+/* vr_deflect.c's: the hands for shot deflection */
+void vr_deflect_tick(struct halo_vr_hands const *hands, long unit_index);
 
 /* the fist (metres): its radius, and how near a body its path need pass
 beyond that (an assist: the game's body is a pill about the bones); the
@@ -610,7 +612,8 @@ boolean vr_fists_parry(long victim_index, long attacker_index)
 
 /* game.c, once a tick, after the players' update before the game: the
 hands told and asked (halo_vr_hands), the punches and the parry's swipes,
-then the grab's pull, props and hand swap (vr_grab.c) */
+then shot deflection's hands (vr_deflect.c) and the grab's pull, props and
+hand swap (vr_grab.c) */
 void vr_hands_tick(void)
 {
 	struct halo_vr_hands hands;
@@ -694,6 +697,7 @@ void vr_hands_tick(void)
 		if (valid[hand])
 			fists.hand[hand] = points[hand];
 	}
+	vr_deflect_tick(&hands, allowed ? unit_index : NONE);
 	vr_grab_hands_tick(&hands, allowed ? unit_index : NONE);
 }
 
