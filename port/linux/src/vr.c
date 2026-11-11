@@ -125,7 +125,9 @@ until it is under HANDS_GRIP_RELEASED. The weapon passes to the other hand
 as that hand's grip closes with the palms within HAND_SWAP_DISTANCE and the
 weapon's grip open (under HANDS_GRIP_RELEASED); both grips are then nothing
 until both are let go. (Metres and metres a second; HaloCE-DecompRemix-VR's
-tuning, by moistman42069, AGPL-3.0-or-later.) */
+tuning, by moistman42069, AGPL-3.0-or-later.) In a game not this computer's
+alone (online, split screen, with bots), where the fists do not hit, a
+punch is the game's melee instead (fist_melee). */
 #define HANDS_SAMPLES 16
 #define HANDS_VELOCITY_SECONDS 0.03f
 #define FIST_REARM_SPEED 1.0f
@@ -138,6 +140,9 @@ tuning, by moistman42069, AGPL-3.0-or-later.) */
 /* a melee's hit (halo_vr_melee_hit): a knock in the right controller */
 #define MELEE_HIT_AMPLITUDE 0.8f
 #define MELEE_HIT_SECONDS 0.06f
+/* (OpenFrame) ... in the hand that pressed the melee, if it landed within
+this of the press (GetTickCount's milliseconds), else the weapon's */
+#define MELEE_HIT_RECENT_MS 1000
 /* holding both grips this long recentres, or a gamepad's Back (View) */
 #define RECENTRE_SECONDS 0.75f
 /* (OpenFrame, vr.auto_recentre) how many frames the aim is let go before
@@ -843,6 +848,10 @@ static struct
 	int fist_swinging[2];
 	unsigned long fist_swings[2];
 	int fist_punch[2];
+	/* (OpenFrame) a punch as the game's melee (fist_melee): the swing that
+	pressed it, and when the hand was last kept from punching (GetTickCount) */
+	unsigned long fist_melee_swing[2];
+	unsigned long fist_busy_ticks[2];
 	float hands_peak[2];
 	float hands_peak_velocity[2][3];
 	int hands_grip_down[2];
@@ -939,6 +948,10 @@ static struct
 	unsigned long melee_release;
 	unsigned long melee_ticks;
 	unsigned long melee_guard_ticks;
+	/* (OpenFrame) the hand the last melee was pressed by (1 the weapon's
+	swing, 0 the other's punch: fist_melee), whose controller its hit
+	knocks */
+	int melee_by_hand;
 	/* the right hand's speed at the last frame (metres a second: from the
 	melee's samples, for holsters_update) */
 	float hand_speed;
@@ -3584,6 +3597,7 @@ static void melee_update(float seconds)
 	vr.melee_fired = 1;
 	vr.melee_ticks = now;
 	vr.melee_release = now + MELEE_PRESS_MS;
+	vr.melee_by_hand = 1;
 	platform_log("vr: melee: a swing of %.2f m/s over %.2f m%s", speed, vr.melee_travel,
 		grip ? ", the grip held" : "");
 }
@@ -3593,7 +3607,9 @@ void halo_vr_melee_hit(void)
 {
 	if (!vr.initialized)
 		return;
-	hand_haptic(1, MELEE_HIT_AMPLITUDE, MELEE_HIT_SECONDS);
+	/* (a punch's melee, just pressed, in the punching hand: fist_melee) */
+	hand_haptic(GetTickCount() - vr.melee_ticks < MELEE_HIT_RECENT_MS ? vr.melee_by_hand : 1, MELEE_HIT_AMPLITUDE,
+		MELEE_HIT_SECONDS);
 	if (settings.melee_log)
 		platform_log("vr: melee: it landed");
 }
@@ -4908,6 +4924,43 @@ static int hands_left_free(void)
 		!vr.flip_grip[0] && !CLIMB_BUSY(0);
 }
 
+/* (OpenFrame) a punch in a game not this computer's alone (online, split
+screen, with bots: vr_fists.c's punches are a game of this computer alone's)
+is the game's melee: B pressed for MELEE_PRESS_MS, as the right hand's swing
+presses it (vr.melee_gesture: melee_update), so that it is the game's own
+input, predicted and sent as the button is. Once a swing; not within
+MELEE_INTERVAL_MS of the last melee by either (a punch and a swing of the
+weapon together melee once), nor within MELEE_GUARD_MS of the hand's other
+uses (the foregrip, a magazine, a grenade, a holster, a lift: fist_busy_ticks)
+or of a throw or a reload (melee_guard_ticks), nor PRESS_NO_MELEE_MS after a
+press of a control; nor going back toward the body (its velocity backward,
+along where the head faces, more than MELEE_BACKWARD of it: a reach for a
+pouch, as melee_update has it). Velocity: game axes, metres a second */
+static void fist_melee(int hand, const float velocity[3], float speed)
+{
+	static const float backwards[3] = { 0.0f, 0.0f, -1.0f };
+	unsigned long now = GetTickCount();
+	float v[3], forward[3], level;
+
+	if (vr.fist_melee_swing[hand] == vr.fist_swings[hand] || now - vr.melee_ticks < MELEE_INTERVAL_MS ||
+		now - vr.fist_busy_ticks[hand] < MELEE_GUARD_MS || now - vr.melee_guard_ticks < MELEE_GUARD_MS ||
+		(vr.press_ticks && now - vr.press_ticks < PRESS_NO_MELEE_MS) || speed <= 0.0f)
+	{
+		return;
+	}
+	quaternion_rotate(vr.views.head.orientation, backwards, v);
+	game_axes(v, vr.origin_yaw, forward);
+	level = sqrtf(forward[0] * forward[0] + forward[1] * forward[1]);
+	if (level > 0.0f && -(velocity[0] * forward[0] + velocity[1] * forward[1]) / level / speed > MELEE_BACKWARD)
+		return;
+	vr.fist_melee_swing[hand] = vr.fist_swings[hand];
+	vr.melee_ticks = now;
+	vr.melee_release = now + MELEE_PRESS_MS;
+	vr.melee_by_hand = hand;
+	platform_log("vr: melee: a punch of the %s hand at %.2f m/s (a game not this computer's alone: the game's "
+		"melee)", hand ? "weapon's" : "other", speed);
+}
+
 /* once a frame, after reload_update (a pouch's grip is the magazine's) and
 before two_handed_update and throw_update (which the hands' take keeps off
 the left grip) */
@@ -4917,6 +4970,7 @@ static void hands_update(float seconds)
 	float inverse[4] = { -head->orientation[0], -head->orientation[1], -head->orientation[2],
 		head->orientation[3] };
 	int able = settings.controller_aim && vr.aimed && vr.crouch_able_frame && !vr.menus && vr.origin_valid;
+	unsigned long now = GetTickCount();
 	unsigned int sample;
 	int hand, axis;
 
@@ -4994,7 +5048,8 @@ static void hands_update(float seconds)
 
 	/* the swings: a punch while past vr.fist_speed (the left hand free, the
 	right only empty), the fastest of each hand kept for the game (a parry's
-	swipe: not the left on the foregrip) */
+	swipe: not the left on the foregrip); in a game not this computer's
+	alone, the game's melee (fist_melee) */
 	for (hand = 0; hand < 2; hand++)
 	{
 		float velocity[3], from_head[3], speed;
@@ -5004,11 +5059,14 @@ static void hands_update(float seconds)
 		{
 			vr.fist_swinging[hand] = 0;
 			vr.fist_punch[hand] = 0;
+			vr.fist_busy_ticks[hand] = now;
 			continue;
 		}
 		speed = length3(velocity);
 		allowed = hand == 0 ? hands_left_free() && !vr.hands_taken[0] :
 			vr.hands_unarmed && !vr.holster_gripped && !vr.grab_gripped && !vr.flip_grip[1] && !CLIMB_BUSY(1);
+		if (!allowed)
+			vr.fist_busy_ticks[hand] = now;
 		if (speed > vr.hands_peak[hand] && speed <= FIST_FASTEST && (hand == 1 || !vr.two_handed))
 		{
 			vr.hands_peak[hand] = speed;
@@ -5028,6 +5086,8 @@ static void hands_update(float seconds)
 			length3(from_head) >= FIST_CARRIED * speed)
 		{
 			vr.fist_punch[hand] = 1;
+			if (!vr.hands_local_game)
+				fist_melee(hand, velocity, speed);
 		}
 	}
 }
