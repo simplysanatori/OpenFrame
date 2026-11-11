@@ -81,6 +81,18 @@ port change), the hands from `port/linux/src/vr.c`.
 - Where: the first player, on foot, alive, the controllers aiming, in a game
   of this computer alone (never online, split screen or with bots); enemies
   only (no allies).
+- Elsewhere (online, split screen, with bots): a punch, as above (past
+  `vr.fist_speed`, the hand free, not carried by the head), is the game's
+  melee, pressed as B is (`fist_melee` in `port/linux/src/vr.c`, the path
+  `vr.melee_gesture`'s swing takes): the game's own input, predicted and
+  sent as the button is, nothing of the fists' own (no blow, stagger or
+  parry). Once a swing; not within 0.6 s of the last melee by either hand
+  (a punch and a swing of the weapon together melee once), nor within
+  0.4 s of the hand holding the foregrip, a magazine, a grenade or a
+  holster's grip, of a throw or a reload, or of a press of a control; nor
+  a hand drawn back toward the body (a reach for a pouch), as for the
+  weapon's swing. Its hit knocks the punching hand. No setting of its own:
+  `vr.fists` on is this.
 - Not carried over: moistman42069's lunges, combos, counters and their
   warnings, takedowns, blocks, combat moves, hit highlights, knockdowns
   (ragdolls on Jolt) and body contact on the bones: the body here is the
