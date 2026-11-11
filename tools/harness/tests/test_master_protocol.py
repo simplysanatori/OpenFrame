@@ -16,6 +16,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 from harness import CHECK_FAILED, ROOT, build, constant, enum_with, function, mutated, read, run, structure  # noqa: E402
+from harness import skip_without_32_bit_abi  # noqa: E402
 
 HERE = Path(__file__).resolve().parent
 CHECKOUT_VECTORS = ROOT.parent / "opence-master-server" / "testdata" / "vectors.json"
@@ -83,6 +84,9 @@ NEGATIVE_CONTROLS = {
     "masters-default-key": (('"ed25519:89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225aa"',
                              '"ed25519:89f4eda71229f11f3538679f49ef7fb0c2b407b380093f7f4fe02105b92225ab"'),
                             "master_list_read_defaults", "masters-default"),
+    "masters-own-default-key": (('"ed25519:120f7635fe754e327cae95480d847aa57b8b23a9bb362b3d6080bfdd21399684"',
+                                 '"ed25519:120f7635fe754e327cae95480d847aa57b8b23a9bb362b3d6080bfdd21399685"'),
+                                "master_list_read_defaults", "masters-default"),
     "masters-json-unbounded": (("for (index = 0; count < maximum && server_json_element",
                                 "for (index = 0; server_json_element"), "master_list_read_json", "masters-json"),
     "list-taken-unchecked": (("p2p_sha256(key, MASTER_LIST_KEY_SIZE, digest);\n\tp2p_hex(digest, 8, key_id);",
@@ -290,6 +294,13 @@ def test_vectors_copy():
         f"the master's vectors changed: copy {CHECKOUT_VECTORS} to {COPIED_VECTORS}"
 
 
+# what only the game's 32-bit ABI shows (harness.NATIVE_64_BIT)
+ABI_DEPENDENT = {
+    "listing-signs-less": ("the fault leaves the signed data's last byte as the stack had it, which differs from the "
+                           "signed byte in the game's ABI but not in a 64-bit one"),
+}
+
+
 @pytest.mark.parametrize("case", [pytest.param(case, marks=pytest.mark.xfail(reason=DISAGREEMENTS[case], strict=True))
                                   if case in DISAGREEMENTS else case for case in CASES])
 def test_case(case):
@@ -300,5 +311,6 @@ def test_case(case):
 @pytest.mark.parametrize("control", NEGATIVE_CONTROLS)
 def test_negative_control(control):
     fault, faulty_function, case = NEGATIVE_CONTROLS[control]
+    skip_without_32_bit_abi(ABI_DEPENDENT, control, case)
     status, output = run(build("master_protocol", generated(fault, faulty_function)), case)
     assert status == CHECK_FAILED, f"the code with a fault ({control}) passed '{case}': the test cannot see it"

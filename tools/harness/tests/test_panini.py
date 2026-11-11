@@ -55,6 +55,12 @@ CONTROLS = [
 ]
 
 
+def _model_slider(key: str) -> str:
+    """the model's slider row of the key (port/assets/menus/model, which menu_functions.c's sliders are made from):
+    its element's line"""
+    model = read("port/assets/menus/model/settings.xml")
+    return next(line for line in model.splitlines() if f'<row key="{key}" kind="slider"' in line)
+
 def generated(fault=None):
     projection = read(PROJECTION)
     game = read(GAME)
@@ -106,7 +112,7 @@ def test_the_hud_and_the_weapon_take_it():
     # middle's magnification, the weapon's projection widened by it, the pass after the anti-aliasing
     assert "if (panini_view_to_screen(camera, frustum, view_point, screen_point, &result))" in \
         read("source/render/render_cameras.c")
-    assert "\t\t\trender_fov_reticle_scale(render.local_player_index) * panini_center_scale() :" in \
+    assert "\t\t\trender_fov_scope_piece_scale(render.local_player_index) * panini_center_scale() :" in \
         read("source/interface/hud_draw.c")
     # (the weapon's reticle at the unzoomed view's magnification, kept through a zoom: #594)
     assert "panini_center_scale_widened(reticle_widenings[local_player_index] > 0.0f ?" in \
@@ -123,7 +129,8 @@ def test_the_settings():
     # (off by default: its strength 0)
     assert '{ "display.panini", _config_real, "0.0", "HALO_PANINI",' in config
     assert '{ "display.panini_vertical", _config_real, "0.0", "HALO_PANINI_VERTICAL",' in config
-    menu = read("port/linux/game/menu_functions.c")
-    assert '{ "op_panini", "display.panini", 0.0, 1.0, 0.25, 0.0, 1.0, FALSE, SLIDER_STOPS(settings_panini_stops) },' \
-        in menu
-    assert '{ "op_panini_vertical", "display.panini_vertical", 0.0, 1.0, 0.05, 0.0, 1.0,' in menu
+    row = _model_slider("panini")
+    assert 'setting="display.panini"' in row and 'least="0" most="1" step="0.25" typed_least="0" typed_most="1"' in row
+    row = _model_slider("panini_vertical")
+    assert 'setting="display.panini_vertical"' in row and \
+        'least="0" most="1" step="0.05" typed_least="0" typed_most="1"' in row

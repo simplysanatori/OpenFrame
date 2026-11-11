@@ -35,6 +35,9 @@ enum halo_keyboard_action
 	HALO_KEYBOARD_SCOREBOARD,
 	HALO_KEYBOARD_PAUSE,
 	HALO_KEYBOARD_SCREENSHOT,
+	/* (Save Report's, which the game itself does not read: port/linux/src/
+	report.c) */
+	HALO_KEYBOARD_REPORT,
 	/* (voice chat's, which the game itself does not read:
 	halo_push_to_talk_held) */
 	HALO_KEYBOARD_PUSH_TO_TALK,
@@ -49,6 +52,12 @@ enum halo_keyboard_action
 	network_votekick.c, read with the chat's keys) */
 	HALO_KEYBOARD_VOTE_YES,
 	HALO_KEYBOARD_VOTE_NO,
+	/* (the clip key's, which the game itself does not read: the demo being
+	recorded marked, port/linux/game/demo.c) */
+	HALO_KEYBOARD_CLIP,
+	/* (a ping's, which the game itself does not read: what the player aims
+	at marked for their allies, port/linux/game/network_markers.c) */
+	HALO_KEYBOARD_PING,
 	NUMBER_OF_HALO_KEYBOARD_ACTIONS
 };
 
@@ -99,6 +108,11 @@ enum halo_chat_pad_button
 };
 
 unsigned long halo_chat_pad_buttons(void);
+/* the stock layouts' ping, D-pad Right, pressed on the port's controller
+since it was last asked (a custom layout's is its PING:
+port/linux/game/network_markers.c); while pings can be sent the game gets
+none of that direction (network_markers_pad_open) */
+int halo_ping_pad_pressed(short port);
 /* Raw physical snapshot: suppress the button which opened controller chat. */
 unsigned long halo_chat_pad_buttons_for_port(short port);
 

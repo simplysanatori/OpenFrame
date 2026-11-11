@@ -28,7 +28,8 @@ enum world_proxies_source_class
 	_world_proxies_source_none, /* projectiles, sound scenery, no model */
 	_world_proxies_source_biped, /* capsules on the limbs, the torso; spheres */
 	_world_proxies_source_vehicle, /* up to 4 boxes and the wheels' spheres */
-	_world_proxies_source_box, /* scenery, items, devices: one box */
+	_world_proxies_source_box, /* scenery, items, devices: one box (of its collision
+		geometry, else of what it draws opaque) */
 	_world_proxies_source_sphere, /* anything else: its bounding sphere */
 	NUMBER_OF_WORLD_PROXIES_SOURCE_CLASSES
 };
@@ -64,11 +65,17 @@ struct world_proxies_source
 	/* the bounding sphere, in the model's space */
 	float bounding_center[3];
 	float bounding_radius;
+	/* a box definition with no collision geometry: the bounds of what its
+	model draws opaque (its most detailed geometry, its regions' first
+	permutations), in node 0's space; drawn 0 when it draws nothing
+	opaque (glass, a glowing marker, an effect) or can't be read */
+	short drawn;
+	float drawn_bounds[2][3];
 	struct world_proxies_source_node nodes[WORLD_PROXIES_SOURCE_MAXIMUM_NODES];
 };
 
-/* a vehicle's occlusion field drawn now (world_sdf.h's struct
-world_sdf_object, docs/world-ao.md "Dynamic objects"), as the window places
+/* an object's occlusion field drawn now (world_sdf.h's struct
+world_sdf_object, docs/world-ao.md "The objects' occlusion fields"), as the window places
 it on node 0: its first voxel's centre and the voxel, in node 0's space; its
 voxels along x, y, z; its reach from the grid's middle, in voxels; its
 place in the GPU's atlas of them and the atlas's size, in texels; its

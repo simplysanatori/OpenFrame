@@ -74,7 +74,9 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   standing on a loading zone is told it waits for the host. A player
   outside the loaded BSP and falling for two seconds is brought back beside
   the host, else a teammate. A dead
-  player watches a living teammate (`coop_spectate.c`) and comes back
+  player watches a living teammate, through their eyes
+  (`dead_spectate.c`, `game.spectate_on_death`, drawn from this machine's
+  copy of the world: nothing is sent) or from behind (`coop_spectate.c`), and comes back
   beside one once it is safe. With everyone dead they come back where they
   were at the last checkpoint, without a revert. A mission the scripts fail
   with players still alive reverts to the last checkpoint on the host, as a
@@ -158,9 +160,22 @@ with ideas from VALORANT's netcode articles, keeping the 30 Hz tick:
   difference between the platforms' phases to its current height, when that
   difference is within 4 world units (the platform's travel over a round
   trip); a greater one, jumps, leaving the platform and authoritative
-  teleports correct normally. Rider carry uses the platform's current
-  collision displacement, including phase corrections, rather than its
-  previous tick's displacement (network version 30).
+  teleports correct normally. The other players standing on an elevator
+  on a client are corrected so too: across, their height kept on the
+  client's floor, the host's word having them on the host's floor (until
+  then each was pulled toward it every tick, the floor putting it back, and
+  drawn gliding from where it was, those glides adding up: in a co-op ride
+  down b40's lift at 120, the host's player drawn as much as 0.6 world
+  units over the client's platform, at 60 0.29 with steps of 0.13 from one
+  frame to the next, at 30 jumping by 0.07 to 0.11). A player stands on the
+  elevator where its physics found it among what it touched this tick
+  (`elevator_ticks` at 60) and is not airborne: not by its support surface,
+  a structure BSP's, which on a machine's floor is none (that test had kept
+  the client's own player's exception from ever applying). Rider carry
+  uses the platform's current collision displacement, including phase
+  corrections, rather than its previous tick's displacement (network
+  version 30). None of this changes what the machines send or agree on:
+  the host decides, and only a client's copies keep their floors.
 - **Shooter's hits.** A client reports what its own players hit; the host
   checks the report (the player's, a weapon they carry, fired from within
   its reach, the target where the host had it when the shooter saw it, no
@@ -379,7 +394,9 @@ off, as Classic has it), read in the lobby as the pickup's way is, so that
 every OpenH1 machine turns a player's body as the host does
 (`network_standard_turns_with_aim`): the turn moves where shots go and
 what the campaign's AI sees. A Legacy game's players, and an OpenCE
-machine's in a mixed game, always turn, as OpenCE's machines turn them.
+machine's in a mixed game, always turn, as OpenCE's machines turn them;
+version 20 sends the players' pings (distributed messages 139 and 140,
+`_distributed_message_marker_up` and `_down`, reliably: below, "Pings").
 With no new version, each client then tells the
 host its build (distributed message 92, `_distributed_message_client_build`,
 reliably once a game after its ready, over its connection alone): its
@@ -643,9 +660,9 @@ list names the chosen game's kind: "OpenH1 60 Tick, OpenCE can join" (a
 mixed game, below), "OpenH1 60 Tick" or "Legacy".
 
 How OpenH1 machines recognise each other in an OpenH1 game that OpenH1
-players alone join (`network.allow_opence` false; by default OpenCE players
-join an OpenH1 game too, advertised as below, "OpenCE players in an OpenH1
-game"):
+players alone join (`network.allow_opence` false, the default; with it on,
+OpenCE players join an OpenH1 game too, advertised as below, "OpenCE players
+in an OpenH1 game"):
 
 - The advertisement's version word carries the OpenH1 protocol version
   (above), and the reserved byte after the game's kind
@@ -1147,9 +1164,92 @@ in an OpenH1 game of several sub-steps a tick (`network_distributed.c`,
   came out of order).
 
 Each costs a client, at 120, 90 states a second for each player near it (30
-at 60), about 3.3 KB/s a player at 120 (1.1 at 60) and 10 bytes a message.
-Nothing changes in a Legacy game, at 30, or for an OpenCE machine (sent no
-message of 120 and after) or an OpenCE player's state.
+at 60), and 10 bytes a message. Nothing changes in a Legacy game, at 30, or
+for an OpenCE machine (sent no message of 120 and after) or an OpenCE
+player's state.
+
+From protocol version 22 a sub-step's state is written as its difference
+from the tick's state the host last sent that client of the player
+(`distributed_substep_state_write`), not whole: the player, the host's ticks
+since that state (at most 7), the client's tick's difference in a byte, the
+position's in 16 bits a part of 1/4096 of a world unit (rounded: an 8192th
+off at most, where a client corrects another player only past a twentieth),
+and the velocity's and the facing's in a byte a part, each part whole where
+its difference does not fit, and the up where it is not the tick state's.
+A sub-step's state carries nothing else the client takes from it (a death,
+a spawn, a seat and the shields wait for the tick's state, as before). Where
+there is no such tick's state (none sent, another unit, older than 7 ticks,
+further than 8 world units away, or the client's tick further than a byte),
+the state goes whole as before, after a byte that says so. A client keeps
+the host's last 8 ticks' states of each player
+(`distributed_taken_substep_bases`) and passes over a difference from one
+it has not (lost), until the tick's state.
+
+A state of a sub-step was 37 bytes on average, and is 17.6 (16 on foot and
+turning slowly). Forty players on Blood Gulch at 120 (8 clients and 32 of
+the host's bots, 60 s): the states of the sub-steps 504 KB/s of the host's
+1,139 KB/s before, 249 KB/s of 895 KB/s after, the datagrams on the wire
+1.24 MB/s and 1.00 MB/s (-20%). Over 20 ms ±3 each way, three games of each
+build in turn, the players near a client (within 25 world units) were where
+the host had them within 0.16 to 0.17 world units (p95) before and 0.16 to
+0.18 after, aimed within 14.9 to 17.9 degrees and 13.9 to 16.0, a press
+seen from one client to another in 50 to 52 ms and 49 to 57, and a hit dealt
+in 26 ms and 25 to 26: the games' spread, not the builds'.
+
+### Tick states as differences
+
+From protocol version 23 an OpenH1 game's host sends its OpenH1 clients each
+tick's states of the players as their differences from states the client
+says it took (`_distributed_message_unit_state_differences`, in place of
+`_distributed_message_unit_states`; `network_distributed.c`'s
+`distributed_unit_difference_write`), not whole. A Legacy game, and what an
+OpenCE machine is sent, are as before.
+
+- **On a grid.** The host's states as its OpenH1 clients have them are on a
+  grid of 1/4096 of a world unit (`distributed_unit_state_snap`: an 8192th
+  off at most, where a client corrects another player only past a
+  twentieth), so a difference and the whole state come to the same state,
+  whatever state the difference is from. The host keeps its last 32 ticks'
+  states of each player so (`distributed_tick_states`), once for every
+  client, and the last 4 ticks it sent each client each player.
+- **The client's word.** A client's input (its byte that was padding) says
+  how many of the host's ticks before `host_time` the latest is whose states
+  it took, or 255: none, or a difference came from a state it has not (lost),
+  until a later tick's are all known. The host writes each difference from
+  the latest state of the player it sent that client at a tick no later than
+  that one, within 32 ticks; with none (or 255), whole.
+- **A difference** is the player, the host's ticks since the state it is
+  from, and which parts differ (16 bits): the flags, the killer, the unit,
+  the vehicle and seat, the position (its steps on the grid, 16 bits a part),
+  the velocity and the facing (a byte a part where the change fits, else
+  whole), the up, the client's tick (a byte, else whole), the shields and
+  health, the damage they show, the powerups, the camouflage. A part the
+  whole state leaves at its default (a dead player's position) is not
+  compared. A teleport further than 8 world units, a state with a velocity
+  at full precision, or no state to be from, goes whole after a byte that
+  says so.
+- **Read.** A client keeps the states it took of the host's last 32 ticks of
+  each player (`distributed_unit_bases`), reads a difference against the one
+  it names and takes the result as the whole state would have been (written
+  and read back); a difference from one it has not is passed over, and the
+  next input asks for them whole. The sub-steps' states are written against
+  these states as before ("States at the sub-steps").
+
+A player's tick state was 35 bytes on foot, and its difference is 14 to 18
+from the tick before (5 of its own, the position 6, the velocity, facing and
+client's tick 7). Forty players on Blood Gulch (8 clients and 32 of the host's
+bots, 60 s, after version 22): the tick states 245 KB/s before and 156 KB/s
+after at 120 (120 KB/s of differences, and 36 KB/s still of
+`_distributed_message_unit_states`, to machines the host does not take for
+OpenH1 clients), the host's datagrams 1.00 MB/s and 0.90 MB/s on the wire (-10%);
+at 60, from before version 22, 0.80 MB/s and 0.64 MB/s (-20%). Over 20 ms ±3
+each way the players near a client were where the host had them within 0.17
+world units (p95; 0.16 to 0.18 before), aimed within 14.6 to 15.4 degrees
+(13.9 to 17.9), a press seen from one client to another in 50 to 56 ms (49 to
+57); with 1% of the datagrams lost too, within 0.17 and 14.8 to 14.9 degrees,
+the host's datagrams 0.92 to 0.96 MB/s (the whole states the lost ones asked
+for). At 30 (16 players) the states go as differences too, with the clients'
+players where the host has them as before.
 
 ### Actors to far clients
 
@@ -1185,6 +1285,22 @@ wandering the beach's fight, 51 seconds), the host sent the client 100.0 KB/s
 on average (`network test: bandwidth`), 63.3 KB/s of it actors' states
 (`network test: actors to clients`): the presses 1.0 KB/s of those, the aims
 1.8 KB/s, so 97.2 KB/s before (2.9% more).
+
+From protocol version 24 an OpenH1 game's host sends its OpenH1 clients the
+actors' states without the parts at their defaults
+(`_distributed_message_actor_states_compact`, `network_actors.c`'s
+`actor_state_compact_write`), in place of the whole 88-byte structure: the
+unit, its flags, animation state, aiming speed and team, its aim, shields
+and health, where it is and which way it faces always (36 bytes), and each
+of the rest only where any of its values is not its default (the vehicle and
+seat, an impulse, a speech, a custom animation, fleeing, camouflage, a look
+or a facing not along its aim, an up not straight up, a velocity, the sticks,
+the control flags, the trigger). The structure read is the one written, byte
+for byte. A Legacy game, and an OpenCE machine, take the whole structure as
+before. On b30 (the host and three clients, the scripted player, 60 s) the
+actors' states were 288 KB/s at 60 and 297 at 120, and are 153 and 150
+(about 45 bytes each), the host's datagrams 0.46 and 0.48 MB/s, now 0.32 and
+0.31 (-31% and -35%, with version 23's tick states).
 
 ### Remote players drawn from the newest sub-steps
 
@@ -1227,8 +1343,11 @@ at 30, single player and split screen are drawn as before.
 
 ### OpenCE players in an OpenH1 game
 
-An OpenH1 game's host takes OpenCE players too (`network.allow_opence`,
-on by default: a mixed game; `port/linux/game/network_standard.c`). The
+An OpenH1 game's host takes OpenCE players too with `network.allow_opence`
+on (a mixed game; `port/linux/game/network_standard.c`). It is off by
+default: an OpenH1 game is OpenH1 players' alone, advertised with OpenH1's
+own protocol version (an OpenH1 build of another version is told so, not
+joined at 30), and a Legacy game is the one to play with OpenCE players. The
 server browser and the LAN list say so ("OpenH1 60 Tick, OpenCE can join"),
 and Server Setup's GAME choices. Each player plays
 at their own rate: OpenCE players at 30, as in a Legacy game, and OpenH1
@@ -1412,6 +1531,57 @@ machine:
   is OpenH1 protocol version 10. They change in a game only when no OpenCE
   machine is in it, as a team move does; otherwise, and in a Legacy game,
   they wait for the next game's lobby. A Legacy game is sent nothing new.
+
+### Pings
+
+A player pings what they aim at (`controls.ping`, the middle mouse button;
+a controller's PING in Button Remapping, D-pad Right with the stock layouts):
+a nav point over it for their allies, the campaign's arrow
+(`hud_nav_points.c`'s `custom_render_nav_point`) with its distance, in the
+player's colour (their team's, or in co-op their profile's) and with their
+name, seen through walls (the arrow's occluded look), for 8 seconds and then
+faded. A ping of a unit, a vehicle, a weapon or equipment follows it; else
+it marks the point the aim hits. A player has one ping: a new one takes the
+last's place, and the same thing or a point within about 5 meters of the
+last takes it away (`port/linux/game/network_markers.c`). Pings are played
+in co-op and in games with teams (split screen's too, but never one player's
+alone on a computer), never in a game without teams, and are nothing of the simulation's: each machine
+keeps them by its own clock, so a recorded game replays the same without
+them.
+
+In a network game they are OpenH1's own (OpenH1 protocol version 20), sent
+only in an OpenH1 game (`network_standard_agreed_rate`): a Legacy game sends
+none, and an OpenCE machine of a mixed game is sent none
+(`network_standard_message_goes_to`; the host also sends only to machines
+that joined with an OpenH1 token), so nothing changes for one. Only the host
+decides:
+
+- A client sends its player's ping to the host
+  (`_distributed_message_marker_up`, 139, reliably): a format byte, the
+  player, whether it is of an object or a point, the object (every machine
+  has the host's units, vehicles, weapons and equipment at the same index:
+  "Stage 3") and the point.
+- The host takes it only over the client's stream, whole, from one of that
+  machine's players with a living unit, at most 3 at once and one each 1.2
+  seconds after, a point inside the world (no NaN) within 400 world units of
+  the player's unit, and an object that is there and of those kinds (else
+  the point). It decides whether the ping takes the player's last away, and
+  sends the ping or its clearing (`_distributed_message_marker_down`, 140,
+  reliably) to each OpenH1 client machine with a player who sees it (the
+  pinger's team; everyone in co-op), as it shows it itself.
+- A client takes the host's word only over the host's connection's stream,
+  in an OpenH1 game under way, of a player it has and a point inside the
+  world (an object it does not have is shown at the point), and plays the
+  menus' cursor sound as a ping its players see comes.
+- The host's `network.pings` (Server Setup's PINGS: Teamplay Options, and
+  co-op's VOICE AND VOTING; on by default) goes to each OpenH1 client in the
+  same message every 3 seconds and as it changes. A client that has not
+  heard it (a host of an earlier protocol, which no client of this one
+  joins) sends none, and with it off a client neither sends pings nor keeps
+  D-pad Right from its player's strafe.
+
+`debug.network_test_ping` tests it ("Testing"), and `debug.network_corrupt`
+the handlers' checks.
 
 ### Bots in network games
 
@@ -2225,7 +2395,13 @@ says one more, the host mutes the last player for everyone (as its
 scoreboard does) around a line each, and the last player's machine mutes
 the host's for itself (as a client's scoreboard does) before another,
 which every machine's `debug.txt` records as
-it shows them (the notices as `chat notice:`), and `debug.network_test_score`
+it shows them (the notices as `chat notice:`), `debug.network_test_ping`
+has each machine's first player ping what they aim at, the same again 3
+seconds on (taking it away) and again 3 more on, then each client send one
+as another machine's player (the host refuses it) and a burst of 6 past its
+own limit (the host takes 3), each machine logging every ping it shows
+(`pings: player <n> pinged ...`) and those it shows a second after each
+step (`network test: pings shown:`), and `debug.network_test_score`
 shortens the game, to test the next (`host:<map>:<variant>,<variant>...`
 plays the variants in turn, the next once a game is over, as the host's
 button on the scores does). `debug.network_test_public` lists the host's
@@ -2377,6 +2553,43 @@ changes only the ticks in the air, as gravity does, is within what
 identical builds show, and not caught. Positions agree to 0.04 world units
 on average, 0.24 at most, in every game, perturbed or not: the netcode
 corrects them.
+
+### Riding an elevator
+
+`debug.network_test_elevator` (seconds into a co-op game, `host:levels\b40\b40:coop`
+and `join`) lists the level's elevators (`network test: elevator <n> ...`:
+name, tag, platform, group), switches the host's structure BSP until the one
+of `debug.network_test_elevator_index` is loaded, stands every player on its
+platform, and has the host send it to its other end and back once it has
+stopped two seconds. Each frame each machine then logs where the platform and
+every player's root node are drawn and where the tick has them, whether each
+stands on it, and the view its own player was drawn from in the frame before
+(none with `debug.null_renderer`). `tools/elevator_jitter.py <log>` reads it:
+for the platform, each player and the view, how far each frame is off the
+line between its neighbours (rms and largest, world units), and each rider's
+height above the platform as drawn (its range, and its largest change from a
+frame to the next).
+
+On b40's 48-unit lift (`lift_a`, index 0), the host and a client on the
+loopback, the players standing still (`debug.test_input` `look:<seed>`),
+riding down (about 16 seconds), before the changes above and after:
+
+| Rate | Client: the host's player above the platform (range, largest step) | Own view's jitter, 144 frames a second (rms, largest) |
+| --- | --- | --- |
+| 120 | 0.606, 0.024 before; 0.005, 0.002 after | 0.0070, 0.020 before; 0.0006, 0.018 after |
+| 60 | 0.285, 0.129 before; 0.003, 0.003 after | 0.023, 0.17 before; 0.0035, 0.051 after |
+| 30 | 0.136, 0.106 before; 0.000, 0.000 after | 0.038, 0.28 before; 0.0067, 0.052 after |
+
+(the same with 40 ms each way, and at 120 with 60 ms and 5% of the datagrams
+lost; the platform and the bodies on the host are 0.0002 to 0.0004 rms in
+every case, before and after). The view's figures are from a hidden window
+on an X server (the frames' pacing there is uneven, and the view is the
+frame's before: its largest are a frame drawn late), the others with
+`debug.null_renderer`. The view was the stepped one at every rate and in
+single player too: drawn from the newest step and carried on by the unit's
+own velocity, which a lift's carry is no part of, it stood still between
+steps (`render_interpolation.c`'s `render_interpolation_rider_carry` carries
+it on by the platform's movement too).
 
 ### Measuring latency
 

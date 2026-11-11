@@ -164,7 +164,9 @@ MENU_ATTRIBUTES = {
                "color", "align", "description", "string_list", "list_flags", "text_flags", "header_bitmap",
                "footer_bitmap", "header_bounds", "footer_bounds", "child_controller", "x", "y", "left", "top",
                "width", "height", "text_x", "text_y", "auto_close", "auto_close_fade", "string_index", "platform",
-               "wide"},
+               "wide", "radius",
+               # where it was made (the game ignores it; the review tools read it: tools/menu_sources.py)
+               "source"},
     "child": {"widget", "controller", "x", "y", "platform"},
     "on": {"event", "run", "script", "open", "replace", "close", "widget", "focus", "reload", "sound", "otherwise",
            "label", "back", "branch", "platform"},
@@ -206,7 +208,8 @@ def test_menus_are_well_formed():
     assert sorted(path.relative_to(MENUS).as_posix() for path in files) == \
         sorted(name for name in listed if name.endswith(".xml"))
     widgets, bitmaps, strings, references, roots = {}, {}, {}, [], []
-    for path in files:
+    # (the menu engine's model, model/, is another format: menu_model.c reads it)
+    for path in (path for path in files if path.relative_to(MENUS).parts[0] != "model"):
         tree = ElementTree.parse(path)
         assert tree.getroot().tag == "menus", path
         if tree.getroot().get("root"):
@@ -227,6 +230,10 @@ def test_menus_are_well_formed():
             for attribute in ("back", "branch", "if_failed"):
                 assert element.get(attribute) in (None, "true", "false"), f"{where} {attribute}"
             # (menu_tags.c's wide layout: "dx dw", each within the extra width 16:9 has)
+            # (a picture's corners cut round: menu_files.c reads 0 to 64)
+            if element.get("radius") is not None:
+                assert re.fullmatch(r"[0-9]+", element.get("radius")) and int(element.get("radius")) <= 64, \
+                    f"{where} radius"
             if element.get("wide") is not None:
                 assert re.fullmatch(r"-?[0-9]+ -?[0-9]+", element.get("wide")) and \
                     all(abs(int(value)) <= 212 for value in element.get("wide").split()), f"{where} wide"
@@ -293,6 +300,8 @@ def test_menu_settings_exist():
     functions = (root / "port/linux/game/menu_functions.c").read_text()
     known = set(re.findall(r'^\t\{ "([a-z_]+\.[a-z_]+)", _config_', config, re.M))
     profile = set(re.findall(r'\{ "(profile\.[a-z_]+)", \d', functions))
+    # (rows of two settings: menu_functions.c's own, render_resolution_text)
+    profile |= set(re.findall(r'#define \w+_SETTING "([a-z_]+\.[a-z_]+)"', functions))
     for path in (MENUS / "ce").glob("*.xml"):
         for setting in re.findall(r'setting="([^"]+)"', path.read_text()):
             assert setting in known | profile, f"{path.name}: {setting}"

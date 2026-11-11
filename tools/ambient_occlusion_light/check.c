@@ -18,9 +18,15 @@ model lit for each vertex with its ambient light apart:
                                       operations (xgpu_spirv_options
                                       subgroups)
 
-<source>: the occlusion's, "screen" (GTAO's texel, the default), "world"
-(display.ambient_occlusion "world": XGPU_AMBIENT_OCCLUSION_WORLD), or "view"
-(the world's, shown: debug.world_ao_view).
+  check trace [<module>]              the distance-field scene's ray step
+                                      alone: the Metal emitter's text, or the
+                                      SPIR-V emitter's module written to
+                                      <module>
+
+<source>: the occlusion's, "world" (display.ambient_occlusion "world":
+XGPU_AMBIENT_OCCLUSION_WORLD, the default), "view" (the world's, shown:
+debug.world_ao_view), or "bare" (the light's bits alone, without
+XGPU_AMBIENT_OCCLUSION_WORLD: no occlusion at all).
 
 Built by the test with the shader decoders and both emitters, as
 tools/msl_corpus is.
@@ -39,7 +45,7 @@ tools/msl_corpus is.
 void platform_log(const char *format, ...) { (void)format; }
 
 /* the occlusion's source: the key's bits beside its light (xgpu.h) */
-static unsigned char source;
+static unsigned char source = XGPU_AMBIENT_OCCLUSION_WORLD;
 
 /* the pixel shader's cases: name, per_pixel_lighting, dynamic_lights, the
 light the occlusion multiplies */
@@ -185,7 +191,7 @@ static int spirv(const char *directory, int subgroups)
 
 static int source_set(const char *name)
 {
-	if (!strcmp(name, "screen"))
+	if (!strcmp(name, "bare"))
 		source = 0;
 	else if (!strcmp(name, "world"))
 		source = XGPU_AMBIENT_OCCLUSION_WORLD;
@@ -196,13 +202,70 @@ static int source_set(const char *name)
 	return 1;
 }
 
+/* the distance-field scene's ray step alone (tools/test_world_trace.py):
+the Metal emitter's text, or the SPIR-V emitter's module written to path */
+static int trace(const char *path)
+{
+	struct xgpu_spirv_module module;
+	char *text;
+	FILE *file;
+
+	if (!path)
+	{
+		text = xgpu_msl_world_trace_test();
+		if (!text)
+			return 1;
+		fputs(text, stdout);
+		free(text);
+		return 0;
+	}
+	if (!xgpu_spirv_world_trace_test(&module) || !(file = fopen(path, "wb")))
+		return 1;
+	fwrite(module.words, sizeof(*module.words), module.count, file);
+	fclose(file);
+	free(module.words);
+	return 0;
+}
+
 int main(int argc, char **argv)
 {
+	if (argc >= 2 && !strcmp(argv[1], "trace"))
+		return trace(argc > 2 ? argv[2] : NULL);
+	/* (the occlusion's pass, as the Metal emitter writes it; or the SPIR-V
+	emitter's, written to a file, with the subgroups' operations) */
+	/* (or with "ray_traced"'s ray queries: pass_rays) */
+	if (argc == 3 && (!strcmp(argv[1], "pass") || !strcmp(argv[1], "pass_rays")))
+	{
+		struct xgpu_spirv_options options;
+		struct xgpu_spirv_module module;
+		FILE *file;
+
+		memset(&options, 0, sizeof(options));
+		options.subgroups = TRUE;
+		options.ray_queries = !strcmp(argv[1], "pass_rays");
+		if (!xgpu_spirv_world_ao_pass(XGPU_SPIRV_WORLD_AO_OCCLUSION, &options, &module) || !(file = fopen(argv[2], "wb")))
+			return 1;
+		fwrite(module.words, sizeof(*module.words), module.count, file);
+		fclose(file);
+		free(module.words);
+		return 0;
+	}
+	if (argc == 2 && !strcmp(argv[1], "pass"))
+	{
+		char *text = xgpu_msl_world_ao_pass(TRUE);
+
+		if (!text)
+			return 1;
+		fputs(text, stdout);
+		free(text);
+		return 0;
+	}
 	if ((argc == 2 || (argc == 3 && source_set(argv[2]))) && !strcmp(argv[1], "msl"))
 		return msl();
 	if ((argc == 3 || (argc == 4 && source_set(argv[3]))) &&
 		(!strcmp(argv[1], "spirv") || !strcmp(argv[1], "spirv_subgroups")))
 		return spirv(argv[2], !strcmp(argv[1], "spirv_subgroups"));
-	fprintf(stderr, "check msl [screen|world|view] | check spirv|spirv_subgroups <directory> [screen|world|view]\n");
+	fprintf(stderr, "check msl [world|view|bare] | check spirv|spirv_subgroups <directory> [world|view|bare] | "
+		"check trace [<module>] | check pass|pass_rays <module>\n");
 	return 2;
 }

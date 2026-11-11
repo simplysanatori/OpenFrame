@@ -133,8 +133,8 @@ static int scene_object_inside(void *context, float const point[3])
 
 /* the field baked (the box's twelve triangles), in an atlas past two
 slices of none, and placed on a frame turned 0.5 about z, scaled 1.2, at
--0.5, -0.4, 0.1: three shapes from first, as world_proxies.c's field_place
-puts them */
+-0.5, -0.4, 0.1: three shapes from first, as world_proxies.c's
+world_proxies_field_place puts them */
 static void scene_field(struct world_proxy *first)
 {
 	static const int faces[6][4] = { { 0, 1, 3, 2 }, { 4, 6, 7, 5 }, { 0, 4, 5, 1 }, { 2, 3, 7, 6 }, { 0, 2, 6, 4 },
@@ -143,6 +143,7 @@ static void scene_field(struct world_proxy *first)
 	float scale = 1.2f, angle = 0.5f, over, middle[3], extents[3], areas, box_reach;
 	unsigned char *solid;
 	unsigned long z, slice, index;
+	struct world_sdf_object_tables *tables;
 	int corner, face, axis, k;
 
 	for (corner = 0; corner < 8; corner++)
@@ -160,13 +161,17 @@ static void scene_field(struct world_proxy *first)
 	}
 	memcpy(bounds, scene_object_low, sizeof(scene_object_low));
 	memcpy(bounds + 3, scene_object_high, sizeof(scene_object_high));
-	world_sdf_object_layout(bounds, &scene_object);
+	world_sdf_object_layout(bounds, WORLD_SDF_OBJECT_MOST_VOXELS, &scene_object);
 	slice = scene_object.width * scene_object.height;
 	values = malloc(slice * scene_object.depth * 4 * sizeof(float));
 	solid = malloc(slice * scene_object.depth);
+	tables = world_sdf_object_tables_make();
+	if (!tables)
+		abort();
 	for (z = 0; z < scene_object.depth; z++)
-		world_sdf_object_slice(&scene_object, triangles, 12, scene_object_inside, NULL, z, values + z * slice * 4,
-			solid + z * slice);
+		world_sdf_object_slice(tables, &scene_object, triangles, NULL, 12, scene_object_inside, NULL, z, 0,
+			scene_object.height, values + z * slice * 4, solid + z * slice);
+	world_sdf_object_tables_free(tables);
 	if (!world_sdf_object_finish(&scene_object, values, solid))
 		abort();
 	free(values);
@@ -733,11 +738,16 @@ int main(int argc, char **argv)
 			first or the second) */
 			float given = lightmap ? (float)(index % 3 - 1) : reference;
 
+			/* (and a model's as a two-sided shader's cards: about their most
+			open direction) */
 			printf("%s{\"point\": [%.9g, %.9g, %.9g], \"normal\": [%.9g, %.9g, %.9g], \"owner\": %.9g, "
-				"\"reference\": %.9g, \"lightmap\": %d, \"occlusion\": %.9g}\n", index || lightmap ? "," : "",
-				point[0], point[1], point[2], normal[0], normal[1], normal[2], owner, given, lightmap,
+				"\"reference\": %.9g, \"lightmap\": %d, \"occlusion\": %.9g, \"cards\": %.9g}\n",
+				index || lightmap ? "," : "", point[0], point[1], point[2], normal[0], normal[1], normal[2], owner, given,
+				lightmap, world_ao_occlusion((float const (*)[4])scene_parameters, &scene_volume, scene_proxies,
+				scene_proxy_count, point, normal, owner, given, lightmap, given >= 0.0f ? scene_pages[(int)given] : 1.0f, 0),
 				world_ao_occlusion((float const (*)[4])scene_parameters, &scene_volume, scene_proxies,
-				scene_proxy_count, point, normal, owner, given, lightmap, given >= 0.0f ? scene_pages[(int)given] : 1.0f));
+				scene_proxy_count, point, normal, owner, given, lightmap, given >= 0.0f ? scene_pages[(int)given] : 1.0f,
+				!lightmap));
 		}
 	}
 	printf("], \"field_shaded\": %ld}\n", scene_field_shaded(count));

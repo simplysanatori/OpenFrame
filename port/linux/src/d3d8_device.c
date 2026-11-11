@@ -37,10 +37,14 @@ Conventions carried over from the Xbox:
 #include "port_config.h"
 #include "battery_saver.h"
 #include "menu_pictures.h"
+#include "halo_menus.h"
+#include "report.h"
 #include "bink_import.h"
 #include "halo_linux_source_fixups.h"
 #include "panini_projection.h"
 #include "world_ao.h"
+#include "world_cascades.h"
+#include "world_rt.h"
 #include "world_sdf.h"
 #include "main/console.h"
 
@@ -51,6 +55,7 @@ Conventions carried over from the Xbox:
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
 #include <time.h>
 
 void d3d8_surface_initialize(D3DSurface *surface, D3DFORMAT format, unsigned long width, unsigned long height);
@@ -83,8 +88,9 @@ render target the size of the screen has per unit of it */
 static long screen_width;
 static float screen_scale[2] = { 1.0f, 1.0f };
 /* how many times the display's pixels each way supersampling draws (with
-the scale screen_mode_choose last chose) */
-static float screen_supersampling = 1.0f;
+the scale screen_mode_choose last chose), and how many it was asked for
+(more where the GPU's largest target has too few pixels) */
+static float screen_supersampling = 1.0f, screen_supersampling_asked = 1.0f;
 static long ui_offset;
 #define UI_OFFSET ((long)ui_offset)
 /* ---------- anti-aliasing
@@ -92,45 +98,56 @@ static long ui_offset;
 display.anti_aliasing, off unless it is set: the Xbox drew without any.
 "fxaa" and "smaa" are passes over each window's 3D view before the HUD and
 menus are drawn over it (halo_screen_anti_alias, xgpu_vulkan_post.c and
-xgpu_metal_post.c); "ssaa2x"
-draws the screen's targets at twice the resolution each way
-(screen_mode_choose), which the display blit scales down; "msaa2x" to
-"msaa8x" draw the back buffer and its depth buffer with that many samples a
-pixel (render_target_multisample). The setting is read again between frames
-(halo_screen_commit), so that a change applies from the next one. */
+xgpu_metal_post.c); "msaa2x" to "msaa8x" draw the back buffer and its depth
+buffer with that many samples a pixel (render_target_multisample). Either
+combines with display.supersampling (screen_mode_choose), which draws the
+screen's targets at more pixels than the display has: the pass and the
+samples' resolve are the targets' own, at that resolution, and the display
+blit scales the frame down after the HUD. The setting is read again between
+frames (halo_screen_commit), so that a change applies from the next one. */
 
 enum
 {
 	_anti_aliasing_off,
 	_anti_aliasing_fxaa,
 	_anti_aliasing_smaa,
-	_anti_aliasing_ssaa,
 	_anti_aliasing_msaa,
 };
+
+/* (supersampling where the build draws it: not Android's, nor Metal's on
+iOS, whose phones' GPUs have no time to spare for it; display.render_scale
+draws them below the screen's resolution instead) */
+#if !defined(HALO_ANDROID) && !defined(HALO_IOS)
+#define SUPERSAMPLING 1
+#endif
 
 static const struct
 {
 	const char *name;
 	int mode;
 	int samples;
+	/* the supersampling it asks for, each way (1: none) */
+	float supersampling;
 } anti_aliasing_values[] =
 {
-	{ "off", _anti_aliasing_off, 0 },
-	{ "fxaa", _anti_aliasing_fxaa, 0 },
+	{ "off", _anti_aliasing_off, 0, 1.0f },
+	{ "fxaa", _anti_aliasing_fxaa, 0, 1.0f },
 	/* (Vulkan draws it on a phone too, as on the desktop, and Metal on a
 	Mac: passes of fixed cost whatever the scene; "fxaa" is the cheaper
 	pass) */
-	{ "smaa", _anti_aliasing_smaa, 0 },
-#if defined(HALO_ANDROID) || defined(HALO_MACOS)
-	/* (supersampling's four times the pixels are more than a phone's GPU
-	has to spare: none, on Android, and with Metal on macOS and iOS) */
-	{ "ssaa2x", _anti_aliasing_off, 0 },
+	{ "smaa", _anti_aliasing_smaa, 0, 1.0f },
+	/* (an older version's: twice the pixels each way and no pass, which
+	display.supersampling = 2.0 is now; config.toml's is written so as it
+	is read, port_config.c's config_migrate_supersampling. It drew nothing
+	on the Mac, which had no supersampling then) */
+#if defined(SUPERSAMPLING) && !defined(HALO_MACOS)
+	{ "ssaa2x", _anti_aliasing_off, 0, 2.0f },
 #else
-	{ "ssaa2x", _anti_aliasing_ssaa, 0 },
+	{ "ssaa2x", _anti_aliasing_off, 0, 1.0f },
 #endif
-	{ "msaa2x", _anti_aliasing_msaa, 2 },
-	{ "msaa4x", _anti_aliasing_msaa, 4 },
-	{ "msaa8x", _anti_aliasing_msaa, 8 },
+	{ "msaa2x", _anti_aliasing_msaa, 2, 1.0f },
+	{ "msaa4x", _anti_aliasing_msaa, 4, 1.0f },
+	{ "msaa8x", _anti_aliasing_msaa, 8, 1.0f },
 };
 
 #define NUMBER_OF_ANTI_ALIASING_VALUES ((int)(sizeof(anti_aliasing_values) / sizeof(anti_aliasing_values[0])))
@@ -145,9 +162,16 @@ static void anti_aliasing_prepare(void);
 /* display.anti_aliasing's value (none of them: the first, off) */
 static void anti_aliasing_read(void)
 {
-	const char *setting = config_string("display.anti_aliasing");
+	/* (read again as the settings change: config_changes) */
+	static unsigned long read_at = (unsigned long)-1;
+	unsigned long changes = config_changes();
+	const char *setting;
 	int value;
 
+	if (anti_aliasing_value >= 0 && read_at == changes)
+		return;
+	read_at = changes;
+	setting = config_string("display.anti_aliasing");
 	for (value = NUMBER_OF_ANTI_ALIASING_VALUES - 1;
 		value > 0 && strcmp(setting, anti_aliasing_values[value].name);
 		value--)
@@ -168,6 +192,54 @@ static int anti_aliasing(void)
 	if (anti_aliasing_value < 0)
 		anti_aliasing_read();
 	return anti_aliasing_values[anti_aliasing_value].mode;
+}
+
+/* ---------- display.supersampling
+
+The screen's targets drawn at this many times the display's pixels each
+way, 1 to 2, which the display blit scales down to the display's
+(screen_mode_choose): the 3D view, the HUD and the menus, with
+display.anti_aliasing's pass or samples at the targets' resolution. 1 (or
+unset, or not a number) draws the display's pixels. The supersampling
+drawn is the most of this, "ssaa2x"'s and display.panini's, at most the
+GPU's largest target; not with display.resolution_scaling "original", which
+draws the Xbox's 640x480. Read between frames (halo_screen_commit). */
+
+#define SUPERSAMPLING_LEAST 1.0f
+#define SUPERSAMPLING_MOST 2.0f
+
+static float supersampling_wanted(void)
+{
+#ifdef SUPERSAMPLING
+	static unsigned long read_at = (unsigned long)-1;
+	/* (the setting as last read, and what it gives) */
+	static float setting = 1.0f, factor = 1.0f;
+	float legacy;
+
+	if (read_at != config_changes())
+	{
+		float value = (float)config_real("display.supersampling");
+
+		read_at = config_changes();
+		if (value != setting)
+		{
+			setting = value;
+			factor = value > SUPERSAMPLING_MOST ? SUPERSAMPLING_MOST :
+				value >= SUPERSAMPLING_LEAST ? value : SUPERSAMPLING_LEAST;
+			if (factor != value)
+				platform_log("supersampling: %g is outside %g to %g, so %gx", value, SUPERSAMPLING_LEAST,
+					SUPERSAMPLING_MOST, factor);
+			else
+				platform_log("supersampling: %gx", factor);
+		}
+	}
+	if (anti_aliasing_value < 0)
+		anti_aliasing_read();
+	legacy = anti_aliasing_values[anti_aliasing_value].supersampling;
+	return legacy > factor ? legacy : factor;
+#else
+	return 1.0f;
+#endif
 }
 
 /* ---------- display.hdr (xgpu_hdr.h)
@@ -238,75 +310,11 @@ void halo_hdr_draw_kind(int kind)
 	hdr.kind = kind;
 }
 
-/* ---------- display.ambient_occlusion (xgpu_backend_ambient_occlusion)
-
-The occlusion is the share of the ambient light that reaches a pixel, so it
-must multiply that light alone, not what the lights add (the flashlight on
-a character, a plasma bolt's glow on a wall), and so it must be known before
-the opaque surfaces shade, which light them in one pass. Each window's 3D
-view draws its opaque surfaces' depth first, alone (source/render/render.c,
-halo_screen_ambient_occlusion_begin): the objects and the structure's
-lightmap pass, as they draw after, into a depth target of the depth
-buffer's size (ambient_occlusion.depth, bind_targets), no colour written
-(ambient_occlusion_prepass); the backend finds the occlusion from that
-depth (halo_screen_ambient_occlusion), and the surfaces then draw with it in
-their shaders (xgpu.h's XGPU_AMBIENT_OCCLUSION_LIGHT_*: the models' ambient
-and distant lights, the lightmap pass's light) until the lightmap pass is
-done (halo_screen_ambient_occlusion__guest_image_end). The pre-pass's draws mark their
-pixels in its stencil as they draw (prepare_draw): an object's
-(a model's: one ambient sample lights it, so everything about it occludes
-it, where the level's lightmap holds the level's own occlusion and only
-objects add to it), and a surface's that lights itself (a structure's
-lightmap pass or a model's with its self-illumination: halo_hdr_draw_kind),
-which with the first-person weapon's (the game's own bit) the occlusion
-leaves as it was; every other draw that writes the depth clears the marks
-where it does (ambient_occlusion_mark). Read between frames
-(halo_screen_commit). */
-
-static struct
-{
-	/* XGPU_AMBIENT_OCCLUSION_SUBTLE or _STRONG, 0 off; the view shown alone
-	(debug.ambient_occlusion_view); config_changes() when read; found for a
-	view since its last show */
-	int quality;
-	BOOL view, laid;
-	long read_at;
-	/* the window's pre-pass is drawing (its depth into depth, a surface of
-	its own the depth buffer's size), and the occlusion found from it is
-	ready for the surfaces' shaders */
-	BOOL prepass, ready;
-	D3DSurface depth;
-	/* the same as the journal notes them (journal_capture): as they would
-	be with the occlusion on, whatever the setting, so that a map's
-	preparation's record holds the pre-pass and the surfaces lit by it, for
-	a load with the setting on (journal_restore leaves them out with it
-	off) */
-	BOOL journal_prepass, journal_ready;
-} ambient_occlusion = { 0, FALSE, FALSE, -1, FALSE, FALSE };
-
-/* the game's renderer's category, and the pre-pass's draws among them, for
-the backend's timing (xgpu_backend_category) */
+/* the game's renderer's category, for the backend's timing
+(xgpu_backend_category) */
 static void category_send(int category)
 {
-	xgpu_backend_category(category, ambient_occlusion.prepass);
-}
-
-static void ambient_occlusion_read(void)
-{
-	const char *setting;
-	int quality;
-
-	if (ambient_occlusion.read_at == config_changes())
-		return;
-	ambient_occlusion.read_at = config_changes();
-	setting = config_string("display.ambient_occlusion");
-	/* ("world" is not the screen's: port/linux/game/world_ao.c, below) */
-	quality = !strcmp(setting, "strong") ? XGPU_AMBIENT_OCCLUSION_STRONG :
-		!strcmp(setting, "subtle") ? XGPU_AMBIENT_OCCLUSION_SUBTLE : 0;
-	if (quality != ambient_occlusion.quality)
-		platform_log("ambient occlusion: %s", quality ? setting : "off");
-	ambient_occlusion.quality = quality;
-	ambient_occlusion.view = config_boolean("debug.ambient_occlusion_view");
+	xgpu_backend_category(category);
 }
 
 /* ---------- display.ambient_occlusion "world" (port/linux/game/world_ao.c,
@@ -344,6 +352,11 @@ _Static_assert(offsetof(struct xgpu_world_ao_block, field) == XGPU_WORLD_AO_BLOC
 _Static_assert(XGPU_WORLD_AO_GRID_X == WORLD_AO_GRID_X && XGPU_WORLD_AO_GRID_Y == WORLD_AO_GRID_Y &&
 	XGPU_WORLD_AO_GRID_Z == WORLD_AO_GRID_Z && XGPU_WORLD_AO_GRID_CELLS == XGPU_WORLD_AO_GRID_CELLS_MAXIMUM,
 	"the world's proxy grid as the game makes it and the emitters read it (world_ao.h, xgpu.h)");
+_Static_assert(XGPU_WORLD_AO_INPUT_LIGHTMAP == XGPU_WORLD_AO_INPUT_LIGHTMAP_BIT &&
+	XGPU_WORLD_AO_INPUT_ALL_SHAPES == XGPU_WORLD_AO_INPUT_ALL_SHAPES_BIT &&
+	XGPU_WORLD_AO_INPUT_PRESENT == XGPU_WORLD_AO_INPUT_PRESENT_BIT &&
+	XGPU_WORLD_AO_INPUT_CARDS == XGPU_WORLD_AO_INPUT_CARDS_BIT,
+	"the pre-pass's inputs as the emitters write them and the CPU reads them (xgpu.h, world_ao.h)");
 _Static_assert(WORLD_AO_FIELD_TABLE == XGPU_STREAM_WORLD_AO_TABLE && WORLD_AO_FIELD_ATLAS == XGPU_STREAM_WORLD_AO_ATLAS &&
 	WORLD_AO_FIELD_SCENERY == XGPU_STREAM_WORLD_AO_SCENERY && WORLD_AO_FIELD_OBJECTS == XGPU_STREAM_WORLD_AO_OBJECTS,
 	"the world's field's parts as the stream carries them");
@@ -358,12 +371,30 @@ static struct
 	int owner;
 	float reference;
 	BOOL failed;
+	/* found once a pixel: the window's pre-pass is drawing (its draws with
+	the world's light drawn as their twins, the others skipped: the
+	backend's), and the surfaces read their pixels' occlusion from its pass
+	(halo_world_ao_prepass_begin, until the window's block is taken away) */
+	BOOL prepass, sampled;
+	/* (the pixels a side of the blocks it is found once for: 2, a quarter
+	of the pixels; 1 with debug.world_ao_full_resolution) */
+	float scale;
 	/* the window's span as the game draws it (WORLD_AO_SPAN_*:
 	halo_world_ao_span), whatever the setting and while a map's pipelines
 	are prepared; a record's draw's as it notes it, played back
 	(journal_restore) */
 	int span;
-} world_ao = { FALSE, FALSE, WORLD_AO_OWNER_NONE, 1.0f, FALSE, WORLD_AO_SPAN_NONE };
+	/* a map's pipelines are prepared (halo_gpu_prepare until
+	halo_gpu_prepared); the backend told to make the draws' twins too
+	(world_ao_twins) */
+	BOOL preparing, twins;
+	/* "ray_traced": the draw's object's owner among the ray-traced scene's
+	instances (0 none: halo_world_ao_object) */
+	unsigned long rays_owner;
+	/* the draws are a two-sided model shader's cards (halo_world_ao_cards) */
+	BOOL cards;
+} world_ao = { FALSE, FALSE, WORLD_AO_OWNER_NONE, 1.0f, FALSE, FALSE, FALSE, 2.0f, WORLD_AO_SPAN_NONE, FALSE, FALSE, 0,
+	FALSE };
 
 /* the draw takes the world's light where its window is given: one of the
 window's opaque surfaces, not the first-person weapon, not lighting itself
@@ -371,16 +402,70 @@ window's opaque surfaces, not the first-person weapon, not lighting itself
 the setting off and in a map's preparation: manifest_note_basis) */
 static BOOL world_ao_applies(void)
 {
-	return world_ao.span == WORLD_AO_SPAN_OPEN && !(hdr.kind & HALO_HDR_KIND_SELF_ILLUMINATION);
+	return (world_ao.span == WORLD_AO_SPAN_OPEN || world_ao.span == WORLD_AO_SPAN_FOUND) &&
+		!(hdr.kind & HALO_HDR_KIND_SELF_ILLUMINATION);
+}
+
+/* while a map's pipelines are prepared, the world's light as the window's
+draws will have it in play where the setting is on (no window is given
+then: world_ao.c's world_ao_window_begin): the world's for every one, read
+from the pre-pass where it would find the window's once a pixel (its span
+found: the primary view into the back buffer, world_ao_prepass_begin) */
+static BOOL world_ao_preparing(void)
+{
+	return world_ao.preparing && !world_ao.failed && world_ao_mode() != 0;
+}
+
+/* the window's span is one the pre-pass finds once a pixel (its first-person
+weapon's too), whatever the setting */
+static BOOL world_ao_span_found(void)
+{
+	return world_ao.span == WORLD_AO_SPAN_FOUND || world_ao.span == WORLD_AO_SPAN_FOUND_FIRST_PERSON;
+}
+
+static BOOL world_ao_found(void)
+{
+	return world_ao_span_found() && !config_boolean("debug.world_ao_inline");
 }
 
 /* a draw's pixel key's occlusion, for the light it multiplies, found in the
 world (0: none) */
 static unsigned char world_ao_key(int light)
 {
-	if (!world_ao.active || world_ao.failed || !world_ao_applies())
+	BOOL view, sampled;
+
+	if (world_ao.failed || !world_ao_applies())
 		return 0;
-	return (unsigned char)(light | XGPU_AMBIENT_OCCLUSION_WORLD | (world_ao.view ? XGPU_AMBIENT_OCCLUSION_WORLD_VIEW : 0));
+	if (world_ao.active)
+	{
+		view = world_ao.view;
+		sampled = world_ao.sampled;
+	}
+	else if (world_ao_preparing())
+	{
+		view = config_boolean("debug.world_ao_view");
+		sampled = world_ao_found();
+	}
+	else
+	{
+		return 0;
+	}
+	return (unsigned char)(light | XGPU_AMBIENT_OCCLUSION_WORLD | (view ? XGPU_AMBIENT_OCCLUSION_WORLD_VIEW : 0) |
+		(sampled ? XGPU_AMBIENT_OCCLUSION_WORLD_SAMPLED : 0));
+}
+
+/* ... and the pre-pass's twins of the window's draws made with them (each
+draw's: xgpu_stream_world_ao_twin, those with the world's light read from
+the pre-pass and the occluders, the first-person weapon among them), the
+backend told as the draws' need changes (XGPU_WORLD_AO_PREPASS_TWINS) */
+static void world_ao_twins(void)
+{
+	BOOL twins = world_ao_preparing() && world_ao_found();
+
+	if (twins == world_ao.twins)
+		return;
+	world_ao.twins = twins;
+	xgpu_backend_world_ao_prepass(twins ? XGPU_WORLD_AO_PREPASS_TWINS : XGPU_WORLD_AO_PREPASS_NONE, 0, NULL);
 }
 
 /* a pipeline with the world's light could not be made: none has it from
@@ -412,6 +497,12 @@ void halo_world_ao_window(float const field[2][4], float const parameters[2][4],
 	world_ao.active = count >= 0;
 	world_ao.owner = WORLD_AO_OWNER_NONE;
 	world_ao.reference = 1.0f;
+	world_ao.rays_owner = 0;
+	world_ao.cards = FALSE;
+	/* (found once a pixel: no more) */
+	if (world_ao.sampled || world_ao.prepass)
+		xgpu_backend_world_ao_prepass(XGPU_WORLD_AO_PREPASS_NONE, 0, NULL);
+	world_ao.sampled = world_ao.prepass = FALSE;
 	if (count < 0)
 	{
 		xgpu_backend_world_ao_window(NULL);
@@ -426,15 +517,72 @@ void halo_world_ao_window(float const field[2][4], float const parameters[2][4],
 	if (count)
 		memcpy(made->proxies, proxies, (size_t)count * sizeof(made->proxies[0]));
 	made->parameters[0][3] = (float)count;
+	/* (found once a pixel: at a quarter of the pixels, or each) */
+	world_ao.scale = config_boolean("debug.world_ao_full_resolution") ? 1.0f : 2.0f;
+	made->parameters[1][3] = world_ao.scale;
 	memcpy(made->grid, grid, sizeof(made->grid));
 	memcpy(made->cells, cells, sizeof(made->cells));
 	xgpu_backend_world_ao_window(made);
 }
 
-void halo_world_ao_object(int owner, float reference)
+void halo_world_ao_object(int owner, float reference, unsigned long rays_owner)
 {
 	world_ao.owner = owner;
 	world_ao.reference = reference;
+	world_ao.rays_owner = rays_owner < XGPU_WORLD_AO_INSTANCE_OWNERS ? rays_owner : 0;
+}
+
+void halo_world_ao_cards(int cards)
+{
+	world_ao.cards = cards != 0;
+}
+
+/* ---------- display.ambient_occlusion "ray_traced" (port/linux/game/world_rt.c)
+
+The ray-traced scene's meshes and instances handed to the backend, which
+traces the dynamic objects' occlusion by the GPU's ray queries where it has
+them (xgpu_backend_capabilities' ray_queries: Vulkan's, where the device has
+VK_KHR_ray_query); the pass is told to (its history[3] 2) and each draw's
+uniforms carry its object's owner among the instances (world_ao[2]), which
+the pre-pass's twins write into their inputs' last word. */
+
+_Static_assert(sizeof(struct world_ao_instance) == sizeof(struct xgpu_world_ao_instance) &&
+	offsetof(struct world_ao_instance, mesh) == offsetof(struct xgpu_world_ao_instance, mesh) &&
+	offsetof(struct world_ao_instance, owner) == offsetof(struct xgpu_world_ao_instance, owner) &&
+	offsetof(struct world_ao_instance, kind) == offsetof(struct xgpu_world_ao_instance, kind) &&
+	WORLD_RT_STRUCTURE == XGPU_WORLD_AO_INSTANCE_STRUCTURE && WORLD_RT_OBJECT == XGPU_WORLD_AO_INSTANCE_OBJECT &&
+	WORLD_RT_MESHES == XGPU_STREAM_WORLD_AO_MESHES - 1 &&
+	WORLD_RT_INSTANCES == XGPU_STREAM_WORLD_AO_INSTANCES_MAXIMUM &&
+	WORLD_RT_MESH_TRIANGLES == XGPU_STREAM_WORLD_AO_MESH_TRIANGLES,
+	"the ray-traced scene as the stream carries it (world_rt.h, xgpu_stream.h)");
+
+int halo_world_ao_ray_queries(void)
+{
+	return xgpu_backend_capabilities.ray_queries != 0;
+}
+
+char const *halo_world_ao_ray_queries_missing(void)
+{
+	/* (said once the backend is ready: its capabilities are zeros before) */
+	if (xgpu_backend_capabilities.ray_queries || !xgpu_backend_capabilities.largest_target)
+		return NULL;
+#ifdef HALO_METAL
+	return "the Metal renderer has no ray queries yet";
+#else
+	return "the GPU or its driver has no Vulkan ray queries (VK_KHR_ray_query, VK_KHR_acceleration_structure)";
+#endif
+}
+
+void halo_world_ao_mesh(unsigned long id, unsigned long count, float const *triangles)
+{
+	if (xgpu_backend_capabilities.ray_queries)
+		xgpu_backend_world_ao_mesh(id, count, triangles);
+}
+
+void halo_world_ao_instances(struct world_ao_instance const *instances, unsigned long count)
+{
+	if (xgpu_backend_capabilities.ray_queries)
+		xgpu_backend_world_ao_instances((struct xgpu_world_ao_instance const *)instances, count);
 }
 
 void halo_world_ao_field(int part, unsigned long width, unsigned long height, unsigned long depth,
@@ -443,40 +591,17 @@ void halo_world_ao_field(int part, unsigned long width, unsigned long height, un
 	xgpu_backend_world_ao_field(part, width, height, depth, z_first, z_count, data);
 }
 
-/* a draw that writes the depth, made to write the occlusion's marks of its
-pixels in the stencil with it (the bits: XGPU_AMBIENT_OCCLUSION_OBJECT,
-_SELF_ILLUMINATED, or none), where its depth passes. Its own or none: the
-objects draw before the level, so a wall drawn over an object behind it (or
-a plain object over a self-illuminated one) must take the pixel's marks with
-its depth, or the occlusion goes on finding the hidden object there. With
-the stencil's test off, or beside a test that reads none of the marks,
-changes nothing where it or the depth fails, and writes nothing (the game's
-rejection of the first-person weapon's pixels, on once it is drawn) or
-replaces its own bits (the weapon's drawing); the game's bits as they were.
-(tools/test_ambient_occlusion_marks.py) */
-static void ambient_occlusion_mark(struct xgpu_pipeline_key *key, unsigned long *reference, unsigned char bits)
-{
-	const unsigned char marks = XGPU_AMBIENT_OCCLUSION_SELF_ILLUMINATED | XGPU_AMBIENT_OCCLUSION_OBJECT;
+_Static_assert(XGPU_WORLD_CASCADES == WORLD_CASCADES && XGPU_WORLD_CASCADE_SIDE == WORLD_CASCADE_SIDE &&
+	XGPU_WORLD_CASCADE_SPAN == WORLD_CASCADE_SPAN && XGPU_WORLD_CASCADE_RANGE_VOXELS == WORLD_CASCADE_RANGE_VOXELS &&
+	XGPU_WORLD_TRACE_STEPS == WORLD_TRACE_STEPS && XGPU_WORLD_TRACE_STRUCTURE == WORLD_TRACE_STRUCTURE &&
+	XGPU_WORLD_TRACE_OBJECTS == WORLD_TRACE_OBJECTS && XGPU_STREAM_WORLD_AO_CASCADES_SIDE == WORLD_CASCADE_SPAN &&
+	XGPU_STREAM_WORLD_AO_CASCADES_DEPTH == WORLD_CASCADE_SPAN * WORLD_CASCADES &&
+	WORLD_CASCADE_TEXEL == 2, "the distance-field scene as the emitters and the stream take it (xgpu.h)");
 
-	if (!key->stencil_test)
-	{
-		key->stencil_test = 1;
-		key->stencil_function = XGPU_COMPARE_ALWAYS;
-		key->stencil_read_mask = 0;
-		key->stencil_fail = XGPU_STENCIL_KEEP;
-		key->stencil_depth_fail = XGPU_STENCIL_KEEP;
-		key->stencil_pass = XGPU_STENCIL_REPLACE;
-		key->stencil_write_mask = marks;
-		*reference = bits;
-	}
-	else if (!(key->stencil_read_mask & marks) && !(key->stencil_write_mask & marks) &&
-		key->stencil_fail == XGPU_STENCIL_KEEP && key->stencil_depth_fail == XGPU_STENCIL_KEEP &&
-		(!key->stencil_write_mask || key->stencil_pass == XGPU_STENCIL_REPLACE))
-	{
-		key->stencil_pass = XGPU_STENCIL_REPLACE;
-		key->stencil_write_mask |= marks;
-		*reference = (*reference & ~(unsigned long)marks) | bits;
-	}
+void halo_world_ao_cascades(unsigned long x, unsigned long y, unsigned long z, unsigned long width, unsigned long height,
+	unsigned long depth, void const *data)
+{
+	xgpu_backend_world_ao_cascades(x, y, z, width, height, depth, data);
 }
 
 /* a draw's tag (nv2a_pixel_shader_key.hdr): 0 but into the HDR back
@@ -510,11 +635,13 @@ The 3D view drawn through the Panini projection is drawn larger at its
 middle (port/linux/include/panini_projection.h): by its magnification there,
 1.5 at 120 degrees across 16:9 at full strength, 2.4 at 150. So that the
 middle keeps its sharpness, the screen is supersampled by as much, as
-"ssaa2x" supersamples it (the display blit scales it down), at most twice
-the pixels each way, as "ssaa2x": the magnification at the widest of
-display.fov's and display.vehicle_fov's views on the display's shape. Not on
-Android, Metal (the Mac and iOS) or VR, where supersampling is not either;
-there the middle is drawn from the pixels the view has. */
+display.supersampling supersamples it (the display blit scales it down), at
+most twice the pixels each way: the magnification at the widest of
+display.fov's and display.vehicle_fov's views on the display's shape, or
+display.supersampling's where that is more. Not on Android, Metal (the Mac
+and iOS) or VR, which draw only the supersampling the player chooses (the
+Mac's: display.supersampling) or none; there the middle is drawn from the
+pixels the view has. */
 
 #define PANINI_SUPERSAMPLING_MOST 2.0f
 
@@ -591,7 +718,7 @@ static void screen_mode_choose(long *width, float scale[2])
 #endif
 	*width = 640;
 	scale[0] = scale[1] = 1.0f;
-	screen_supersampling = 1.0f;
+	screen_supersampling = screen_supersampling_asked = 1.0f;
 	if (platform_screen_mode(&display_width, &display_height) && display_width > 0 && display_height > 0)
 	{
 		long wanted = (SCREEN_HEIGHT * display_width + display_height / 2) / display_height;
@@ -604,18 +731,22 @@ static void screen_mode_choose(long *width, float scale[2])
 		keeps its shape and the display blit letterboxes it */
 		if (*width != wanted && *width != (wanted & ~1L))
 			scale[0] = scale[1] = scale[0] < scale[1] ? scale[0] : scale[1];
-		/* supersampling: twice the pixels each way, or as many as the GPU's
-		largest target has (once it is known), which the display blit
-		scales down; not with "original" resolution scaling, which draws
-		the Xbox's 640x480. display.panini's: its middle's magnification
-		(above), as much as "ssaa2x" at most */
+		/* supersampling: display.supersampling's (or "ssaa2x"'s), or
+		display.panini's, its middle's magnification (above), whichever is
+		more, at most as many pixels as the GPU's largest target has (once
+		it is known), which the display blit scales down; not with
+		"original" resolution scaling, which draws the Xbox's 640x480 (and
+		gives no display_width). Each target's pixels are its units times
+		the scale, rounded (render_target_get): 1.5 at 2560x1440 draws
+		3840x2160 */
 		if (xgpu_backend_capabilities.largest_target > 0)
 		{
-			float factor = anti_aliasing() == _anti_aliasing_ssaa ? 2.0f : 1.0f;
+			float factor = supersampling_wanted();
 			float panini = panini_supersampling(display_width, display_height);
 
 			if (factor < panini)
 				factor = panini;
+			screen_supersampling_asked = factor;
 			if (*width * scale[0] * factor > (float)xgpu_backend_capabilities.largest_target)
 				factor = (float)xgpu_backend_capabilities.largest_target / (*width * scale[0]);
 			if (SCREEN_HEIGHT * scale[1] * factor > (float)xgpu_backend_capabilities.largest_target)
@@ -630,13 +761,28 @@ static void screen_mode_choose(long *width, float scale[2])
 	}
 }
 
+/* the screen's size and its targets' pixels, in the log, with the
+supersampling they have and any the GPU could not draw */
+static void screen_mode_log(long width, const float scale[2])
+{
+	if (screen_supersampling_asked > screen_supersampling)
+		platform_log("screen: %ldx%d drawn at %.0fx%.0f, supersampled %.3gx (%.3gx asked: the GPU's targets have "
+			"%ld pixels at most each way)", width, SCREEN_HEIGHT, width * scale[0], SCREEN_HEIGHT * scale[1],
+			screen_supersampling, screen_supersampling_asked, xgpu_backend_capabilities.largest_target);
+	else if (screen_supersampling > 1.0f)
+		platform_log("screen: %ldx%d drawn at %.0fx%.0f, supersampled %.3gx", width, SCREEN_HEIGHT, width * scale[0],
+			SCREEN_HEIGHT * scale[1], screen_supersampling);
+	else
+		platform_log("screen: %ldx%d drawn at %.0fx%.0f", width, SCREEN_HEIGHT, width * scale[0],
+			SCREEN_HEIGHT * scale[1]);
+}
+
 long halo_screen_width(void)
 {
 	if (!screen_width)
 	{
 		screen_mode_choose(&screen_width, screen_scale);
-		platform_log("screen: %ldx%d drawn at %.0fx%.0f", screen_width, SCREEN_HEIGHT,
-			screen_width * screen_scale[0], SCREEN_HEIGHT * screen_scale[1]);
+		screen_mode_log(screen_width, screen_scale);
 	}
 	return screen_width;
 }
@@ -645,6 +791,15 @@ long halo_screen_width(void)
 static float vr_text_pixel_scale(void);
 static int vr_drawing_eyes(void);
 #endif
+
+/* the back buffer's pixels for each of the screen's units, across and down
+(debug.render_marks' viewports: port/linux/game/render_marks.c) */
+void halo_screen_scale_axes(float scale[2])
+{
+	halo_screen_width();
+	scale[0] = screen_scale[0];
+	scale[1] = screen_scale[1];
+}
 
 /* the display's pixels for each of the 480 lines (text_hires.c) */
 float halo_screen_pixel_scale(void)
@@ -920,6 +1075,10 @@ struct d3d8_device
 	D3DMATRIX transforms[D3DTS_MAX];
 	D3DBaseTexture *textures[D3DTSS_MAXSTAGES];
 	D3DPalette *palettes[D3DTSS_MAXSTAGES];
+	/* the region of its texture each stage samples, as a texture of its own
+	with its border beyond it (d3d8_texture_region: its size and origin, in
+	the texture's coordinates; size 0: the whole texture) */
+	float texture_regions[D3DTSS_MAXSTAGES][4];
 	D3DSHADERCONSTANTMODE shader_constant_mode;
 
 	struct vertex_shader_object *vertex_shader;
@@ -972,9 +1131,6 @@ enum
 	JOURNAL_CLEAR,
 	JOURNAL_ANTI_ALIAS,
 	JOURNAL_PANINI,
-	JOURNAL_OCCLUSION_BEGIN,
-	JOURNAL_OCCLUSION,
-	JOURNAL_OCCLUSION_END,
 	JOURNAL_TONE_MAP,
 	JOURNAL_HALOS,
 	JOURNAL_STATES,
@@ -1697,10 +1853,7 @@ static BOOL bind_targets(BOOL *has_depth)
 	vr_frame_resume();
 #endif
 	color = render_target_get(device.render_target);
-	/* (display.ambient_occlusion's pre-pass: the depth buffer's depth into
-	a target of its own, ambient_occlusion_prepass) */
-	depth = render_target_get(ambient_occlusion.prepass && device.depth_stencil == &device.depth_buffer ?
-		&ambient_occlusion.depth : device.depth_stencil);
+	depth = render_target_get(device.depth_stencil);
 	if (depth && !depth->target.depth)
 		depth = NULL;
 	if (!color && !depth)
@@ -1805,12 +1958,17 @@ static void device_backend_ready(void)
 		anti_aliasing_read();
 	else
 		anti_aliasing_prepare();
-	/* (and display.hdr and display.ambient_occlusion, which halo_screen_commit
-	reads between frames, now: a frame drawn before the next, a map loaded
-	as the game starts, prepares its pipelines as they are, its targets none
-	yet) */
+	/* (and display.hdr, which halo_screen_commit reads between frames, now:
+	a frame drawn before the next, a map loaded as the game starts,
+	prepares its pipelines as they are, its targets none yet) */
 	hdr_read();
-	ambient_occlusion_read();
+	/* (the PC menus' files read meanwhile, on a thread of their own, for
+	the first map's load: menu_files.c. Not before: their rows for the
+	renderer that draws display.hdr, and for the VR mode, are kept or left
+	out as the files are read, by the capabilities and the VR mode set
+	above) */
+	if (!halo_server_mode() && !strcasecmp(config_string("display.menus"), "pc"))
+		halo_menus_read_ahead();
 }
 
 /* what display.anti_aliasing's value needs of the backend, once it is
@@ -2066,10 +2224,13 @@ static void gamma_send(void)
 {
 #ifndef HALO_VR
 	static float sent;
+	/* (read again as the settings change: config_changes) */
+	static unsigned long read_at = (unsigned long)-1;
 	float gamma;
 
-	if (!device.gl_ready)
+	if (!device.gl_ready || read_at == config_changes())
 		return;
+	read_at = config_changes();
 	gamma = (float)config_real("display.gamma");
 	gamma = !(gamma > 0.0f) ? 1.0f : gamma < GAMMA_LEAST ? GAMMA_LEAST : gamma > GAMMA_MOST ? GAMMA_MOST : gamma;
 	if (gamma != sent)
@@ -2192,14 +2353,29 @@ static BOOL hdr_display_text(int kind, char *text, unsigned int size)
 they are now; the back buffer made again if the frame is drawn otherwise */
 static void hdr_read(void)
 {
+	/* (the settings, read again as they change: config_changes; the
+	display is asked every frame) */
+	static unsigned long read_at = (unsigned long)-1;
+	static int setting_read, paper_white_read, paper_white_nits_read, ui_nits_read, mode_read;
 	float headroom = 1.0f;
 	BOOL display = FALSE, active = FALSE;
-	int setting = hdr_setting(), paper_white = (int)config_integer("display.hdr_paper_white");
-	int paper_white_nits = (int)config_integer("display.hdr_paper_white_nits");
-	int ui_nits = (int)config_integer("display.hdr_ui_nits");
-	int mode = config_string("display.hdr_mode") && !strcmp(config_string("display.hdr_mode"), "punchy") ?
-		XGPU_HDR_MODE_PUNCHY : XGPU_HDR_MODE_FAITHFUL;
+	int setting, paper_white, paper_white_nits, ui_nits, mode;
 
+	if (read_at != config_changes())
+	{
+		read_at = config_changes();
+		setting_read = hdr_setting();
+		paper_white_read = (int)config_integer("display.hdr_paper_white");
+		paper_white_nits_read = (int)config_integer("display.hdr_paper_white_nits");
+		ui_nits_read = (int)config_integer("display.hdr_ui_nits");
+		mode_read = config_string("display.hdr_mode") && !strcmp(config_string("display.hdr_mode"), "punchy") ?
+			XGPU_HDR_MODE_PUNCHY : XGPU_HDR_MODE_FAITHFUL;
+	}
+	setting = setting_read;
+	paper_white = paper_white_read;
+	paper_white_nits = paper_white_nits_read;
+	ui_nits = ui_nits_read;
+	mode = mode_read;
 	if (!device.gl_ready)
 		return;
 	if (xgpu_backend_capabilities.hdr)
@@ -2295,13 +2471,11 @@ long halo_screen_commit(void)
 	/* (display.movies: the movies copied from the disc image when the data
 	root has none) */
 	bink_import_update();
-	/* (display.anti_aliasing, as Settings or config.toml has it now:
-	supersampling changes the scale below) */
+	/* (display.anti_aliasing, as Settings or config.toml has it now; it and
+	display.supersampling change the scale below) */
 	anti_aliasing_read();
 	/* (display.hdr, and the display: the back buffer's format) */
 	hdr_read();
-	/* (display.ambient_occlusion) */
-	ambient_occlusion_read();
 	/* (the settings taken up: a map's preparation made again under them,
 	render_enumerate.c) */
 	screen_settings_taken = config_changes();
@@ -2328,8 +2502,7 @@ long halo_screen_commit(void)
 	screen_mode_choose(&width, scale);
 	if (width != screen_width || scale[0] != screen_scale[0] || scale[1] != screen_scale[1])
 	{
-		platform_log("screen: %ldx%d drawn at %.0fx%.0f", width, SCREEN_HEIGHT,
-			width * scale[0], SCREEN_HEIGHT * scale[1]);
+		screen_mode_log(width, scale);
 		screen_width = width;
 		screen_scale[0] = scale[0];
 		screen_scale[1] = scale[1];
@@ -2437,6 +2610,16 @@ void d3d8_viewport_depth_range(float minimum, float maximum, float previous[2])
 	device.viewport.MinZ = minimum;
 	device.viewport.MaxZ = maximum;
 	viewport_update_constants();
+}
+
+void d3d8_texture_region(unsigned long stage, const float *region)
+{
+	if (stage >= D3DTSS_MAXSTAGES)
+		return;
+	if (region && region[0] > 0.0f && region[1] > 0.0f)
+		memcpy(device.texture_regions[stage], region, sizeof(device.texture_regions[stage]));
+	else
+		memset(device.texture_regions[stage], 0, sizeof(device.texture_regions[stage]));
 }
 
 void WINAPI D3DDevice_SetTransform(D3DTRANSFORMSTATETYPE state, CONST D3DMATRIX *matrix)
@@ -3024,6 +3207,8 @@ static void sampler_describe(int stage, BOOL mipmapped, BOOL hires, BOOL rendere
 	sampler->magnify = sampler_filter(hires ? D3DTEXF_LINEAR : state[D3DTSS_MAGFILTER]);
 	sampler->address[0] = sampler_address(state[D3DTSS_ADDRESSU]);
 	sampler->address[1] = sampler_address(state[D3DTSS_ADDRESSV]);
+	if (device.texture_regions[stage][0] > 0.0f)
+		sampler->address[0] = sampler->address[1] = XGPU_ADDRESS_REGION;
 	sampler->address[2] = sampler_address(state[D3DTSS_ADDRESSW]);
 	sampler->lod_bias = hires ? 0.0f : dword_to_float(state[D3DTSS_MIPMAPLODBIAS]);
 	sampler->first_level = hires ? 0 : state[D3DTSS_MAXMIPLEVEL];
@@ -3203,6 +3388,14 @@ static void bind_textures(struct nv2a_pixel_shader_key *key, float texture_scale
 			}
 		}
 		sampler_describe(stage, description.levels > 1, description.hires, target != NULL, &source->sampler);
+		if (device.texture_regions[stage][0] > 0.0f)
+			memcpy(texture_scale[stage], device.texture_regions[stage], sizeof(texture_scale[stage]));
+		/* (the high-res text's distance fields: text_hires.c) */
+		if (description.hires_msdf)
+		{
+			source->sampler.address[0] = source->sampler.address[1] = XGPU_ADDRESS_CLAMP;
+			source->sampler.address[2] = XGPU_ADDRESS_MSDF;
+		}
 		if (stage == 0)
 		{
 			key->coverage_alpha = description.hires_coverage != FALSE;
@@ -3399,7 +3592,7 @@ static void pipeline_state_describe(BOOL has_depth, struct xgpu_pipeline_key *ke
 }
 /* the uniforms of the latest draws, converted from these inputs; the serial
 counts the conversions */
-#define DRAW_UNIFORM_INPUT_COUNT (4 + 4 + 16 + 1 + 16 + 2 + 4 + 1 + 1 + 7 * D3DTSS_MAXSTAGES + 2)
+#define DRAW_UNIFORM_INPUT_COUNT (4 + 4 + 16 + 1 + 16 + 2 + 4 + 1 + 1 + 7 * D3DTSS_MAXSTAGES + 4)
 
 static DWORD draw_uniform_inputs[DRAW_UNIFORM_INPUT_COUNT];
 static struct xgpu_draw_uniforms draw_uniforms;
@@ -3427,7 +3620,7 @@ static void draw_uniforms_update(const float texture_scale[4][4])
 {
 	DWORD inputs[DRAW_UNIFORM_INPUT_COUNT];
 	unsigned long count = 0;
-	float world_object[2];
+	float world_object[4];
 	int stage;
 
 	memcpy(&inputs[count], device.viewport_scale, sizeof(device.viewport_scale));
@@ -3451,11 +3644,14 @@ static void draw_uniforms_update(const float texture_scale[4][4])
 	inputs[count++] = D3D__RenderState[D3DRS_ALPHAREF];
 	inputs[count++] = (DWORD)UI_OFFSET;
 	/* (display.ambient_occlusion "world": the draw's object, its owner
-	slot and reference; -1 and 1 without the window's block) */
+	slot and reference, its owner among the rays' instances, and whether it
+	is two-sided cards; -1, 1, 0 and 0 without the window's block) */
 	world_object[0] = world_ao.active ? (float)world_ao.owner : (float)WORLD_AO_OWNER_NONE;
 	world_object[1] = world_ao.active ? world_ao.reference : 1.0f;
+	world_object[2] = world_ao.active ? (float)world_ao.rays_owner : 0.0f;
+	world_object[3] = world_ao.active && world_ao.cards ? 1.0f : 0.0f;
 	memcpy(&inputs[count], world_object, sizeof(world_object));
-	count += 2;
+	count += 4;
 	for (stage = 0; stage < D3DTSS_MAXSTAGES; stage++)
 	{
 		DWORD *state = D3D__TextureState[stage];
@@ -3508,6 +3704,8 @@ static void draw_uniforms_update(const float texture_scale[4][4])
 		converted->screen_offset = (float)UI_OFFSET;
 		converted->world_ao[0] = world_object[0];
 		converted->world_ao[1] = world_object[1];
+		converted->world_ao[2] = world_object[2];
+		converted->world_ao[3] = world_object[3];
 	}
 }
 
@@ -3528,8 +3726,8 @@ lights cost what lights each pixel, not their number. A plasma bolt's light
 backend has them (xgpu_backend_capabilities: Vulkan, Metal). */
 static struct
 {
-	/* the settings read, as config_changes() was then (0 too, before any
-	change: the flag says whether they have been read) */
+	/* the settings read, as halo_gpu_settings_taken() was then (the flag
+	says whether they have been read) */
 	BOOL read;
 	unsigned long read_at;
 	BOOL enhanced;
@@ -3560,10 +3758,14 @@ static void dynamic_lights_read_settings(void)
 	static const float defaults[2][4] = { { 1.7f, 12.0f, 0.18f, 0.25f }, { 0.22f, 1.2f, 0.12f, 0.035f } };
 	const char *look;
 
-	if (dynamic_lights.read && dynamic_lights.read_at == config_changes())
+	/* (as the front end took the settings up between frames, not as the
+	menus write them: the draws' pipelines change at the frame that
+	prepares the map again under them, render_enumerate.c's
+	enumerated_derivation_check) */
+	if (dynamic_lights.read && dynamic_lights.read_at == halo_gpu_settings_taken())
 		return;
 	dynamic_lights.read = TRUE;
-	dynamic_lights.read_at = config_changes();
+	dynamic_lights.read_at = halo_gpu_settings_taken();
 	dynamic_lights.enhanced = !strcmp(config_string("display.dynamic_lights"), "enhanced");
 	memcpy(dynamic_lights.look, defaults, sizeof(defaults));
 	look = config_string("debug.dynamic_lights_look");
@@ -3807,16 +4009,19 @@ void halo_dynamic_lights_halos_draw(void)
 
 /* display.per_pixel_lighting: the model lighting programs' draws are lit for
 each pixel (xgpu_spirv.c's model lighting), from shaders of their own; read
-again when a setting changes. The enhanced dynamic lights light models for
-each pixel too, whatever it says. */
+again as the front end takes a change up between frames (as the dynamic
+lights are: dynamic_lights_read_settings). The enhanced dynamic lights light
+models for each pixel too, whatever it says. */
 static BOOL per_pixel_lighting(void)
 {
-	static unsigned long read_at = (unsigned long)-1;
+	static BOOL read;
+	static unsigned long read_at;
 	static BOOL enabled;
 
-	if (read_at != config_changes())
+	if (!read || read_at != halo_gpu_settings_taken())
 	{
-		read_at = config_changes();
+		read = TRUE;
+		read_at = halo_gpu_settings_taken();
 		enabled = config_boolean("display.per_pixel_lighting") != 0;
 	}
 	return enabled || halo_dynamic_lights_enhanced();
@@ -3964,26 +4169,55 @@ static void unread_stage_fields_clear(DWORD *state, DWORD texture_modes)
 }
 
 /* the combiners' part of a draw's pixel shader key, from the render states
-and the texture modes: most draws share them with the draw before, and so
-share the key's part (the same inputs, the same part) */
+(less the constants, which are uniforms) and the texture modes: a frame's
+draws use a few dozen pixel shaders, interleaved, so the parts already made
+are kept, each under its inputs (the same inputs, the same part) */
+#define COMBINER_PARTS 128
+
+static struct combiner_part
+{
+	BOOL made;
+	DWORD texture_modes;
+	DWORD inputs[D3DRS_PS_MAX];
+	DWORD state[D3DRS_PS_MAX];
+} combiner_parts[COMBINER_PARTS];
+
+static BOOL combiner_part_found(const struct combiner_part *part, const DWORD *inputs, DWORD texture_modes)
+{
+	return part->made && part->texture_modes == texture_modes && words_equal(part->inputs, inputs, sizeof(part->inputs));
+}
+
 static void combiner_state_describe(DWORD *state, DWORD texture_modes)
 {
-	static DWORD last_inputs[D3DRS_PS_MAX], last_state[D3DRS_PS_MAX];
-	static DWORD last_texture_modes;
-	static BOOL described;
-	int stage;
+	static struct combiner_part *last;
+	struct combiner_part *part;
+	DWORD hash = texture_modes;
+	int stage, index;
 
-	if (described && texture_modes == last_texture_modes &&
-		words_equal(D3D__RenderState, last_inputs, sizeof(last_inputs)))
-	{
-		memcpy(state, last_state, sizeof(last_state));
-		return;
-	}
 	memcpy(state, D3D__RenderState, D3DRS_PS_MAX * sizeof(DWORD));
 	/* constants are uniforms, not part of the program */
 	memset(&state[D3DRS_PSCONSTANT0_0], 0, 16 * sizeof(DWORD));
 	state[D3DRS_PSFINALCOMBINERCONSTANT0] = 0;
 	state[D3DRS_PSFINALCOMBINERCONSTANT1] = 0;
+	/* (most often the draw before's; else found by a sum of the inputs,
+	each word weighted apart, which the compiler sums several at once) */
+	if (last && combiner_part_found(last, state, texture_modes))
+	{
+		memcpy(state, last->state, sizeof(last->state));
+		return;
+	}
+	for (index = 0; index < D3DRS_PS_MAX; index++)
+		hash += state[index] * (2u * (DWORD)index + 0x9e3779b1u);
+	part = &combiner_parts[(hash ^ (hash >> 15) ^ (hash >> 23)) % COMBINER_PARTS];
+	last = part;
+	if (combiner_part_found(part, state, texture_modes))
+	{
+		memcpy(state, part->state, sizeof(part->state));
+		return;
+	}
+	part->made = TRUE;
+	part->texture_modes = texture_modes;
+	memcpy(part->inputs, state, sizeof(part->inputs));
 	/* nor are the stages past the combiner count (what earlier draws left
 	in them): one program, one key */
 	for (stage = (int)(D3D__RenderState[D3DRS_PSCOMBINERCOUNT] & 0xff); stage < 8; stage++)
@@ -3995,10 +4229,7 @@ static void combiner_state_describe(DWORD *state, DWORD texture_modes)
 	}
 	dead_portions_clear(state);
 	unread_stage_fields_clear(state, texture_modes);
-	memcpy(last_inputs, D3D__RenderState, sizeof(last_inputs));
-	memcpy(last_state, state, sizeof(last_state));
-	last_texture_modes = texture_modes;
-	described = TRUE;
+	memcpy(part->state, state, sizeof(part->state));
 }
 
 /* what the settings make of a draw's pipeline (xgpu_draw_derive), in it */
@@ -4007,8 +4238,6 @@ static void pipeline_derived(const struct xgpu_draw_derived *derived, struct xgp
 	key->color_format = derived->color_format;
 	key->samples = derived->samples;
 	key->lighting = derived->lighting;
-	if (derived->no_color)
-		key->color_mask = 0;
 	key->pixel.alpha_test_samples = derived->alpha_test_samples;
 	key->pixel.hdr = derived->hdr;
 	key->pixel.per_pixel_lighting = derived->per_pixel_lighting;
@@ -4028,9 +4257,6 @@ static void manifest_note_basis(const struct vertex_shader_object *program, cons
 	context.world_found = program->lighting.world_found ? 1 : 0;
 	context.multisampled = target_multisampled ? 1 : 0;
 	context.screen_colour = target_screen_colour ? 1 : 0;
-	/* (as with the occlusion on: as the journal notes them) */
-	context.occlusion_prepass = ambient_occlusion.journal_prepass || ambient_occlusion.prepass;
-	context.occlusion_ready = ambient_occlusion.journal_ready || ambient_occlusion.ready;
 	/* (the lights given to the front end whatever the setting where the
 	map's preparation is recorded: halo_dynamic_lights_walked) */
 	context.lights_present = dynamic_lights.count > 0;
@@ -4042,6 +4268,8 @@ static void manifest_note_basis(const struct vertex_shader_object *program, cons
 	span as the game draws it, whatever the setting, as the journal notes
 	it) */
 	context.world = world_ao_applies() ? 1 : 0;
+	/* (...and where the pre-pass draws its twin: world_ao_twins) */
+	context.found = world_ao_span_found() ? 1 : 0;
 	xgpu_manifest_note_basis(key, &context);
 }
 
@@ -4100,8 +4328,8 @@ static BOOL pipeline_bind(struct vertex_shader_object *program, struct xgpu_draw
 /* display.ambient_occlusion "world": each pipeline with the world's light
 (by its number: xgpu_backend_pipeline_number) told its stand-in, the
 pipeline the draw would have without the world, which the backend draws
-with until the world's is made (and while a map is prepared: the world's
-pipelines are never made in a load). Found the first time the number is
+with until the world's is made (a map's preparation makes the world's:
+world_ao_key; the stand-in is drawn where it missed them, or they fail). Found the first time the number is
 drawn with: the draw derived again from its facts without the world's
 light (basis: its pipeline before the derivation), then the world's bound
 again. */
@@ -4224,28 +4452,20 @@ static BOOL prepare_draw(BOOL immediate, unsigned long primitive)
 	make of it from (debug.render_manifest) */
 	if (xgpu_manifest_recording())
 		manifest_note_basis(program, &pipeline_key);
-	/* display.ambient_occlusion's pre-pass: an object (a model:
-	rasterizer.h's _rasterizer_profile_models) and a surface that lights
-	itself mark their pixels (ambient_occlusion_mark) */
-	if (ambient_occlusion.prepass && pipeline_key.depth_write)
-		ambient_occlusion_mark(&pipeline_key, &dynamic.stencil_reference, (unsigned char)(
-			((hdr.kind & HALO_HDR_KIND_SELF_ILLUMINATION) ? XGPU_AMBIENT_OCCLUSION_SELF_ILLUMINATED : 0) |
-			(hdr.category == 2 ? XGPU_AMBIENT_OCCLUSION_OBJECT : 0)));
 	/* ...and what the settings make of it as they are now: its targets'
 	samples and format, its alpha test (a sample mask, where the backend
-	has one), its tag (display.hdr: from its blend), the pre-pass's depth
-	alone (display.ambient_occlusion: ambient_occlusion_prepass, its draws
-	unlit), and its lighting (xgpu_draw_derive): a model lighting program's
-	lit for each pixel (display.per_pixel_lighting), the enhanced dynamic
-	lights in its two point lights' place; over a model lit for each vertex,
-	the ambient occlusion its ambient light handed on apart, by the
-	occlusion at each pixel (the program's own sum clamps each vertex's
-	light: xgpu.h); a structure's lightmap pass lit by the dynamic lights
-	(its normal, binormal and tangent packed:
-	rasterizer_xbox_vertex_shaders_initialize.c's declaration), their light
-	past white with display.hdr, the lightmap's light by the occlusion and
-	theirs added after; else, a lightmap pass's light, drawn opaque, by the
-	occlusion */
+	has one), its tag (display.hdr: from its blend), and its lighting
+	(xgpu_draw_derive): a model lighting program's lit for each pixel
+	(display.per_pixel_lighting), the enhanced dynamic lights in its two
+	point lights' place; over a model lit for each vertex, the ambient
+	occlusion its ambient light handed on apart, by the occlusion at each
+	pixel (the program's own sum clamps each vertex's light: xgpu.h); a
+	structure's lightmap pass lit by the dynamic lights (its normal,
+	binormal and tangent packed: rasterizer_xbox_vertex_shaders_initialize.c's
+	declaration), their light past white with display.hdr, the lightmap's
+	light by the occlusion and theirs added after; else, with
+	display.ambient_occlusion "world", a lightmap pass's light, drawn
+	opaque, by the occlusion */
 	memset(&facts, 0, sizeof(facts));
 	facts.blend = pipeline_key.blend;
 	facts.color = target_has_color;
@@ -4259,8 +4479,6 @@ static BOOL prepare_draw(BOOL immediate, unsigned long primitive)
 	facts.samples = target_samples;
 	facts.hdr_target = hdr.target;
 	facts.hdr = hdr_tag(&pipeline_key);
-	facts.occlusion_prepass = ambient_occlusion.prepass;
-	facts.occlusion_ready = ambient_occlusion.ready;
 	facts.per_pixel = per_pixel_lighting();
 	facts.lights_active = dynamic_lights_active();
 	facts.environment = dynamic_lights.environment;
@@ -4268,6 +4486,8 @@ static BOOL prepare_draw(BOOL immediate, unsigned long primitive)
 	/* (display.ambient_occlusion "world": its light, where its window is
 	given and the draw takes it: world_ao_key) */
 	facts.world = world_ao_key(XGPU_AMBIENT_OCCLUSION_LIGHT_NONE);
+	if (device.gl_ready)
+		world_ao_twins();
 	basis = pipeline_key;
 	ready = pipeline_bind(program, &facts, &pipeline_key);
 	if (ready && (pipeline_key.pixel.ambient_occlusion & XGPU_AMBIENT_OCCLUSION_WORLD))
@@ -4373,6 +4593,10 @@ void halo_gpu_prepare(int new_map)
 	preparation.attempts = preparation.sampled_draws = 0;
 	memset(preparation.sampled_seconds, 0, sizeof(preparation.sampled_seconds));
 	xgpu_manifest_enumerating(1, new_map);
+	/* (display.ambient_occlusion "world": its pipelines and twins made too,
+	the backend's flag cleared as it begins: world_ao_key) */
+	world_ao.preparing = TRUE;
+	world_ao.twins = FALSE;
 	if (device.gl_ready)
 		xgpu_backend_prepare();
 }
@@ -4414,6 +4638,8 @@ double halo_gpu_prepared(void)
 	preparation.active = FALSE;
 	preparation.sample = FALSE;
 	preparation.checkpoint = NULL;
+	/* (the backend's twins' flag cleared as it ends) */
+	world_ao.preparing = world_ao.twins = FALSE;
 	preparation.duplicate = FALSE;
 	platform_log("GPU: preparation reused %lu of %lu tracked draws", preparation.duplicates, preparation.draws);
 	preparation_clear();
@@ -5180,10 +5406,6 @@ void WINAPI D3DDevice_Clear(DWORD count, CONST D3DRECT *rectangles, DWORD flags,
 			device.depth_stencil ? (unsigned long)device.depth_stencil->Data : 0);
 	stats.clears++;
 	color_to_vec4(color, rgba);
-	/* (display.ambient_occlusion's pre-pass draws depth alone: its draws
-	clear the colour again as they draw it) */
-	if (ambient_occlusion.prepass)
-		flags &= ~(DWORD)D3DCLEAR_TARGET;
 	if (flags & D3DCLEAR_TARGET)
 	{
 		/* the Xbox clears the channels named (D3DCLEAR_TARGET_R, _G, _B, _A):
@@ -5281,6 +5503,80 @@ static void view_corners(struct render_target_entry *target, short x0, short y0,
 	corners[3] = scaled_pixel(y1, target->target.scale[1]);
 }
 
+/* found once a pixel (xgpu_stream.h's WORLD_AO_PREPASS): the window's
+pre-pass, into the backend's targets of the back buffer's size, where the
+window draws into the back buffer with its depth buffer */
+int halo_world_ao_prepass_found(void)
+{
+	return device.render_target == &device.back_buffer && device.depth_stencil == &device.depth_buffer;
+}
+
+int halo_world_ao_prepass_begin(void)
+{
+	struct render_target_entry *target;
+
+	if (!device.gl_ready || !world_ao.active || world_ao.failed || device.render_target != &device.back_buffer ||
+		device.depth_stencil != &device.depth_buffer || !(target = render_target_get(&device.back_buffer)))
+		return FALSE;
+	world_ao.prepass = world_ao.sampled = TRUE;
+	xgpu_backend_world_ao_prepass(XGPU_WORLD_AO_PREPASS_BEGIN, target->target.number, NULL);
+	return TRUE;
+}
+
+/* ... done: the occlusion found from it over the window's view (its bounds
+in the game's units of the screen), as the camera saw it */
+void halo_world_ao_prepass_end(short x0, short y0, short x1, short y1, float const camera[4][4],
+	float const cascades[4][4], unsigned long frame, int history)
+{
+	/* (the previous pass, its camera and corners, which the history is
+	reprojected by) */
+	static struct xgpu_world_ao_pass previous;
+	static int previous_made;
+	struct render_target_entry *target = render_target_get(&device.back_buffer);
+	struct xgpu_world_ao_pass pass;
+	long corners[4];
+	int index;
+
+	world_ao.prepass = FALSE;
+	if (!target || !world_ao.sampled)
+	{
+		previous_made = 0;
+		return;
+	}
+	memset(&pass, 0, sizeof(pass));
+	view_corners(target, x0, y0, x1, y1, corners);
+	memcpy(pass.camera, camera, sizeof(pass.camera));
+	pass.camera[3][3] = world_ao.scale;
+	for (index = 0; index < 4; index++)
+		pass.corners[index] = (int32_t)corners[index];
+	memcpy(pass.cascades, cascades, sizeof(pass.cascades));
+	if (previous_made)
+	{
+		memcpy(pass.previous, previous.camera, sizeof(pass.previous));
+		memcpy(pass.previous_corners, previous.corners, sizeof(pass.previous_corners));
+	}
+	/* (the history only where the last frame's was this window's, alike in
+	place and scale) */
+	pass.history[0] = history && previous_made && !memcmp(previous.corners, pass.corners, sizeof(pass.corners)) &&
+		previous.camera[3][3] == pass.camera[3][3] ? 1.0f : 0.0f;
+	pass.history[1] = (float)(frame & 0xFFFFu);
+	pass.history[2] = XGPU_WORLD_AO_HISTORY_NEW;
+	{
+		/* (HALO_WORLD_AO_NO_TRACE, measuring: the shapes walked, as before
+		the distance-field scene, no history) */
+		static int traced = -1;
+
+		if (traced < 0)
+			traced = getenv("HALO_WORLD_AO_NO_TRACE") == NULL;
+		pass.history[3] = !traced ? 0.0f : world_ao_mode() & WORLD_AO_RAYS ? 2.0f : 1.0f;
+		if (!traced)
+			pass.history[0] = 0.0f;
+	}
+	previous = pass;
+	previous_made = 1;
+	xgpu_backend_world_ao_prepass(XGPU_WORLD_AO_PREPASS_END, target->target.number, &pass);
+}
+
 /* display.panini's pass over a window's 3D view (port/linux/game/panini.c),
 once it is whole, tone mapped and antialiased, before the HUD: the window's
 bounds in the game's units of the screen, and the projection (its d, s and
@@ -5318,96 +5614,6 @@ void halo_screen_panini(short x0, short y0, short x1, short y1, const float proj
 	xgpu_backend_panini(target->target.number, corners, projection);
 }
 
-/* display.ambient_occlusion's pre-pass of a window's 3D view, before its
-opaque surfaces shade (source/render/render.c): FALSE where there is none.
-Its depth target cleared, as the window's beginning clears the depth
-buffer: the opaque surfaces' alone (not the sky's, which nothing occludes) */
-BOOL halo_screen_ambient_occlusion_begin(void)
-{
-	if (journal_recording)
-		journal_operation(JOURNAL_OCCLUSION_BEGIN, NULL, 0);
-	ambient_occlusion.prepass = ambient_occlusion.ready = FALSE;
-	ambient_occlusion.journal_prepass = ambient_occlusion.journal_ready = FALSE;
-	if (!device.gl_ready || device.depth_stencil != &device.depth_buffer ||
-		device.render_target != &device.back_buffer)
-		return FALSE;
-	/* (off, and a map's preparation recorded: its pre-pass drawn all the
-	same, as the journal notes it, into the targets as they are: the
-	record is for a load with the occlusion on too) */
-	if (!ambient_occlusion.quality)
-	{
-		if (!journal_recording)
-			return FALSE;
-		ambient_occlusion.journal_prepass = TRUE;
-		D3DDevice_Clear(0, NULL, D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL, 0, 1.0f, 0);
-		return TRUE;
-	}
-	if (!ambient_occlusion.depth.Data)
-		d3d8_surface_initialize(&ambient_occlusion.depth, D3DFMT_LIN_D24S8, 1, 1);
-	if (!ambient_occlusion.depth.Data)
-		return FALSE;
-	/* (the depth buffer's size and format, in memory of its own: a target
-	of its own, render_target_get) */
-	ambient_occlusion.depth.Format = device.depth_buffer.Format;
-	ambient_occlusion.depth.Size = device.depth_buffer.Size;
-	ambient_occlusion.prepass = ambient_occlusion.journal_prepass = TRUE;
-	D3DDevice_Clear(0, NULL, D3DCLEAR_ZBUFFER | D3DCLEAR_STENCIL, 0, 1.0f, 0);
-	return TRUE;
-}
-
-/* ... and the occlusion found from its depth, once its opaque surfaces
-have drawn it, from the camera it was drawn with: its near and far planes
-and its projection's x and y scales and offsets (render_frustum's
-projection_matrix [0][0], [1][1], [2][0], [2][1]); the surfaces then shade
-with it, until halo_screen_ambient_occlusion_end */
-void halo_screen_ambient_occlusion(short x0, short y0, short x1, short y1, float z_near, float z_far,
-	const float projection[4])
-{
-	struct render_target_entry *target;
-	long corners[4];
-	float camera[6];
-	BOOL has_depth = FALSE;
-
-	if (journal_recording)
-	{
-		unsigned int arguments[8];
-		short bounds[4] = { x0, y0, x1, y1 };
-
-		memcpy(arguments, bounds, sizeof(bounds));
-		memcpy(arguments + 2, &z_near, sizeof(float));
-		memcpy(arguments + 3, &z_far, sizeof(float));
-		memcpy(arguments + 4, projection, 4 * sizeof(float));
-		journal_operation(JOURNAL_OCCLUSION, arguments, sizeof(arguments));
-	}
-	ambient_occlusion.journal_ready = ambient_occlusion.journal_prepass;
-	ambient_occlusion.journal_prepass = FALSE;
-	if (!ambient_occlusion.prepass)
-		return;
-	target = render_target_get(&device.back_buffer);
-	/* (the pre-pass's targets bound: the occlusion is found from the depth
-	target drawn with the view) */
-	if (target && bind_targets(&has_depth) && has_depth)
-	{
-		view_corners(target, x0, y0, x1, y1, corners);
-		camera[0] = z_near;
-		camera[1] = z_far;
-		memcpy(camera + 2, projection, sizeof(float) * 4);
-		xgpu_backend_ambient_occlusion(target->target.number, corners, ambient_occlusion.quality, camera);
-		ambient_occlusion.laid = TRUE;
-		ambient_occlusion.ready = TRUE;
-	}
-	ambient_occlusion.prepass = FALSE;
-}
-
-/* ... the window's opaque surfaces drawn: nothing after is shaded with it */
-void halo_screen_ambient_occlusion_end(void)
-{
-	if (journal_recording)
-		journal_operation(JOURNAL_OCCLUSION_END, NULL, 0);
-	ambient_occlusion.prepass = ambient_occlusion.ready = FALSE;
-	ambient_occlusion.journal_prepass = ambient_occlusion.journal_ready = FALSE;
-}
-
 /* display.hdr's tone map of a window's 3D view (source/render/render.c),
 before its anti-aliasing and the HUD: the draws from now on are the HUD's
 and the menus' (xgpu_hdr.h) */
@@ -5422,14 +5628,6 @@ void halo_screen_tone_map(short x0, short y0, short x1, short y1)
 
 		journal_operation(JOURNAL_TONE_MAP, arguments, sizeof(arguments));
 	}
-	/* (debug.ambient_occlusion_view: the view is the occlusion alone) */
-	if (device.gl_ready && ambient_occlusion.laid && ambient_occlusion.view &&
-		(target = render_target_get(&device.back_buffer)))
-	{
-		view_corners(target, x0, y0, x1, y1, corners);
-		xgpu_backend_ambient_occlusion(target->target.number, corners, XGPU_AMBIENT_OCCLUSION_SHOW, NULL);
-	}
-	ambient_occlusion.laid = FALSE;
 	hdr.view = FALSE;
 	if (!device.gl_ready || !hdr.active)
 		return;
@@ -5496,7 +5694,11 @@ void xgpu_write_bmp(const char *name, const unsigned char *pixels, unsigned long
 	char path[512];
 	FILE *file;
 
-	snprintf(path, sizeof(path), "%s/%s%05lu.bmp", directory, name, xgpu_screenshot_number());
+	/* (a name of its own, the menu tour's, as it is: halo_screenshot_named) */
+	if (name[0] == '=')
+		snprintf(path, sizeof(path), "%s/%s.bmp", directory, name + 1);
+	else
+		snprintf(path, sizeof(path), "%s/%s%05lu.bmp", directory, name, xgpu_screenshot_number());
 	file = fopen(path, "wb");
 	if (!file)
 		return;
@@ -5547,6 +5749,39 @@ static void write_screenshot_stream(const unsigned char *pixels, unsigned long w
 	fflush(stream);
 }
 
+/* the next frame saved as a PNG in a folder, as the screenshot key saves
+one (the menu studio's notes: port/linux/game/menu_studio.c), and the name
+it was saved as, once */
+static char screenshot_png_directory[512];
+static char screenshot_png_name[128];
+static BOOL screenshot_png_taken;
+
+void halo_screenshot_png(const char *directory)
+{
+	snprintf(screenshot_png_directory, sizeof(screenshot_png_directory), "%s", directory);
+	screenshot_png_taken = FALSE;
+}
+
+BOOL halo_screenshot_png_taken(char *name, unsigned long size)
+{
+	if (!screenshot_png_taken)
+		return FALSE;
+	screenshot_png_taken = FALSE;
+	snprintf(name, size, "%s", screenshot_png_name);
+	return TRUE;
+}
+
+/* the next frame saved as debug.screenshot_directory's <name>.bmp (the
+menu tour's: port/linux/game/menu_tour.c) */
+static char screenshot_name[128];
+
+void halo_screenshot_named(const char *name)
+{
+	snprintf(screenshot_name, sizeof(screenshot_name), "=%s", name ? name : "");
+	if (!name || !name[0])
+		screenshot_name[0] = 0;
+}
+
 static void write_screenshot(struct render_target_entry *target)
 {
 	unsigned long width = target->target.pixel_width, height = target->target.pixel_height;
@@ -5554,7 +5789,10 @@ static void write_screenshot(struct render_target_entry *target)
 	unsigned long index;
 
 	if (!*config_string("debug.screenshot_directory") && !*config_string("debug.screenshot_stream"))
+	{
+		screenshot_name[0] = 0;
 		return;
+	}
 	pixels = xgpu_backend_read_target(target->target.number, -1, FALSE);
 	if (!pixels)
 		return;
@@ -5577,7 +5815,8 @@ static void write_screenshot(struct render_target_entry *target)
 	if (*config_string("debug.screenshot_stream"))
 		write_screenshot_stream(pixels, width, height);
 	else
-		xgpu_write_bmp("frame", pixels, width, height, FALSE);
+		xgpu_write_bmp(screenshot_name[0] ? screenshot_name : "frame", pixels, width, height, FALSE);
+	screenshot_name[0] = 0;
 	free(pixels);
 }
 
@@ -5999,7 +6238,7 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 				back_buffer->target.number);
 		render_target_resolve(&back_buffer->target);
 		xgpu_backend_visibility_frame();
-		if (screenshot_this_frame())
+		if (screenshot_this_frame() || screenshot_name[0])
 			write_screenshot(back_buffer);
 		if (determinism_log_frames())
 		{
@@ -6012,8 +6251,28 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 				free(pixels);
 			}
 		}
+		if (screenshot_png_directory[0])
+		{
+			screenshot_png_name[0] = 0;
+			if (!xgpu_backend_screenshot(back_buffer->target.number, screenshot_png_directory, screenshot_png_name,
+				sizeof(screenshot_png_name)))
+			{
+				screenshot_png_name[0] = 0;
+			}
+			screenshot_png_directory[0] = 0;
+			screenshot_png_taken = TRUE;
+		}
 		if (platform_screenshot_take_request())
 			write_key_screenshot(back_buffer);
+		/* (Save Report's zip, this frame its screenshot: report.c) */
+		if (report_take_request())
+		{
+			char message[160];
+
+			report_write(back_buffer->target.number, TRUE, message, sizeof(message));
+			if (message[0])
+				console_printf(FALSE, "%s", message);
+		}
 		/* (a menu picture's frame: kept, and not shown, the preparing
 		screen staying: port/linux/game/menu_pictures_render.c) */
 		if (!menu_pictures_frame_kept())
@@ -6021,8 +6280,19 @@ void WINAPI D3DDevice_Present(CONST RECT *source_rectangle, CONST RECT *destinat
 		memory_watch_begin_frame();
 		xgpu_backend_frame_end();
 	}
+	/* (a report asked for with no frame shown: the VR mode's, no renderer's;
+	no screenshot) */
+	if (report_take_request())
+	{
+		char message[160];
+
+		report_write(0, TRUE, message, sizeof(message));
+		if (message[0])
+			console_printf(FALSE, "%s", message);
+	}
 	device.frame++;
 	stats.presents++;
+	report_frame_presented();
 	/* (display.hdr: a frame begins with no 3D view drawn) */
 	hdr.view = FALSE;
 	hdr.category = -1;
@@ -6082,7 +6352,7 @@ it the same without the walk: each draw that was not a repeat
 states, the textures, targets, viewport, vertex shader and streams, and the
 front end's own that prepare_draw reads); each operation of a window that a
 backend prepares something for (a clear, the anti-aliasing, Panini, the
-ambient occlusion, the tone map, the glows); each texture the cache loaded
+tone map, the glows); each texture the cache loaded
 for them, in order; and the mirror's pages uploaded. Played back, each draw
 is made again in its state from a vertex or a few (a backend prepares its
 pipeline and binds its textures; it draws nothing), each operation again,
@@ -6118,8 +6388,7 @@ enum
 	_journal_object_bitmap,
 	/* (value: its number, d3d8_resource_created) */
 	_journal_object_created,
-	/* (value: 0 the back buffer, 1 its depth buffer, 2 the ambient
-	occlusion's depth) */
+	/* (value: 0 the back buffer, 1 its depth buffer) */
 	_journal_object_device,
 	/* (value: its address, in the contiguous memory) */
 	_journal_object_memory,
@@ -6145,7 +6414,7 @@ struct journal_state
 	uint32_t viewport[6];
 	uint32_t vertex_shader, program, program_address, shader_constant_mode;
 	uint32_t streams[16][2];
-	uint32_t hdr_category, hdr_kind, hdr_view, occlusion_prepass, occlusion_ready;
+	uint32_t hdr_category, hdr_kind, hdr_view;
 	uint32_t lights_environment, lights_count, halos_count, sky, visibility, world_span;
 	uint32_t render_state[D3DRS_MAX];
 	uint32_t texture_state[D3DTSS_MAXSTAGES][D3DTSS_MAX];
@@ -6290,7 +6559,7 @@ struct journal_saved
 	UINT stream_stride[16], base_vertex_index;
 	float attributes[XGPU_VERTEX_ATTRIBUTE_COUNT][4];
 	int hdr_category, hdr_kind;
-	BOOL hdr_view, occlusion_prepass, occlusion_ready, occlusion_noted_prepass, occlusion_noted_ready;
+	BOOL hdr_view;
 	BOOL lights_environment, visibility;
 	int lights_count, halos_count, world_span;
 	unsigned long sky;
@@ -6407,7 +6676,7 @@ static struct
 static void *journal_view(const struct journal_object *object)
 {
 	const D3DSurface *target = object->value == 0 ? &device.back_buffer : object->value == 1 ? &device.depth_buffer :
-		object->value == 2 ? &ambient_occlusion.depth : NULL;
+		NULL;
 	int index;
 
 	if (!target || !target->Data)
@@ -6435,10 +6704,10 @@ static void journal_identify(const void *object, struct journal_object *to)
 	memset(to, 0, sizeof(*to));
 	if (!object)
 		return;
-	if (object == &device.back_buffer || object == &device.depth_buffer || object == &ambient_occlusion.depth)
+	if (object == &device.back_buffer || object == &device.depth_buffer)
 	{
 		to->kind = _journal_object_device;
-		to->value = object == &device.back_buffer ? 0 : object == &device.depth_buffer ? 1 : 2;
+		to->value = object == &device.back_buffer ? 0 : 1;
 		return;
 	}
 	if (journal.bitmaps && journal.bitmaps->identify(object, &tag_index, &bitmap_index))
@@ -6472,11 +6741,10 @@ static void journal_identify(const void *object, struct journal_object *to)
 		uint32_t type = fields[0] & D3DCOMMON_TYPE_MASK;
 
 		if ((type == D3DCOMMON_TYPE_TEXTURE || type == D3DCOMMON_TYPE_SURFACE) && fields[1] &&
-			(fields[1] == device.back_buffer.Data || fields[1] == device.depth_buffer.Data ||
-			fields[1] == ambient_occlusion.depth.Data))
+			(fields[1] == device.back_buffer.Data || fields[1] == device.depth_buffer.Data))
 		{
 			to->kind = _journal_object_view;
-			to->value = fields[1] == device.back_buffer.Data ? 0 : fields[1] == device.depth_buffer.Data ? 1 : 2;
+			to->value = fields[1] == device.back_buffer.Data ? 0 : 1;
 			to->check = journal_object_check(object);
 			journal_object_shape(object, to);
 			return;
@@ -6499,7 +6767,7 @@ static void *journal_resolve(const struct journal_object *object)
 		return NULL;
 	case _journal_object_device:
 		found = object->value == 0 ? (void *)&device.back_buffer : object->value == 1 ? (void *)&device.depth_buffer :
-			object->value == 2 ? (void *)&ambient_occlusion.depth : NULL;
+			NULL;
 		break;
 	case _journal_object_bitmap:
 		found = journal.bitmaps ? journal.bitmaps->load(object->value, object->check) : NULL;
@@ -6575,9 +6843,6 @@ static void journal_capture(struct journal_state *state)
 	state->hdr_category = (uint32_t)hdr.category;
 	state->hdr_kind = (uint32_t)hdr.kind;
 	state->hdr_view = (uint32_t)hdr.view;
-	/* (as they would be with the occlusion on: journal_occlusion) */
-	state->occlusion_prepass = (uint32_t)ambient_occlusion.journal_prepass;
-	state->occlusion_ready = (uint32_t)ambient_occlusion.journal_ready;
 	state->lights_environment = (uint32_t)dynamic_lights.environment;
 	state->lights_count = (uint32_t)dynamic_lights.count;
 	state->halos_count = (uint32_t)dynamic_lights.halos.count;
@@ -6675,27 +6940,26 @@ static void journal_operation(unsigned long op, const void *arguments, unsigned 
 
 /* the front end's state that a draw's pipeline is derived from under some
 settings and not under others (the HDR's tags, with display.hdr; the
-occlusion's pre-pass and readiness, as journal_capture notes them, with
-display.ambient_occlusion; the enhanced lights', with display.dynamic_lights
-"enhanced"), as three words: recording a map's preparation, a draw is
+enhanced lights', with display.dynamic_lights "enhanced"; the window's
+span, with display.ambient_occlusion "world": world_ao_key), as three words: recording a map's preparation, a draw is
 journaled where it is new in these or in its pipeline (preparation_seen),
 so that its record holds every draw a load under other settings tells
 apart; 0 otherwise */
 static void journal_settings_blind_of(unsigned long words[3], int hdr_category, int hdr_kind, BOOL hdr_view,
-	BOOL prepass, BOOL ready, int lights, BOOL environment)
+	int lights, BOOL environment, int world_span)
 {
 	words[0] = (unsigned long)hdr_category;
 	words[1] = (unsigned long)hdr_kind;
-	words[2] = (unsigned long)(hdr_view != 0) | (unsigned long)(prepass != 0) << 1 | (unsigned long)(ready != 0) << 2 |
-		(unsigned long)(lights > 0) << 3 | (unsigned long)(environment != 0) << 4;
+	words[2] = (unsigned long)(hdr_view != 0) | (unsigned long)(lights > 0) << 1 |
+		(unsigned long)(environment != 0) << 2 | (unsigned long)world_span << 3;
 }
 
 static void journal_settings_blind(unsigned long words[3])
 {
 	words[0] = words[1] = words[2] = 0;
 	if (journal_recording)
-		journal_settings_blind_of(words, hdr.category, hdr.kind, hdr.view, ambient_occlusion.journal_prepass,
-			ambient_occlusion.journal_ready, dynamic_lights.count, dynamic_lights.environment);
+		journal_settings_blind_of(words, hdr.category, hdr.kind, hdr.view, dynamic_lights.count,
+			dynamic_lights.environment, world_ao.span);
 }
 
 static void journal_page(unsigned long page)
@@ -6777,8 +7041,10 @@ unsigned int *halo_gpu_journal_take(unsigned int *count, unsigned int *unknown)
 /* the journal's form: a change to what an entry holds or how it is written
 makes it 2, 3 and so on; its state's size is in it as well (5: the pages'
 runs in JOURNAL_PAGE_UNIT's units, not the platform's pages; 6: the world's
-window's span, world_span) */
-#define JOURNAL_FORM 6
+window's span, world_span; 7: without the screen's ambient occlusion, its
+pre-pass, its flags and its operations; 8: world_span's
+WORLD_AO_SPAN_FOUND, the window found once a pixel) */
+#define JOURNAL_FORM 8
 
 unsigned int halo_gpu_journal_form(void)
 {
@@ -6805,17 +7071,6 @@ static unsigned long journal_vertices(unsigned long primitive, unsigned long cou
 		primitive == D3DPT_QUADLIST || primitive == D3DPT_QUADSTRIP ? 4 : 3;
 
 	return count < least ? count : least;
-}
-
-/* the occlusion's pre-pass or its readiness, as a recorded draw notes it
-(as it would be with the occlusion on, whatever the setting was:
-halo_screen_ambient_occlusion_begin), played back as the setting is now:
-with the occlusion off, a draw of its pre-pass is the opaque surfaces' draw
-it repeats (the record's alone, of the structure's preprocess), and a
-surface it lit is lit without it */
-static BOOL journal_occlusion(uint32_t noted, int quality)
-{
-	return noted != 0 && quality != 0;
 }
 
 static void journal_restore(const struct journal_state *state)
@@ -6849,12 +7104,6 @@ static void journal_restore(const struct journal_state *state)
 	hdr.category = (int)state->hdr_category;
 	hdr.kind = (int)state->hdr_kind;
 	hdr.view = state->hdr_view != 0;
-	ambient_occlusion.prepass = journal_occlusion(state->occlusion_prepass, ambient_occlusion.quality);
-	ambient_occlusion.ready = journal_occlusion(state->occlusion_ready, ambient_occlusion.quality);
-	/* (as noted: with the occlusion on, whatever it is now, the draws'
-	contexts in a recording of the manifest, prepare_draw) */
-	ambient_occlusion.journal_prepass = state->occlusion_prepass != 0;
-	ambient_occlusion.journal_ready = state->occlusion_ready != 0;
 	dynamic_lights.environment = state->lights_environment != 0;
 	dynamic_lights.count = (int)state->lights_count;
 	dynamic_lights.halos.count = (int)state->halos_count;
@@ -6921,22 +7170,6 @@ static void journal_play(unsigned long op, const struct journal_state *state)
 			halo_screen_panini(bounds[0], bounds[1], bounds[2], bounds[3], projection);
 		break;
 	}
-	case JOURNAL_OCCLUSION_BEGIN:
-		(void)halo_screen_ambient_occlusion_begin();
-		break;
-	case JOURNAL_OCCLUSION:
-	{
-		float z_near, z_far;
-
-		memcpy(&z_near, &state->arguments[2], sizeof(z_near));
-		memcpy(&z_far, &state->arguments[3], sizeof(z_far));
-		halo_screen_ambient_occlusion(bounds[0], bounds[1], bounds[2], bounds[3], z_near, z_far,
-			(const float *)&state->arguments[4]);
-		break;
-	}
-	case JOURNAL_OCCLUSION_END:
-		halo_screen_ambient_occlusion_end();
-		break;
 	case JOURNAL_TONE_MAP:
 		halo_screen_tone_map(bounds[0], bounds[1], bounds[2], bounds[3]);
 		break;
@@ -7068,10 +7301,6 @@ int halo_gpu_journal_replay(const unsigned int *words, unsigned int count, const
 	saved.hdr_category = hdr.category;
 	saved.hdr_kind = hdr.kind;
 	saved.hdr_view = hdr.view;
-	saved.occlusion_prepass = ambient_occlusion.prepass;
-	saved.occlusion_ready = ambient_occlusion.ready;
-	saved.occlusion_noted_prepass = ambient_occlusion.journal_prepass;
-	saved.occlusion_noted_ready = ambient_occlusion.journal_ready;
 	saved.lights_environment = dynamic_lights.environment;
 	saved.lights_count = dynamic_lights.count;
 	saved.halos_count = dynamic_lights.halos.count;
@@ -7111,10 +7340,6 @@ int halo_gpu_journal_replay(const unsigned int *words, unsigned int count, const
 	hdr.category = saved.hdr_category;
 	hdr.kind = saved.hdr_kind;
 	hdr.view = saved.hdr_view;
-	ambient_occlusion.prepass = saved.occlusion_prepass;
-	ambient_occlusion.ready = saved.occlusion_ready;
-	ambient_occlusion.journal_prepass = saved.occlusion_noted_prepass;
-	ambient_occlusion.journal_ready = saved.occlusion_noted_ready;
 	dynamic_lights.environment = saved.lights_environment;
 	dynamic_lights.count = saved.lights_count;
 	dynamic_lights.halos.count = saved.halos_count;

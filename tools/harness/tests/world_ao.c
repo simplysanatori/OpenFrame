@@ -9,7 +9,9 @@ tools/test_world_ao_light.py. */
 
 #include "harness.h"
 #include "world_ao.h"
+#include "world_cascades.h"
 #include "world_proxies.h"
+#include "world_rt.h"
 #include "world_scene.h"
 #include "world_sdf.h"
 
@@ -26,6 +28,11 @@ static struct
 static int object_owner = -100;
 unsigned char render_enumerating;
 static float object_reference = -100.0f;
+/* ("ray_traced": the backend's ray queries, the object's owner among the
+ray-traced scene's instances, its frames and the log's lines) */
+static int ray_queries, backend_ready;
+static unsigned long object_rays_owner = 12345, rt_frames;
+static int rt_unloads, logged;
 /* (the window's span as the front end was last told it) */
 static int span = -100;
 
@@ -36,9 +43,35 @@ const char *config_string(const char *name)
 	return setting;
 }
 
-unsigned long config_changes(void)
+/* (the settings as the front end took them up: d3d8_device.c's) */
+unsigned long halo_gpu_settings_taken(void)
 {
 	return changes;
+}
+
+int config_boolean(const char *name)
+{
+	(void)name;
+	return 0;
+}
+
+/* (found once a pixel: the front end's pre-pass, none here) */
+static int prepass_found;
+
+int halo_world_ao_prepass_found(void)
+{
+	return prepass_found;
+}
+
+int halo_world_ao_prepass_begin(void)
+{
+	return 0;
+}
+
+void halo_world_ao_prepass_end(short x0, short y0, short x1, short y1, float const camera[4][4],
+	float const cascades[4][4], unsigned long frame, int history)
+{
+	(void)x0; (void)y0; (void)x1; (void)y1; (void)camera; (void)cascades; (void)frame; (void)history;
 }
 
 /* the parts (their stubs' behaviour: the real ones are tested apart) */
@@ -67,11 +100,16 @@ float world_sdf_fade(void)
 	return 0.5f;
 }
 
-/* (no static scenery) */
+/* (static scenery: object 400, with collision geometry, and 500, a shrub
+without) */
 int world_proxies_source_baked(long id)
 {
-	(void)id;
-	return 0;
+	return id == 400 || id == 500;
+}
+
+int world_proxies_source_solid(long id)
+{
+	return id == 400;
 }
 
 /* (no static scenery's pages) */
@@ -113,11 +151,11 @@ struct world_scene_instance const *world_scene_instance_find(long id)
 {
 	static struct world_scene_instance instance;
 
-	if (id != 200)
+	if (id != 200 && id != 500)
 		return NULL;
 	memset(&instance, 0, sizeof(instance));
 	instance.id = id;
-	instance.lighting_point[2] = 7.0f;
+	instance.lighting_point[2] = id == 200 ? 7.0f : 6.0f;
 	return &instance;
 }
 
@@ -158,10 +196,51 @@ void halo_world_ao_span(int value)
 	span = value;
 }
 
-void halo_world_ao_object(int owner, float reference)
+void halo_world_ao_object(int owner, float reference, unsigned long rays_owner)
 {
 	object_owner = owner;
 	object_reference = reference;
+	object_rays_owner = rays_owner;
+}
+
+static int object_cards = -1;
+
+void halo_world_ao_cards(int cards)
+{
+	object_cards = cards;
+}
+
+int halo_world_ao_ray_queries(void)
+{
+	return ray_queries;
+}
+
+char const *halo_world_ao_ray_queries_missing(void)
+{
+	return backend_ready && !ray_queries ? "none here" : NULL;
+}
+
+void platform_log(const char *format, ...)
+{
+	(void)format;
+	logged++;
+}
+
+/* (world_rt.c's, tested apart: test_world_rt.py) */
+void world_rt_frame(unsigned long frame)
+{
+	(void)frame;
+	rt_frames++;
+}
+
+void world_rt_map_unloaded(void)
+{
+	rt_unloads++;
+}
+
+unsigned long world_rt_owner(long object_index)
+{
+	return object_index == -1 ? 0 : (unsigned long)(object_index & 0xFFFF) + 1;
 }
 
 /* (the made-up field made sparse and handed on: world_sdf_bake.c's and
@@ -180,15 +259,79 @@ void world_sdf_upload(struct world_sdf_volume const *uploaded)
 	fields_handed++;
 }
 
+/* (the distance-field scene: world_cascades.c's, tested apart; here, how
+many frames it was updated in) */
+static int scene_updates;
+float world_sdf_sample(struct world_sdf_volume const *sampled, float const point[3])
+{
+	(void)sampled;
+	return point[2];
+}
+unsigned long long SDL_GetTicksNS(void)
+{
+	return 0;
+}
+long world_proxies_scene(float const camera_position[3], float reach, struct world_proxy *proxies, long *owners,
+	long maximum)
+{
+	(void)camera_position;
+	(void)reach;
+	(void)proxies;
+	(void)owners;
+	(void)maximum;
+	return 0;
+}
+int world_cascades_create(struct world_cascades *cascades)
+{
+	memset(cascades, 0, sizeof(*cascades));
+	return 1;
+}
+void world_cascades_free(struct world_cascades *cascades)
+{
+	(void)cascades;
+}
+void world_cascades_update(struct world_cascades *cascades, float const camera[3], int structure_changed,
+	world_cascades_structure structure, void *context, struct world_cascades_object const *objects, long object_count,
+	struct world_proxy const *shapes)
+{
+	(void)cascades;
+	(void)camera;
+	(void)structure_changed;
+	(void)structure;
+	(void)context;
+	(void)objects;
+	(void)object_count;
+	(void)shapes;
+	scene_updates++;
+}
+void world_cascades_block(struct world_cascades const *cascades, float block[WORLD_CASCADES][4])
+{
+	(void)cascades;
+	memset(block, 0, sizeof(float) * 4 * WORLD_CASCADES);
+}
+void halo_world_ao_cascades(unsigned long x, unsigned long y, unsigned long z, unsigned long width, unsigned long height,
+	unsigned long depth, void const *data)
+{
+	(void)x;
+	(void)y;
+	(void)z;
+	(void)width;
+	(void)height;
+	(void)depth;
+	(void)data;
+}
+
 #include "under_test.inc"
 
 static void off_case(void)
 {
 	float const camera[3] = { 0.0f, 0.0f, 0.0f };
-	static const char *const others[] = { "off", "subtle", "strong", "" };
+	/* (the older "subtle" and "strong" are read as "world" by the settings
+	themselves, before this reads them: port_config.c's config_renamed_words) */
+	static const char *const others[] = { "off", "" };
 	int index;
 
-	for (index = 0; index < 4; index++)
+	for (index = 0; index < 2; index++)
 	{
 		setting = others[index];
 		changes++;
@@ -204,6 +347,20 @@ static void off_case(void)
 		CHECK(span == WORLD_AO_SPAN_OPEN, "%s: after it: %d", setting, span);
 		world_ao_window_end();
 		CHECK(span == WORLD_AO_SPAN_NONE, "%s: the span closed: %d", setting, span);
+		/* (a window the pre-pass would find once a pixel: its span told so
+		whatever the setting, the first-person weapon's in it, and the
+		window's again after it: a map's preparation makes their pipelines) */
+		prepass_found = 1;
+		world_ao_window_begin(0, 0, camera);
+		CHECK(!world_ao_prepass_begin(), "%s: a pre-pass begun while off", setting);
+		CHECK(span == WORLD_AO_SPAN_FOUND, "%s: the found span: %d", setting, span);
+		world_ao_first_person(1);
+		CHECK(span == WORLD_AO_SPAN_FOUND_FIRST_PERSON, "%s: its first-person weapon's span: %d", setting, span);
+		world_ao_first_person(0);
+		CHECK(span == WORLD_AO_SPAN_FOUND, "%s: after it, found: %d", setting, span);
+		world_ao_window_end();
+		CHECK(span == WORLD_AO_SPAN_NONE, "%s: the found span closed: %d", setting, span);
+		prepass_found = 0;
 	}
 	CHECK(scene_frames == 0 && sdf_frames == 0 && windows_handed == 0, "%d %d %d", scene_frames, sdf_frames,
 		windows_handed);
@@ -259,6 +416,17 @@ static void window_case(void)
 	CHECK(object_owner == 0 && object_reference == 1.0f, "%d %g", object_owner, object_reference);
 	world_ao_object_begin(300);
 	CHECK(object_owner == WORLD_AO_OWNER_NONE && object_reference == 1.0f, "%d %g", object_owner, object_reference);
+	/* a static placement the field holds: none (from its own depth); one
+	the field does not hold (a shrub): its reference, as a moving object's */
+	world_ao_object_begin(400);
+	CHECK(object_reference == WORLD_AO_REFERENCE_NO_FIELD, "a baked rock: %g", object_reference);
+	world_ao_object_begin(500);
+	CHECK(object_reference == 0.6f, "a baked shrub: %g", object_reference);
+	/* a two-sided shader's cards, and after them */
+	world_ao_cards(1);
+	CHECK(object_cards == 1, "cards: %d", object_cards);
+	world_ao_cards(0);
+	CHECK(object_cards == 0, "cards drawn: %d", object_cards);
 	world_ao_first_person(1);
 	CHECK(object_owner == WORLD_AO_OWNER_UNLIT, "the first-person weapon: %d", object_owner);
 	world_ao_first_person(0);
@@ -270,6 +438,9 @@ static void window_case(void)
 	object_owner = -100;
 	world_ao_object_begin(200);
 	CHECK(object_owner == -100, "an object named with no window");
+	object_cards = -1;
+	world_ao_cards(1);
+	CHECK(object_cards == -1, "cards with no window: %d", object_cards);
 	/* without a field: none faded in, every reference 1 */
 	field_ready = 0;
 	world_ao_window_begin(0, 0, camera);
@@ -277,6 +448,58 @@ static void window_case(void)
 	world_ao_object_begin(200);
 	CHECK(object_owner == 1 && object_reference == 1.0f, "%d %g", object_owner, object_reference);
 	world_ao_window_end();
+	/* (the distance-field scene: updated once a frame, whatever its windows,
+	never while a map's pipelines are prepared) */
+	CHECK(scene_updates == 1, "%d updates in a frame of three windows", scene_updates);
+	world_ao_frame_begin();
+	world_ao_window_begin(0, 0, camera);
+	world_ao_window_end();
+	CHECK(scene_updates == 2, "%d updates in two frames", scene_updates);
+}
+
+/* "ray_traced": "world" and the rays where the backend has ray queries
+(said once where it has not, once it is ready); the ray-traced scene's
+frame once a frame, each object's owner handed on */
+static void rays_case(void)
+{
+	float const camera[3] = { 1.0f, 2.0f, 3.0f };
+
+	setting = "ray_traced";
+	changes++;
+	CHECK(world_ao_mode() == (WORLD_AO_PROXIES | WORLD_AO_FIELD), "before the backend is ready: %d", world_ao_mode());
+	CHECK(logged == 0, "said before the backend was ready");
+	backend_ready = 1;
+	CHECK(world_ao_mode() == (WORLD_AO_PROXIES | WORLD_AO_FIELD), "without ray queries: %d", world_ao_mode());
+	CHECK(world_ao_mode() == (WORLD_AO_PROXIES | WORLD_AO_FIELD) && logged == 1, "said once: %d", logged);
+	world_ao_window_begin(0, 0, camera);
+	CHECK(rt_frames == 0, "the ray-traced scene's frame without ray queries");
+	world_ao_object_begin(200);
+	CHECK(object_rays_owner == 0, "an owner without ray queries: %lu", object_rays_owner);
+	world_ao_window_end();
+	ray_queries = 1;
+	CHECK(world_ao_mode() == (WORLD_AO_PROXIES | WORLD_AO_FIELD | WORLD_AO_RAYS), "with them: %d", world_ao_mode());
+	world_ao_frame_begin();
+	world_ao_window_begin(0, 0, camera);
+	CHECK(rt_frames == 1, "the scene's frame: %lu", rt_frames);
+	world_ao_object_begin(200);
+	CHECK(object_owner == 1 && object_rays_owner == 201, "%d %lu", object_owner, object_rays_owner);
+	world_ao_object_begin(-1);
+	CHECK(object_rays_owner == 0, "the structure's owner: %lu", object_rays_owner);
+	world_ao_first_person(1);
+	CHECK(object_rays_owner == 0, "the first-person weapon's owner: %lu", object_rays_owner);
+	world_ao_first_person(0);
+	world_ao_window_end();
+	/* ("world" again: none) */
+	setting = "world";
+	changes++;
+	world_ao_frame_begin();
+	world_ao_window_begin(0, 0, camera);
+	CHECK(rt_frames == 1, "the scene's frame with \"world\": %lu", rt_frames);
+	world_ao_object_begin(200);
+	CHECK(object_rays_owner == 0, "an owner with \"world\": %lu", object_rays_owner);
+	world_ao_window_end();
+	world_ao_map_unloaded();
+	CHECK(rt_unloads == 1, "the scene let go of at the map's end: %d", rt_unloads);
 }
 
 static void test_case(void)
@@ -312,6 +535,8 @@ int main(int argc, char **argv)
 		window_case();
 	else if (!strcmp(name, "test"))
 		test_case();
+	else if (!strcmp(name, "rays"))
+		rays_case();
 	else
 		return 2;
 	return 0;
