@@ -1441,6 +1441,12 @@ static const struct config_setting config_settings[] =
 		"rider up, and the body, so the campaign's AI plays as on the Xbox. A\n"
 		"rule of the game, read as its map begins: in an OpenH1 network game the\n"
 		"host's, on every machine (a Legacy game's players turn)." GRAPHICS_CHOOSES },
+	{ "game.blood_layers", _config_integer, "6", "HALO_BLOOD_LAYERS", _environment_value, _platform_all,
+		"How many splats of blood one place carries at once: a new one is not\n"
+		"laid where that many, not yet faded, already lie within its size\n"
+		"(HaloFreak95's, through moistman42069's VR fork). Blood on blood is\n"
+		"solid after a few layers, and each layer more is drawn again, in both\n"
+		"eyes. 0: every splat, as the game lays them. Only what is drawn changes." },
 	{ "game.campaign_difficulty", _config_integer, "1", "HALO_CAMPAIGN_DIFFICULTY", _environment_value, _platform_all,
 		"The difficulty Choose Difficulty opens on: the one chosen last (0 Easy,\n"
 		"1 Normal, 2 Heroic, 3 Legendary). The campaign's menus write it." },
