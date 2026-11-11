@@ -164,6 +164,8 @@ static void game_axes(const float*v,float yaw,float*out) {(void)yaw;memcpy(out,v
 static void body_place(const float*h,const float*f,const float*u,float*n,float*e) {(void)f;(void)u;memcpy(n,h,12);memcpy(e,h,12);}
 static void weapon_pointing(float*f,float*u) {f[0]=!located;f[1]=!!located;f[2]=0;u[0]=u[1]=0;u[2]=1;}
 static int hand_controller(int hand) {return hand;}
+/* (vr.vehicle_grip_angle's kept turn: none, the control's pose) */
+static int held_hand_axes(int hand,int now,float*f,float*u) {(void)hand;(void)now;(void)f;(void)u;return 0;}
 ''' + move + refresh + r'''
 int main(void) {
  struct halo_vr_view view;
