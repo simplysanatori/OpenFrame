@@ -597,8 +597,9 @@ def generate_guest_image(n: Writer, sln: Any, config: Dict[str, Any], *, arch: G
         if source.name == FFMPEG_CALLER:
             continue
         # (the build's number: the updater's, and a dedicated server's
-        # --version and status)
-        if source.name in ("updater.c", "server_mode.c") and updater_cflags:
+        # --version and status; OpenFrame: and its problem reports', which
+        # OPENFRAME sends to OpenFrame's issues, report.c)
+        if source.name in ("updater.c", "server_mode.c", "report.c") and updater_cflags:
             objects.append(guest_object(source, f"{platform_cflags} {updater_cflags}"))
         else:
             objects.append(guest_object(source, platform_cflags))
