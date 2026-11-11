@@ -5068,6 +5068,9 @@ int halo_vr_hands(struct halo_vr_hands *hands)
 		hands->peak[hand] = hands->enabled ? vr.hands_peak[hand] : 0.0f;
 		memcpy(hands->peak_velocity[hand], vr.hands_peak_velocity[hand], sizeof(hands->peak_velocity[hand]));
 		hands->taken[hand] = hands->enabled && vr.hands_taken[hand];
+		/* (OpenFrame: free as a fist, as the swings' allowed has it) */
+		hands->free[hand] = hands->enabled && (hand == 0 ? hands_left_free() && !vr.hands_taken[0] :
+			hands->unarmed && !vr.holster_gripped && !vr.grab_gripped && !vr.flip_grip[1] && !CLIMB_BUSY(1));
 		vr.fist_punch[hand] = 0;
 		vr.hands_peak[hand] = 0.0f;
 		for (axis = 0; axis < 3; axis++)

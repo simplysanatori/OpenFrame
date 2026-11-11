@@ -31,8 +31,8 @@ one purpose each:
   then GESTURES... (bullet time binding, third person binding).
 - HANDS AND WEAPONS: hands, two-handed aim, aim assist, scopes, holsters,
   reload by hand, swing to melee, grenade throw, haptics, then FISTS AND
-  GRABBING... (fists, punch speed and damage, weapon pull and range, hand
-  swap, prop throw and strength, grab world).
+  GRABBING... (fists, punch speed and damage, deflect shots, weapon pull
+  and range, hand swap, prop throw and strength, grab world).
 
 ## Ported from HaloCE-DecompRemix-VR
 
@@ -86,6 +86,44 @@ port change), the hands from `port/linux/src/vr.c`.
   (ragdolls on Jolt) and body contact on the bones: the body here is the
   aim assist's pill, and a strong hit's stagger the game's own stun and
   stumble.
+
+### Shot deflection
+
+`port/linux/game/vr_deflect.c`, its hands from `vr_fists.c`'s tick (the
+free hands from `port/linux/src/vr.c`), asked by the game's projectile
+update in each pass of a shot's travel (`source/items/projectiles.c`, a
+marked port change), in sub-steps as at 30.
+
+- Block: the gun in the weapon's hand is a body, a capsule from a little
+  behind the grip along the controller's aim, as long as the weapon's model
+  (its radius times 0.4 behind and 1.5 ahead, 6 to 25 cm and 25 to 75 cm),
+  4 cm round. Held still in a shot's path it glances the shot off its
+  surface: mirrored about the surface there, keeping 85% of its speed (a
+  bullet 70%, a grenade 45%).
+- Swing: the gun, or a free fist (the hand without the weapon, not on the
+  foregrip nor holding anything; the weapon's hand while it holds none),
+  moving past 1.2 m/s bats a shot it meets along the swing, at the shot's
+  speed or the swing's, whichever is faster. The fist's path over the tick
+  is the body, 5 cm round.
+- By kind, from the projectile's tag (never its name): plasma, needles and
+  vehicles' bolts by any of them; bullets only off the gun; grenades batted
+  or bounced; rockets and fuel rods only by a hard swing (2.5 m/s), never a
+  block; tank shells, mortars, beams and flame never. Each shot is
+  deflected once.
+- The deflected shot is the player's (its damage and kills, its team); it
+  no longer tracks its target, can strike the one who fired it, and not the
+  player. The hand that met it pulses (both on the gun's block or swing);
+  the log says what was deflected and how.
+- Keys: `vr.deflect` (default `false`; VR Setup > HANDS AND WEAPONS > FISTS
+  AND GRABBING > DEFLECT SHOTS), `vr.deflect_strength` (0.5 to 1.5, default
+  `1.0`: moistman42069's DEFLECT FORCE), `vr.deflect_assist` (metres added
+  round the gun and the fist, 0 to 0.1, default `0.03`: DEFLECT AID).
+- Where: the first player, on foot, alive, the controllers aiming, in a game
+  of this computer alone (never online, split screen or with bots).
+- From moistman42069's `vr_projectile_parry.c` (Test72): the kinds and what
+  deflects each, the gun's capsule, the block's mirror and what it keeps.
+  Not carried over: its highlight and armour sound at the contact, and its
+  co-op host's deflection.
 
 ### Weapon pull, prop throw and hand swap
 
