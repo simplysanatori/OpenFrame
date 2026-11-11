@@ -12,7 +12,7 @@ The Frame's controllers are the two halves of an Xbox controller. The right one 
 | Left trigger | Second weapon in a Banshee. On foot you throw grenades by hand (GRENADE THROW set to BOTH: the trigger throws too; TRIGGER: only the trigger throws) |
 | Left stick | Move |
 | Left stick click | Crouch while you hold it. With CROUCH set to TOGGLE, a quick tap keeps you crouched until you press it again, jump, take a seat or die; a longer press still crouches only while held. You stay crouched at a full push of the stick (CROUCH WALK). While sprinting, slide (PARKOUR on) |
-| Turning stick, left and right | Turn, in steps or smoothly |
+| Turning stick, left and right | Turn, in steps or smoothly. In a vehicle's seat it turns smoothly even with snap turning, and snaps again once you are out and have let the stick back to the middle (`vr.seat_smooth_turn = false` in config.toml keeps snapping in seats) |
 | Turning stick, flick up | Sprint on or off (SPRINT set to TOGGLE) |
 | Turning stick, flick down | Bullet time on or off (BULLET TIME on) |
 | Turning stick, held down 0.8 seconds | Third person on or off. Needs no setting |
