@@ -436,6 +436,7 @@ void render_objects(
 boolean first_person_legs_wanted(long object_index);
 real_matrix4x3 const *first_person_legs_node_matrices(long object_index, real_matrix4x3 const *nodes);
 real_matrix4x3 const *first_person_legs_shadow_node_matrices(long object_index, real_matrix4x3 const *nodes);
+real first_person_legs_shadow_radius(long object_index, real_point3d const *center, real radius);
 #ifdef HALO_VR
 /* port: port/linux/game/vr_death.c */
 real_matrix4x3 const *vr_death_body_nodes(long object_index, real_matrix4x3 const *nodes);
@@ -956,6 +957,13 @@ static boolean render_object_shadow_begin(
 	real shadow_intensity = level_of_detail;
 
 	object_get_bounding_sphere(data->object_index, &center, &radius);
+	/* port: the player's own body's shadow in first person, in the VR mode
+	wide enough for its arms reaching the controllers
+	(port/linux/game/first_person_legs.c) */
+	if (object_is_first_person_camera(data->object_index))
+	{
+		radius = first_person_legs_shadow_radius(data->object_index, &center, radius);
+	}
 
 	perpendicular3d(&data->lighting->shadow_vector, &shadow_right);
 	normalize3d(&shadow_right);

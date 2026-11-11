@@ -2048,6 +2048,51 @@ boolean vr_render_body_anchor(real_point3d *neck, real *yaw)
 	return TRUE;
 }
 
+/* (OpenFrame) first_person_legs.c, the shadow of the player's body
+(vr.body_shadow): during the eye pass, the head's forward and up in the
+world, and where each wrist is in the world (0 the left controller's, 1 the
+right's: a left-hander's, whose weapon's hand is the left, swapped back),
+BODY_WRIST_BACK behind its grip along its pointing; reach[hand] FALSE where
+no controller places that hand (vr.aim = "gamepad"; the left with vr.hands =
+"game", or its controller untracked). FALSE as vr_render_body_anchor */
+#define BODY_WRIST_BACK 0.075f
+boolean vr_render_body_reach(real_vector3d *head_forward, real_vector3d *head_up, real_point3d wrists[2],
+	boolean reach[2])
+{
+	struct halo_vr_view const *view = &vr_render.view;
+	real units = view->world_units_per_metre;
+	short hand;
+
+	if (!vr_render.active || !view->body_heading_valid || !halo_vr_aiming() || cinematic_in_progress())
+		return FALSE;
+	view_rotate(vr_render.base_yaw, view_pitch(), view->head_forward, head_forward);
+	view_rotate(vr_render.base_yaw, view_pitch(), view->head_up, head_up);
+	for (hand = 0; hand < 2; hand++)
+	{
+		/* (hand: as this view names them, 1 the weapon's; side: the
+		controller's own) */
+		float const *grip = hand ? (view->floating_hands ? view->right_grip_position : view->hand_position) :
+			view->left_grip_position;
+		float const *pointing = hand ? view->hand_forward : view->left_hand_forward;
+		boolean known = hand ? view->controller_aim && !view->gamepad_aim : view->floating_hands && view->left_hand_valid;
+		short side = halo_vr_left_handed() ? !hand : hand;
+		real_vector3d back;
+
+		reach[side] = known;
+		if (!known)
+			continue;
+		hand_point(grip, &wrists[side]);
+		yaw_rotate(vr_render.base_yaw, pointing, &back);
+		if (normalize3d(&back) > 0.0f)
+		{
+			wrists[side].x -= back.i * BODY_WRIST_BACK * units;
+			wrists[side].y -= back.j * BODY_WRIST_BACK * units;
+			wrists[side].z -= back.k * BODY_WRIST_BACK * units;
+		}
+	}
+	return TRUE;
+}
+
 /* first_person_legs.c: the player's body is drawn in the vehicle's seat it
 is in, viewed from it (object_index, the seated unit: vr.vehicle_view =
 "first_person"), and how (seat): once the eye is in the seat (vr_seat.c,

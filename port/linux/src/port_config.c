@@ -768,6 +768,11 @@ static const struct config_setting config_settings[] =
 		_platform_desktop,
 		"With vr.hands = \"arms\", where each shoulder is from your eyes, in\n"
 		"meters: \"out to its side, up, forward\" (turned with your body)." },
+	{ "vr.body_shadow", _config_boolean, "true", "HALO_VR_BODY_SHADOW", _environment_value, _platform_desktop,
+		"With display.first_person_legs, on foot: your body casts its shadow\n"
+		"whole, standing where you stand, its head turned as yours is and its\n"
+		"arms reaching your controllers. false: no shadow of your body in the\n"
+		"headset, as the game casts none in first person." },
 	{ "vr.vehicle_view", _config_string, "\"first_person\"", "HALO_VR_VEHICLE_VIEW", _environment_value, _platform_desktop,
 		"The view in a vehicle's seat: \"first_person\" from your head where you\n"
 		"sit, level with the horizon; \"third_person\" the game's camera following\n"
