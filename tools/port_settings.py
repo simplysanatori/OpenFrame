@@ -492,7 +492,7 @@ VR_SCREENS["vr_fists"] = {
     "help_top": 366,
     "rows": [
         ("FISTS:", "vr.fists", ON_OFF,
-         "Offline: punch with your free hand, or with an\nempty one; swipe across a blow to parry it.", None),
+         "Punch with your free or empty hand; swipe across a\nblow to parry it. Online a punch is a melee (B).", None),
         ("PUNCH SPEED:", "vr.fist_speed",
          [(f"{speed:g} M/S", f"{speed:g}") for speed in (1.5, 2, 2.5, 3, 3.5, 4)],
          "How fast a hand must swing to punch.", None),
