@@ -23,6 +23,8 @@ NEGATIVE_CONTROLS = {
     "router-setting-always": (('!config_boolean("network.allow_upnp") ?', 'TRUE ?'), "cause"),
     # (a full game told what any refusal is)
     "full-as-any-refusal": (("\tcase _rejection_code_game_is_full:\n", "\tcase 99:\n"), "rejection"),
+    # ((OpenFrame) a newer host's refusal told as an older one's: the wrong side told to update)
+    "newer-as-older": (("return NETWORK_VERSION_NEWER_TEXT;", "return NETWORK_VERSION_OLDER_TEXT;"), "rejection"),
     # (a technical term back in the words)
     "jargon": (('L"Your network is blocking it."', 'L"This network\'s NAT is strict."'), "words"),
 }
@@ -36,7 +38,9 @@ def generated(fault=None):
     config = "\n\n".join([
         enum_with(p2p, "_p2p_join_idle"), structure(p2p, "p2p_join_status"),
         enum_with(protocol, "_rejection_code_version_too_old"),
-        "\n".join(re.findall(r"^#define CONNECT_(?:HEADLINE|DETAIL|LINE)_LENGTH \d+$", menus, re.M))]) + "\n"
+        "\n".join(re.findall(r"^#define CONNECT_(?:HEADLINE|DETAIL|LINE)_LENGTH \d+$", menus, re.M)),
+        # ((OpenFrame) a version's refusal's words, the version dialog's too)
+        "\n".join(re.findall(r"^#define NETWORK_VERSION_\w+_TEXT L\".*\"$", client, re.M))]) + "\n"
     code = "\n\n".join([function(menus, "connect_failure_text"),
                         function(client, "network_game_client_rejection_text")])
     if fault:

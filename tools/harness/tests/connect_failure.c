@@ -171,9 +171,12 @@ int main(int argc, char **argv)
 	}
 	CASE("rejection")
 	{
-		CHECK(contains(network_game_client_rejection_text(_rejection_code_version_too_old), L"Update OpenH1"),
+		/* (OpenFrame: which is newer, and the update: its next release) */
+		CHECK(contains(network_game_client_rejection_text(_rejection_code_version_too_old), L"newer version") &&
+			contains(network_game_client_rejection_text(_rejection_code_version_too_old), L"OpenFrame release"),
 			"a newer host's: %ls", network_game_client_rejection_text(_rejection_code_version_too_old));
-		CHECK(contains(network_game_client_rejection_text(_rejection_code_version_too_new), L"Ask the host to update"),
+		CHECK(contains(network_game_client_rejection_text(_rejection_code_version_too_new), L"older version") &&
+			contains(network_game_client_rejection_text(_rejection_code_version_too_new), L"host needs to update"),
 			"an older host's: %ls", network_game_client_rejection_text(_rejection_code_version_too_new));
 		CHECK(contains(network_game_client_rejection_text(_rejection_code_bad_password), L"password"),
 			"a wrong password's: %ls", network_game_client_rejection_text(_rejection_code_bad_password));

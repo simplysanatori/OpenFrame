@@ -197,9 +197,11 @@ The native builds' network code has a version, an unsigned 16-bit number
 raised with any change to what the machines send each other. A host puts it
 in its game's advertisement (reserved bytes that hosts built before there
 was a version send as zeros, so they are version 0). A client does not join
-a host of another version: it shows a message box that says which of the
-two is newer, with both versions ("update the game" or "ask the host to
-update"), and stays in the list of games. Version 1 was the first of this
+a host of another version: it shows the menus' error dialog, VERSION
+DIFFERENCE (OpenFrame: drawn in the menus, so the headset shows it too),
+that says which of the two is newer ("install the latest OpenFrame release"
+or "the host needs to update"; both versions in the log), and stays in the
+list of games. A host's refusal for its version says the same. Version 1 was the first of this
 netcode; version 2 lets a machine join a game in progress; version 3 puts
 each player in its slot of the host's player list on every machine;
 version 4 plays the European (PAL) maps as the North American ones
