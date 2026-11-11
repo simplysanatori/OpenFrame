@@ -5,10 +5,10 @@ where each came from, and how to turn it on. Each is set in `config.toml`
 (the `vr.*` keys below) or in VR Setup: MOVEMENT AND COMFORT..., HANDS AND
 WEAPONS... (and its FISTS AND GRABBING...), HUD... (WRIST HUD..., HUD
 LAYOUT...) and PLAYER....
-Every one is off, or as OpenH1 had it, until you choose it, apart from three
+Every one is off, or as OpenH1 had it, until you choose it, apart from four
 things that are on from the start: the third person's hold on the turning
-stick, the HUD's corners placed for the Frame, and no magazine eject on the
-stick.
+stick, the HUD's corners placed for the Frame, no magazine eject on the
+stick, and the hands keeping their angle on a vehicle's controls.
 
 The VR Setup menu (Settings > CONTROLS tab > VR SETUP, in the CONTROLLER
 section; also at the foot of the player profile menu) is a tree of pages of
@@ -420,6 +420,24 @@ snap turn.
   how much of the edges, and how dark). `vr.comfort_vignette = false`, the
   older switch, still turns it off.
 - Input: none.
+
+### Hands keep their angle on a vehicle's controls
+
+OpenH1 draws a hand that grips a vehicle's control (the Warthog's wheel, the
+Ghost's handlebars, a turret's handles) in one fixed pose on its handle,
+however the hand was turned as it took hold. Now the hand keeps the angle it
+took hold at: on the first frame of the grip its turn is kept in the
+control's own axes (along the control, to its left, up), and from then on it
+is drawn turned with the control, so a hand on the Warthog's rim turns as the
+wheel turns and a hand on a turret's handles turns as the turret does. It
+stays on the handle, as before; letting go of the grip lets the hand go back
+to the controller, and the next grip keeps its own angle.
+
+- Key: `vr.vehicle_grip_angle` (default `true`; `false`, OpenH1's fixed pose).
+  No menu row.
+- After moistman42069's HAND LOCK (`vr.vehicle_hand_lock`,
+  `vr_vehicle_handles_hand_turn`). How: `port/linux/src/vr.c`,
+  `held_hand_axes`.
 
 ### Wrist HUD and HUD modes
 
