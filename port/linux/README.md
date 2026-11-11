@@ -4032,7 +4032,7 @@ The Steam Frame's controllers are the halves of an Xbox controller:
 | --- | --- |
 | Left stick | Move (click: crouch) |
 | Head | Crouch: crouch in the room, and the game crouches (`vr.physical_crouch`) |
-| Right stick, left and right | Turn: in steps (`vr.turn = "snap"`) or smoothly (`"smooth"`) |
+| Right stick, left and right | Turn: in steps (`vr.turn = "snap"`) or smoothly (`"smooth"`); in a vehicle's seat smoothly (`vr.seat_smooth_turn`) |
 | Right stick click | Zoom: a window about the reticle (`vr.scope_view = "smartlink"`), or a raised scope's magnification (`"eye"`): below. Always the zoom, in bullet time as well, with the default `vr.bullet_time_binding = "flick_down"` |
 | Right stick, flick up | (OpenFrame) Sprint on or off, with `vr.sprint_mode = "toggle"` |
 | Right stick, flick down | (OpenFrame) Bullet time on or off, if `vr.bullet_time` is on (let go before 0.8 s; held 0.8 s it is the third person's) |
@@ -5403,6 +5403,7 @@ the next start.
 | `vr.turn` | `"snap"` | `HALO_VR_TURN` | `"snap"` or `"smooth"` (with `vr.aim = "gamepad"`, `vr.gamepad_view` instead). |
 | `vr.snap_turn_angle` | `30.0` | `HALO_VR_SNAP_TURN_ANGLE` | Degrees of each snap turn. |
 | `vr.smooth_turn_speed` | `150.0` | `HALO_VR_SMOOTH_TURN_SPEED` | Degrees each second of smooth turning. |
+| `vr.seat_smooth_turn` | `true` | `HALO_VR_SEAT_SMOOTH_TURN` | With `vr.turn = "snap"`: in any vehicle's seat the turning stick turns smoothly (`vr.smooth_turn_speed`); out of the seat it keeps turning smoothly until the stick is back in the middle, then snaps again. `false`: it snaps in a seat too. |
 | `vr.height` | `"seated"` | `HALO_VR_HEIGHT` | `"seated"`: the head where it is at the recentring is the player's eye. `"standing"`: the head `vr.player_height` above the floor is. |
 | `vr.player_height` | `1.65` | `HALO_VR_PLAYER_HEIGHT` | Standing, the height of your eyes, in metres. |
 | `vr.auto_recentre` | `true` | `HALO_VR_AUTO_RECENTRE` | (OpenFrame) Recentre on the first frame drawn of each level start (a map loaded, a mission restarted, a checkpoint gone back to), as play comes back after a cinematic, and open each menu in front of where you look; none within 5 s of a recentre by hand, and with a stick pushed it waits up to 2 s. `false`: only both grips (or a gamepad's Back) and SteamVR's own recentre do. |

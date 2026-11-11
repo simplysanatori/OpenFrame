@@ -588,6 +588,10 @@ placed as a seat (the Scorpion: port/linux/game/vr_vehicle.c), told each
 frame: the move stick's sideways push turns the player there, as the turn
 stick does, and does not reach the game's sideways throttle */
 void halo_vr_seat_drive(void);
+/* (OpenFrame) the first player sits in a vehicle's seat, any (not only those
+vr_vehicle.c places), told each frame (port/linux/game/vr_render.c): with
+vr.seat_smooth_turn the turning stick turns smoothly there */
+void halo_vr_seated(void);
 /* the smart-link's view on the visor magnifies the aim this many times
 this frame (1: it is not shown), told by the game (vr_aim.c): the aim is
 steadied the more, the more it is magnified */
