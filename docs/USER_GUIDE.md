@@ -35,7 +35,7 @@ If you use [Frametanium](https://github.com/Cogential/frametanium), add `simplys
 
 ### Install with FrameDrop
 
-[FrameDrop](https://framedropvr.com) can install this too: [Install with FrameDrop](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Fsimplysanatori%2FOpenFrame%2Freleases%2Flatest%2Fdownload%2Fopenframe.framedrop.json). The release has a `openframe-<version>-framedrop-linux-arm64.zip` and a `openframe.framedrop.json` for it. Copy the maps of your own Xbox disc into `~/.local/share/OpenFrame/maps` first, or run `install.sh --maps DIR` once.
+[FrameDrop](https://framedropvr.com) can install this too: [Install with FrameDrop](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Fsimplysanatori%2FOpenFrame%2Freleases%2Flatest%2Fdownload%2Fopenframe.framedrop.json). The release has a `openframe-<version>-framedrop.zip` and a `openframe.framedrop.json` for it. Copy the maps of your own Xbox disc into `~/.local/share/OpenFrame/maps` first, or run `install.sh --maps DIR` once.
 
 ## First run
 

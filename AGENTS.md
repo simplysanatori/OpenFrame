@@ -535,6 +535,10 @@ The installer changes nothing outside `~/Games/OpenFrame`, `~/.local/share/OpenF
 
 FrameDrop unpacks the zip on the Frame and adds its own library entry, which runs the `run.sh` in the zip. The first time it runs, and again after an update, `run.sh` runs `install.sh` with the Steam shortcut step turned off, so you get FrameDrop's entry and no second one from the installer, and then starts OpenFrame through its launch wrapper.
 
+### SteamOS versions
+
+Since 1.1.1, OpenFrame runs on SteamOS Stable, Beta and Preview. It is built against glibc 2.39 and carries the libraries it needs, so it starts on every SteamOS the Steam Frame ships. 1.1.0 only started on the Beta.
+
 ### Performance internals
 
 What the build does, so you know what the numbers in [docs/USER_GUIDE.md](docs/USER_GUIDE.md#performance) mean:

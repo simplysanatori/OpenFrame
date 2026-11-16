@@ -1,28 +1,26 @@
 # OpenFrame
 
-Halo: Combat Evolved in VR, running natively on the Steam Frame. It is based on [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo: Combat Evolved.
-
-> [!IMPORTANT]
-> **OpenFrame 1.1.1 runs on SteamOS Stable, Beta and Preview.** It is built against glibc 2.39 and carries the libraries it needs, so it starts on every SteamOS the Steam Frame ships. (1.1.0 only started on the Beta.)
+Halo: Combat Evolved in VR on the Valve Steam Frame.
+Based on [OpenH1](https://github.com/OpenH1/OpenH1), the recompiled Halo.
 
 ## Features
 
-- No emulator, APK or PC needed
-- 90 Hz, eye-tracked foveation, faster loads
-- Working recentre; HUD fits the Frame's view
+- 90 Hz with eye-tracked foveation
+- Faster loads
+- Recentre that works, HUD sized for the Frame
 - Sprint, bullet time and third person on the stick
 - Parkour, fists and wrist HUD from moistman42069's mod
 - Online play with OpenH1 and OpenCE players
 
 ## How it works
 
-The Xbox game's own code, rebuilt, runs on the Frame itself. It shows in VR through SteamVR. You supply the maps from your own disc.
+The Xbox game's code, rebuilt, runs on the Frame itself in SteamVR. You supply the maps from your own disc.
 
 ## Requirements
 
-- A Steam Frame with SteamOS and SteamVR, and about 5 GB free
-- The 24 `.map` files from your own Xbox disc of Halo: Combat Evolved, not PC or MCC maps ([how to get them](https://openh1.com/maps))
-- A terminal on the Frame: SSH, or Konsole in desktop mode
+- A Steam Frame with SteamVR (SteamOS Stable, Beta or Preview), and about 5 GB free
+- The 24 `.map` files from your own Xbox disc, not PC or MCC maps ([how to get them](https://openh1.com/maps))
+- A terminal on the Frame: SSH or Konsole
 - Steam running while you install
 
 ## Install
@@ -43,16 +41,16 @@ The Xbox game's own code, rebuilt, runs on the Frame itself. It shows in VR thro
    steam-frame/install.sh --maps /path/to/your/maps ~/Downloads/openframe-1.2.0-linux-arm64.tar.gz
    ```
 
-Or copy your maps into `~/.local/share/OpenFrame/maps`, then:
+Other installers (copy your maps into `~/.local/share/OpenFrame/maps` first):
 
-- [Frametanium](https://github.com/Cogential/frametanium): add `simplysanatori/OpenFrame`
-- [FrameDrop](https://framedropvr.com): [Install with FrameDrop](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Fsimplysanatori%2FOpenFrame%2Freleases%2Flatest%2Fdownload%2Fopenframe.framedrop.json)
+- [Frametanium](https://github.com/Cogential/frametanium): add `simplysanatori/OpenFrame`.
+- [FrameDrop](https://framedropvr.com): [Install with FrameDrop](https://framedropvr.com/install?manifest=https%3A%2F%2Fgithub.com%2Fsimplysanatori%2FOpenFrame%2Freleases%2Flatest%2Fdownload%2Fopenframe.framedrop.json).
 
 ## First run
 
 1. Start SteamVR and put the headset on.
 2. Launch **OpenFrame** from your Steam library.
-3. Sit or stand as you will play when the loading picture fades.
+3. When the loading picture fades, sit or stand as you will play.
 
 ## Controls
 
@@ -61,17 +59,16 @@ Or copy your maps into `~/.local/share/OpenFrame/maps`, then:
 | Right trigger | Fire |
 | Left stick | Move. Click to crouch |
 | Right stick: flick up, flick down, hold down | Sprint, bullet time, third person |
-| **A**, **B**, **X** | Jump, melee, action and reload |
-| **Y** | Switch weapon |
+| **A**, **B**, **X**, **Y** | Jump, melee, action and reload, switch weapon |
 | Right grip at shoulder or hip | Draw a weapon |
 | Left grip, swing and let go | Throw a grenade |
 | Both grips, held | Recentre |
 
-Turn on sprint, bullet time and the other added features in **Settings > CONTROLS > VR SETUP**. Left-handed: set **DOMINANT HAND** to LEFT there. [All controls](docs/CONTROLS.md).
+The added features and left-handed play are in **Settings > CONTROLS > VR SETUP**. [All controls](docs/CONTROLS.md).
 
 ## Update
 
-Download and check the new release as above, then in the `OpenFrame` folder:
+Download and check the new release, then in the `OpenFrame` folder:
 
 ```sh
 git pull
@@ -80,7 +77,7 @@ steam-frame/install.sh ~/Downloads/openframe-<version>-linux-arm64.tar.gz
 
 ## Uninstall
 
-`--purge` also deletes your maps, saves and settings:
+Add `--purge` to also delete your maps, saves and settings.
 
 ```sh
 ~/Games/OpenFrame/app/tools/uninstall.sh
@@ -90,10 +87,8 @@ steam-frame/install.sh ~/Downloads/openframe-<version>-linux-arm64.tar.gz
 
 - **Steam's debugging port is not reachable:** start Steam, try again.
 - **Game asks for the disc image:** run `install.sh --maps` with your maps folder.
-- **It plays flat in a window:** start SteamVR first.
+- **Plays flat in a window, or quits after a minute:** wake the headset and start SteamVR first.
 - **HUD corners cut off:** raise **HUD INSET** in VR Setup > HUD... > HUD LAYOUT....
-
-More: [user guide](docs/USER_GUIDE.md#troubleshooting).
 
 ## Reporting a problem
 
@@ -101,7 +96,7 @@ More: [user guide](docs/USER_GUIDE.md#troubleshooting).
 ~/Games/OpenFrame/app/tools/collect-logs.sh
 ```
 
-It writes `openframe-logs-<date-time>.tar.gz` to your home folder, personal details masked as a best effort. Check it, then attach it to an [issue](https://github.com/simplysanatori/OpenFrame/issues).
+It saves `openframe-logs-<date-time>.tar.gz` in your home folder, with personal details masked as far as it can. Check it, then attach it to an [issue](https://github.com/simplysanatori/OpenFrame/issues).
 
 ## More
 
@@ -112,9 +107,9 @@ It writes `openframe-logs-<date-time>.tar.gz` to your home folder, personal deta
 
 ## Support
 
-Support the upstream projects first: OpenH1, OpenCE, the decompilation and moistman42069's [Halo VR mod](https://github.com/moistman42069/HaloCE-DecompRemix-VR-PC-Android).
+Support OpenH1, OpenCE, the decompilation and moistman42069's mod first; they're linked under Credits.
 
-For more Steam Frame ports, [buy me a coffee](https://ko-fi.com/sana748653). Thank you.
+For more Steam Frame ports, [buy me a coffee](https://ko-fi.com/sana748653).
 
 ## Credits
 
@@ -124,7 +119,7 @@ For more Steam Frame ports, [buy me a coffee](https://ko-fi.com/sana748653). Tha
 - [OpenCE](https://github.com/OpenCommunityEdition/OpenCE), [punpckhdq/halo](https://github.com/punpckhdq/halo), [bnunu/halo-1](https://github.com/bnunu/halo-1): what OpenH1 builds on
 - Bungie: Halo: Combat Evolved
 
-Full list: [CREDITS.md](CREDITS.md), [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). OpenH1's README: [README.upstream.md](README.upstream.md).
+Full lists: [CREDITS.md](CREDITS.md), [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). OpenH1's README: [README.upstream.md](README.upstream.md).
 
 Halo, Halo: Combat Evolved and their logos are trademarks of Microsoft. This is an unofficial fan project. It is not affiliated with or endorsed by Microsoft, Bungie, 343 Industries, Valve, OpenH1 or OpenCE.
 
